@@ -1,0 +1,55 @@
+Return-Path: <Oneil.844@randtelekom.com.tr>
+Delivered-To: kalinokyra@thismail.it
+Received: (qmail 13850 invoked from network); 22 Aug 2016 13:56:15 -0000
+Received: from 67.175.76.202.static.randtelekom.com.tr (67.175.76.202)
+  by smtp.server.net with SMTP; 22 Aug 2016 13:56:15 -0000
+Date: Mon, 22 Aug 2016 16:56:09 +0300
+From: "Ava Oneil" <Oneil.844@randtelekom.com.tr>
+To: kalinokyra@thismail.it
+Message-ID: <8AF5A2192C2A46BE.2743cdb5-7033-d969-fce8-c552542a49a3@mail.outlook.com>
+Subject: Hi there
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+	boundary="----=_NextPart_000_0010_01D1FC96.14E54A00"
+X-Mailer: Outlook for iOS and Android
+
+------=_NextPart_000_0010_01D1FC96.14E54A00
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_001_0011_01D1FC96.14E54A00"
+
+------=_NextPart_001_0011_01D1FC96.14E54A00
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+X-WatchGuard-AntiVirus: part scanned. clean action=allow
+
+I am sending you the bills of the goods we delivered to you in the =
+attachment
+
+------=_NextPart_001_0011_01D1FC96.14E54A00
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: 7bit
+X-WatchGuard-AntiVirus: part scanned. clean action=allow
+
+<p dir="auto">I am sending you the bills of the goods we delivered to you in the attachment</p>
+
+------=_NextPart_001_0011_01D1FC96.14E54A00--
+
+------=_NextPart_000_0010_01D1FC96.14E54A00
+Content-Type: text/plain; name="message.txt"; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: inline
+
+
+The WatchGuard Firebox that protects your network has detected a message =
+that may not be safe.
+
+Cause : The file type may not be safe.
+Content type : application/x-compressed
+File name    : export_pdf_ 65acf801~.js
+Status       : File Name violation
+Action       : The Firebox deleted export_pdf_ 65acf801~.js.
+
+Your network administrator can not restore this attachment.
+
+
+------=_NextPart_000_0010_01D1FC96.14E54A00--
