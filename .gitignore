@@ -1,3 +1,5 @@
 *.pyc
 .ropeproject
+dist/
+mail_parser.egg-info/
 venv
