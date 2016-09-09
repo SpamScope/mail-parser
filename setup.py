@@ -1,5 +1,5 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 
 from os.path import join, dirname
 from setuptools import setup
@@ -7,13 +7,13 @@ from setuptools import setup
 
 VERSION = (0, 1, 0)
 __version__ = VERSION
-__versionstr__ = 'v' + '.'.join(map(str, VERSION))
+__versionstr__ = '.'.join(map(str, VERSION))
 
 f = open(join(dirname(__file__), 'README'))
 long_description = f.read().strip()
 f.close()
 
-install_requires = ['simplejson']
+requires = ['simplejson']
 
 
 setup(
@@ -25,7 +25,10 @@ setup(
     version=__versionstr__,
     author="Fedele Mantuano",
     author_email="mantuano.fedele@gmail.com",
+    maintainer="Fedele Mantuano",
+    maintainer_email='mantuano.fedele@gmail.com',
     packages=["mailparser"],
+    keywords=['mail', 'email', 'parser', 'wrapper'],
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
         "Intended Audience :: Developers",
@@ -39,5 +42,5 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
     ],
-    install_requires=install_requires,
+    requires=requires,
 )
