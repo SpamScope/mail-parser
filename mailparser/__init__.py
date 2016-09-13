@@ -36,15 +36,24 @@ log = logging.getLogger(__name__)
 
 
 class MailParser(object):
+    """Tokenizer for raw mails. """
 
-    """Class to parse mail. """
+    def __init__(self):
+        # With these defect bad payload is on epilogue
+        self._epilogue_defects = set([
+            "StartBoundaryNotFoundDefect"
+        ])
 
     def parse_from_file(self, fd):
+        """Parsing mail from file. """
+
         with open(fd) as mail:
             self._message = email.message_from_file(mail)
             self._parse()
 
     def parse_from_string(self, s):
+        """Parsing mail from string. """
+
         self._message = email.message_from_string(s)
         self._parse()
 
@@ -70,86 +79,44 @@ class MailParser(object):
 
     def _force_unicode(self, s):
         try:
-            u = unicode(
-                s,
-                encoding=self.charset,
-                errors='ignore',
-            )
+            u = unicode(s, encoding=self.charset, errors='ignore')
         except:
-            u = unicode(
-                s,
-                errors='ignore',
-            )
+            u = unicode(s, errors='ignore',)
 
         if not isinstance(u, unicode):
             raise NotUnicodeError("Body part is not unicode")
 
         return u
 
-    def _parse(self):
-        if not self._message.keys():
-            raise InvalidMail(
-                "Mail without headers: {}".format(self._message.as_string())
-            )
+    def _append_defects(self, part, part_content_type):
+        part_defects = {}
 
-        self._attachments = list()
-        self._text_plain = list()
-        self._defects = list()
-        self._has_defects = False
-        self._has_anomalies = False
-        self._anomalies = list()
+        for e in part.defects:
+            defects = "{}: {}".format(e.__class__.__name__, e.__doc__)
+            self._defects_category.add(e.__class__.__name__)
 
-        # walk all mail parts
-        for p in self._message.walk():
-            part_content_type = p.get_content_type()
+            if part_defects:
+                part_defects[part_content_type].append(defects)
+            else:
+                part_defects[part_content_type] = [defects]
 
-            # Get all part defects
-            part_defects = {part_content_type: list()}
-
-            for e in p.defects:
-                part_defects[part_content_type].append(
-                    "{}: {}".format(e.__class__.__name__, e.__doc__)
-                )
-
-            # Tag mail with defect
-            if part_defects[part_content_type]:
-                self._has_defects = True
+        # Tag mail with defect
+        if part_defects:
+            self._has_defects = True
 
             # Save all defects
             self._defects.append(part_defects)
 
-            if not p.is_multipart():
-                f = p.get_filename()
-                if f:
-                    filename = self._decode_header_part(f)
-                    mail_content_type = self._decode_header_part(
-                        p.get_content_type(),
-                    )
-                    transfer_encoding = \
-                        unicode(p.get('content-transfer-encoding', '')).lower()
+    def _reset(self):
+        self._attachments = list()
+        self._text_plain = list()
+        self._defects = list()
+        self._defects_category = set()
+        self._has_defects = False
+        self._has_anomalies = False
+        self._anomalies = list()
 
-                    if transfer_encoding == "base64":
-                        payload = p.get_payload(decode=False)
-                    else:
-                        payload = self._force_unicode(
-                            p.get_payload(decode=True),
-                        )
-
-                    self._attachments.append(
-                        {
-                            "filename": filename,
-                            "payload": payload,
-                            "mail_content_type": mail_content_type,
-                            "content_transfer_encoding": transfer_encoding,
-                        }
-                    )
-                else:
-                    payload = self._force_unicode(
-                        p.get_payload(decode=True),
-                    )
-                    self._text_plain.append(payload)
-
-        # Parsed object mail
+    def _make_mail(self):
         self._mail = {
             "attachments": self.attachments_list,
             "body": self.body,
@@ -164,14 +131,82 @@ class MailParser(object):
             "has_anomalies": self._has_anomalies,
         }
 
+    def _parse(self):
+        if not self._message.keys():
+            raise InvalidMail("Mail without headers: {}".format(
+                self._message.as_string()))
+
+        # Reset for new mail
+        self._reset()
+        parts = list()  # Normal parts plus defects
+
+        # walk all mail parts to search defects
+        for p in self._message.walk():
+            part_content_type = p.get_content_type()
+            self._append_defects(p, part_content_type)
+            parts.append(p)
+
+        # If defects are in epilogue defects get epilogue
+        if self._epilogue_defects & self._defects_category:
+            epilogue = self.find_between(
+                self._message.epilogue,
+                "{}".format("--" + self._message.get_boundary()),
+                "{}".format("--" + self._message.get_boundary() + "--"),
+            )
+            p = email.message_from_string(epilogue)
+            parts.append(p)
+
+        # walk all mail parts
+        for p in parts:
+            if not p.is_multipart():
+                f = p.get_filename()
+                if f:
+                    filename = self._decode_header_part(f)
+                    mail_content_type = self._decode_header_part(
+                        p.get_content_type(),
+                    )
+                    transfer_encoding = \
+                        unicode(p.get('content-transfer-encoding', '')).lower()
+
+                    if transfer_encoding == "base64":
+                        payload = p.get_payload(decode=False)
+                    else:
+                        payload = self._force_unicode(
+                            p.get_payload(decode=True))
+
+                    self._attachments.append(
+                        {
+                            "filename": filename,
+                            "payload": payload,
+                            "mail_content_type": mail_content_type,
+                            "content_transfer_encoding": transfer_encoding,
+                        }
+                    )
+                else:
+                    payload = self._force_unicode(
+                        p.get_payload(decode=True))
+                    self._text_plain.append(payload)
+
+        # Parsed object mail
+        self._make_mail()
+
         # Add defects
         if self.has_defects:
             self._mail["defects"] = self.defects
+            self._mail["defects_category"] = list(self._defects_category)
 
         # Add anomalies
         if self.has_anomalies:
             self._mail["anomalies"] = self.anomalies
             self._mail["has_anomalies"] = True
+
+    def find_between(self, text, first_token, last_token):
+        try:
+            start = text.index(first_token) + len(first_token)
+            end = text.index(last_token, start)
+            return text[start:end].strip()
+        except ValueError:
+            return
 
     @property
     def body(self):
@@ -259,6 +294,11 @@ class MailParser(object):
         all the problems found when parsing this message.
         """
         return self._defects
+
+    @property
+    def defects_category(self):
+        """Return a list with only defects categories. """
+        return self._defects_category
 
     @property
     def has_defects(self):

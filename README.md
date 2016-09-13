@@ -2,7 +2,7 @@
 
 ## Overview
 
-mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library.
+mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
 
 ## Description
 
@@ -19,7 +19,12 @@ mail-parser takes as input a raw mail and generates a parsed object. This object
 
 We have also two indicator:
   - anomalies: mail without message id or date
-  - defects: mail with some not compliance RFC part
+  - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
+
+### Defects
+These defects can be used to evade the antispam filter. An example are the mails with a malformed boundary that can hide a not legitimate epilogue (often malware).
+This library can take these epilogues.
+
 
 ### Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
@@ -81,6 +86,7 @@ parser.date_mail
 parser.parsed_mail_obj: tokenized mail in a object
 parser.parsed_mail_json: tokenized mail in a JSON
 parser.defects: defect RFC non compliance
+parser.defects_category: only defects categories
 parser.has_defects
 parser.anomalies
 parser.has_anomalies

@@ -53,6 +53,8 @@ class TestMailParser(unittest.TestCase):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
 
+        self.assertEqual(False, parser.has_defects)
+
         raw = "<4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>"
         result = parser.message_id
         self.assertEqual(raw, result)
@@ -85,6 +87,8 @@ class TestMailParser(unittest.TestCase):
     def test_types(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
+
+        self.assertEqual(False, parser.has_defects)
 
         result = parser.parsed_mail_obj
         self.assertIsInstance(result, dict)
@@ -129,13 +133,20 @@ class TestMailParser(unittest.TestCase):
 
     def test_defects_anomalies(self):
         parser = mailparser.MailParser()
-
         parser.parse_from_file(mail_malformed)
+
         self.assertEqual(True, parser.has_defects)
-        self.assertEqual(4, len(parser.defects))
+        self.assertEqual(1, len(parser.defects))
+        self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
+        self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
+        self.assertIsInstance(parser.parsed_mail_json, unicode)
+
+        result = len(parser.attachments_list)
+        self.assertEqual(1, result)
 
         parser.parse_from_file(mail_test_1)
+        self.assertEqual(False, parser.has_defects)
         self.assertEqual(True, parser.has_anomalies)
         self.assertEqual(2, len(parser.anomalies))
         self.assertIn("anomalies", parser.parsed_mail_obj)
@@ -143,6 +154,8 @@ class TestMailParser(unittest.TestCase):
     def test_add_content_type(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_3)
+
+        self.assertEqual(False, parser.has_defects)
 
         result = parser.parsed_mail_obj
 
