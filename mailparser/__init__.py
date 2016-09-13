@@ -150,8 +150,8 @@ class MailParser(object):
         if self._epilogue_defects & self._defects_category:
             epilogue = self.find_between(
                 self._message.epilogue,
-                "{}".format(self._message.get_boundary()),
-                "{}".format(self._message.get_boundary() + "--"),
+                "{}".format("--" + self._message.get_boundary()),
+                "{}".format("--" + self._message.get_boundary() + "--"),
             )
             p = email.message_from_string(epilogue)
             parts.append(p)
