@@ -28,7 +28,8 @@ root = os.path.join(base_path, '..')
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
-mail_malformed = os.path.join(base_path, 'mails', 'mail_malformed')
+mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
+mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 
 sys.path.append(root)
 import mailparser
@@ -133,7 +134,7 @@ class TestMailParser(unittest.TestCase):
 
     def test_defects_anomalies(self):
         parser = mailparser.MailParser()
-        parser.parse_from_file(mail_malformed)
+        parser.parse_from_file(mail_malformed_1)
 
         self.assertEqual(True, parser.has_defects)
         self.assertEqual(1, len(parser.defects))
@@ -150,6 +151,20 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(True, parser.has_anomalies)
         self.assertEqual(2, len(parser.anomalies))
         self.assertIn("anomalies", parser.parsed_mail_obj)
+
+    def test_defects_bug(self):
+        parser = mailparser.MailParser()
+        parser.parse_from_file(mail_malformed_2)
+
+        self.assertEqual(True, parser.has_defects)
+        self.assertEqual(1, len(parser.defects))
+        self.assertEqual(1, len(parser.defects_category))
+        self.assertIn("defects", parser.parsed_mail_obj)
+        self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
+        self.assertIsInstance(parser.parsed_mail_json, unicode)
+
+        result = len(parser.attachments_list)
+        self.assertEqual(0, result)
 
     def test_add_content_type(self):
         parser = mailparser.MailParser()
