@@ -153,8 +153,9 @@ class MailParser(object):
                 "{}".format("--" + self._message.get_boundary()),
                 "{}".format("--" + self._message.get_boundary() + "--"),
             )
-            p = email.message_from_string(epilogue)
-            parts.append(p)
+            if epilogue:
+                p = email.message_from_string(epilogue)
+                parts.append(p)
 
         # walk all mail parts
         for p in parts:

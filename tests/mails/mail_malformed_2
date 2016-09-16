@@ -1,0 +1,61 @@
+Return-Path: <>
+Delivered-To: tanya@infospacemail.com
+Received: (qmail 32129 invoked from network); 22 Aug 2016 09:22:13 -0000
+Received: from c.netpar.com.br (HELO apus.netpar.com.br) (189.125.104.100)
+  by smtp.customers.net with SMTP; 22 Aug 2016 09:22:13 -0000
+To: tanya@infospacemail.com
+Subject: Delivery failure (abh@netpar.com.br)
+From: postmaster@netpar.com.br
+Message-Id: <B0950073156@apus.netpar.com.br>
+Date: Mon, 22 Aug 2016 06:23:36 -0300
+MIME-Version: 1.0
+Content-Type: multipart/report; report-type=delivery-status; boundary="48461/50/1471857816/MailSite/apus.netpar.com.br"
+
+--48461/50/1471857816/MailSite/apus.netpar.com.br
+Content-Type: text/plain
+
+Your message has encountered delivery problems
+to the following recipient(s):
+
+abh
+(Was addressed to abh@netpar.com.br)
+Delivery failed
+User's mailbox quota exceeded
+
+
+
+
+--48461/50/1471857816/MailSite/apus.netpar.com.br
+Content-Type: message/delivery-status
+Content-Disposition: attachment; filename="DSN57BAC498.txt"
+
+Reporting-MTA: dns; apus.netpar.com.br
+Arrival-Date: Mon, 22 Aug 2016 06:23:36 -0300
+
+Final-Recipient: rfc822; abh@netpar.com.br
+Action: failed
+Status: 4.2.2 (Persistent transient failure - mailbox: mailbox full)
+
+--48461/50/1471857816/MailSite/apus.netpar.com.br
+Content-Type: message/rfc822-headers
+
+Received: from cygnus.netpar.com.br (unverified [189.125.104.24]) by apus.netpar.com.br
+ (Rockliffe SMTPRA 4.5.6) with ESMTP id <B0950073155@apus.netpar.com.br> for <abh@netpar.com.br>;
+ Mon, 22 Aug 2016 06:23:36 -0300
+Received: from [117.201.229.175] (unknown [117.201.229.175])
+	by cygnus.netpar.com.br (Postfix) with ESMTP id 9B8AE886048E
+	for <abh@netpar.com.br>; Mon, 22 Aug 2016 09:22:04 +0000 (UTC)
+From: "Reynaldo Stevens" <tanya@infospacemail.com>
+To: <abh@netpar.com.br>
+Subject: Trabajo perfecto a distancia 
+Date: 22 Aug 2016 18:37:49 +0400
+Message-ID: <004801d1fc84$01c934ac$b247f0b7$@infospacemail.com>
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+	boundary="----=_NextPart_000_0045_01D1FC84.01C36A99"
+X-Mailer: Microsoft Outlook 14.0
+Thread-Index: Ac1doyjrxh5tdsxl1doyjrxh5tdsxl==
+Content-Language: en
+
+--48461/50/1471857816/MailSite/apus.netpar.com.br--
+
