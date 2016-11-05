@@ -41,8 +41,7 @@ class MailParser(object):
     def __init__(self):
         # With these defect bad payload is on epilogue
         self._epilogue_defects = set([
-            "StartBoundaryNotFoundDefect"
-        ])
+            "StartBoundaryNotFoundDefect"])
 
     def parse_from_file(self, fd):
         """Parsing mail from file. """
