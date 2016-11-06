@@ -63,7 +63,7 @@ or use ``pip``:
 
     pip install mail-parser
 
-Usage
+Usage in a project
 -----
 
 Import ``MailParser`` class:
@@ -101,3 +101,44 @@ Then you can get all parts
 .. _email: https://docs.python.org/2/library/email.message.html
 .. _SpamScope: https://github.com/SpamScope/spamscope
 .. _defects: https://docs.python.org/2/library/email.message.html#email.message.Message.defects
+
+Usage from command-line
+-----------------------
+
+If you installed mailparser with ``pip`` or ``setup.py`` you can it with
+command-line.
+
+These are all swithes:
+
+::
+
+    usage: mailparser [-h] (-f FILE_ | -s STRING_) [-j] [-b] [-a] [-r] [-t] [-m]
+                      [-u] [-d] [-n]
+
+    Wrapper for email Python Standard Library
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -f FILE_, --file FILE_
+                            Raw email file (default: None)
+      -s STRING_, --string STRING_
+                            Raw email string (default: None)
+      -j, --json            Show the JSON of parsed mail (default: False)
+      -b, --body            Print the body of mail (default: False)
+      -a, --attachments     Print the attachments of mail (default: False)
+      -r, --headers         Print the headers of mail (default: False)
+      -t, --to              Print the to of mail (default: False)
+      -m, --from            Print the from of mail (default: False)
+      -u, --subject         Print the subject of mail (default: False)
+      -d, --defects         Print the defects of mail (default: False)
+      -n, --anomalies       Print the anomalies of mail (default: False)
+
+    It takes as input a raw mail and generates a parsed object.
+
+Example:
+
+.. code:: shell
+
+    $ mailparser -f example_mail -j
+
+This example will show you the tokenized mail in a JSON pretty format.
