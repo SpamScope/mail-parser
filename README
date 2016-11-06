@@ -64,7 +64,7 @@ or use ``pip``:
     pip install mail-parser
 
 Usage in a project
------
+-------------------
 
 Import ``MailParser`` class:
 
