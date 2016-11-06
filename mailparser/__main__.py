@@ -1,4 +1,4 @@
-n!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 """
@@ -49,7 +49,7 @@ def get_args():
         "-s",
         "--string",
         dest="string_",
-        help="Raw string")
+        help="Raw email string")
 
     parser.add_argument(
         "-j",
