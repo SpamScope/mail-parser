@@ -5,15 +5,12 @@ from os.path import join, dirname
 from setuptools import setup
 
 
-VERSION = (0, 2, 2)
+VERSION = (0, 3, 0)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
-f = open(join(dirname(__file__), 'README'))
-long_description = f.read().strip()
-f.close()
-
-requires = ['simplejson']
+long_description = open(join(dirname(__file__), 'README')).read().strip()
+requires = open("requirements.txt").read().splitlines()
 
 
 setup(
@@ -28,6 +25,7 @@ setup(
     maintainer="Fedele Mantuano",
     maintainer_email='mantuano.fedele@gmail.com',
     packages=["mailparser"],
+    platforms=["Linux", ],
     keywords=['mail', 'email', 'parser', 'wrapper'],
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
@@ -42,5 +40,7 @@ setup(
         "Programming Language :: Python :: 3.3",
         "Programming Language :: Python :: 3.4",
     ],
-    requires=requires,
+    install_requires=requires,
+    entry_points={'console_scripts': [
+        'mailparser = mailparser.__main__:main']},
 )

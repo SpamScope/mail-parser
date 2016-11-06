@@ -1,5 +1,7 @@
 *.pyc
+.*.swp
 .ropeproject
+build/
 dist/
 mail_parser.egg-info/
 venv
