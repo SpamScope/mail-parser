@@ -5,12 +5,13 @@ from os.path import join, dirname
 from setuptools import setup
 
 
-VERSION = (0, 3, 0)
+VERSION = (0, 3, 7)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
 long_description = open(join(dirname(__file__), 'README')).read().strip()
-requires = open("requirements.txt").read().splitlines()
+requires = open(join(dirname(__file__),
+                     'requirements.txt')).read().splitlines()
 
 
 setup(
