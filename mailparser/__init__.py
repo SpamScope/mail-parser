@@ -71,9 +71,9 @@ class MailParser(object):
                         output += unicode(i[0], errors='ignore').strip()
                 else:
                     if i[1]:
-                        output += (i[0].decode() + i[1].decode()).strip()
+                        output += (i[0] + i[1]).strip()
                     else:
-                        output += i[0].decode().strip()
+                        output += i[0].strip()
 
         # Header parsing failed, when header has charset Shift_JIS
         except HeaderParseError:
