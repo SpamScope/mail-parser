@@ -22,6 +22,8 @@ import os
 import sys
 import unittest
 
+pyver = sys.version_info[0]
+
 base_path = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(base_path, '..')
 
@@ -88,7 +90,10 @@ class TestMailParser(unittest.TestCase):
     def test_types(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
-
+        if pyver == 2:
+            checktype = unicode
+        else:
+            checktype = str
         self.assertEqual(False, parser.has_defects)
 
         result = parser.parsed_mail_obj
@@ -97,28 +102,28 @@ class TestMailParser(unittest.TestCase):
         self.assertNotIn("anomalies", result)
 
         result = parser.parsed_mail_json
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.headers
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.body
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
         result = parser.from_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.to_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.subject
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.message_id
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, checktype)
 
         result = parser.attachments_list
         self.assertIsInstance(result, list)
@@ -141,7 +146,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        if pyver == 2:
+            self.assertIsInstance(parser.parsed_mail_json, unicode)
+        else:
+            self.assertIsInstance(parser.parsed_mail_json, str)
 
         result = len(parser.attachments_list)
         self.assertEqual(1, result)
