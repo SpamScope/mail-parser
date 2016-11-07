@@ -20,7 +20,7 @@ limitations under the License.
 from __future__ import unicode_literals
 from email.errors import HeaderParseError
 from email.header import decode_header
-from exceptions import InvalidMail, NotUnicodeError
+from .exceptions import InvalidMail, NotUnicodeError
 import datetime
 import email
 import logging
