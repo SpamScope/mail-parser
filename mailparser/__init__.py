@@ -71,9 +71,9 @@ class MailParser(object):
                         output += unicode(i[0], errors='ignore').strip()
                 else:
                     if i[1]:
-                        output += i[0].strip() + i[1].strip()
+                        output += str(i[0] + i[1]).strip()
                     else:
-                        output += i[0].strip()
+                        output += str(i[0]).strip()
 
         # Header parsing failed, when header has charset Shift_JIS
         except HeaderParseError:
@@ -87,7 +87,7 @@ class MailParser(object):
 
     def _force_unicode(self, s):
         if pyver == 3:
-            return s
+            return str(s)
         try:
             u = unicode(s, encoding=self.charset, errors='ignore')
         except:
