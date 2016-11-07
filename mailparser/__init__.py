@@ -25,6 +25,9 @@ import datetime
 import email
 import logging
 import time
+import sys
+
+pyver = sys.version_info[0] 
 
 
 try:
@@ -61,29 +64,38 @@ class MailParser(object):
 
         try:
             for i in decode_header(header):
-                if i[1]:
-                    output += unicode(i[0], i[1], errors='ignore').strip()
+                if pyver == 2:
+                    if i[1]:
+                        output += unicode(i[0], i[1], errors='ignore').strip()
+                    else:
+                        output += unicode(i[0], errors='ignore').strip()
                 else:
-                    output += unicode(i[0], errors='ignore').strip()
+                    if i[1]:
+                        output += i[0].strip() + i[1].strip()
+                    else:
+                        output += i[0].strip()
 
         # Header parsing failed, when header has charset Shift_JIS
         except HeaderParseError:
             log.error("Failed decoding header part: {}".format(header))
             output += header
-
-        if not isinstance(output, unicode):
-            raise NotUnicodeError("Header part is not unicode")
+        if pyver == 2:
+            if not isinstance(output, unicode):
+                raise NotUnicodeError("Header part is not unicode")
 
         return output
 
     def _force_unicode(self, s):
+        if pyver == 3:
+            return s
         try:
             u = unicode(s, encoding=self.charset, errors='ignore')
         except:
             u = unicode(s, errors='ignore',)
 
-        if not isinstance(u, unicode):
-            raise NotUnicodeError("Body part is not unicode")
+        if pyver == 2:
+            if not isinstance(output, unicode):
+                raise NotUnicodeError("Header part is not unicode")
 
         return u
 
@@ -167,8 +179,12 @@ class MailParser(object):
                     mail_content_type = self._decode_header_part(
                         p.get_content_type(),
                     )
-                    transfer_encoding = \
-                        unicode(p.get('content-transfer-encoding', '')).lower()
+                    if pyver == 2:
+                        transfer_encoding = \
+                            unicode(p.get('content-transfer-encoding', '')).lower()
+                    else:
+                        transfer_encoding = \
+                            p.get('content-transfer-encoding', '').lower()
 
                     if transfer_encoding == "base64":
                         payload = p.get_payload(decode=False)
