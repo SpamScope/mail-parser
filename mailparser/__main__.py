@@ -135,7 +135,7 @@ def main():
 
     if args.json:
         j = json.loads(parser.parsed_mail_json)
-        print(json.dumps(j, ensure_ascii=False, indent=4))
+        print(json.dumps(j, ensure_ascii=False, indent=4).encode('utf-8'))
 
     if args.body:
         print(parser.body.encode('utf-8'))
@@ -162,7 +162,7 @@ def main():
 
     if args.attachments:
         for i in parser.attachments_list:
-            print(json.dumps(i, ensure_ascii=False, indent=4))
+            print(json.dumps(i, ensure_ascii=False, indent=4).encode('utf-8'))
 
 
 if __name__ == '__main__':
