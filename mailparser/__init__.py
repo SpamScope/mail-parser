@@ -76,11 +76,11 @@ class MailParser(object):
 
         return output
 
-    def _force_unicode(self, s):
+    def _force_unicode(self, string, encoding):
         try:
-            u = unicode(s, encoding=self.charset, errors='ignore')
+            u = unicode(string, encoding=encoding, errors='ignore')
         except:
-            u = unicode(s, errors='ignore',)
+            u = unicode(string, errors='ignore',)
 
         if not isinstance(u, unicode):
             raise NotUnicodeError("Body part is not unicode")
@@ -125,7 +125,6 @@ class MailParser(object):
             "message_id": self.message_id,
             "subject": self.subject,
             "to": self.to_,
-            "charset": self.charset,
             "has_defects": self._has_defects,
             "has_anomalies": self._has_anomalies,
         }
@@ -150,8 +149,8 @@ class MailParser(object):
             epilogue = self.find_between(
                 self._message.epilogue,
                 "{}".format("--" + self._message.get_boundary()),
-                "{}".format("--" + self._message.get_boundary() + "--"),
-            )
+                "{}".format("--" + self._message.get_boundary() + "--"))
+
             try:
                 p = email.message_from_string(epilogue)
                 parts.append(p)
@@ -162,11 +161,12 @@ class MailParser(object):
         for p in parts:
             if not p.is_multipart():
                 f = p.get_filename()
+                charset = p.get_content_charset('utf-8')
+
                 if f:
                     filename = self._decode_header_part(f)
                     mail_content_type = self._decode_header_part(
-                        p.get_content_type(),
-                    )
+                        p.get_content_type())
                     transfer_encoding = \
                         unicode(p.get('content-transfer-encoding', '')).lower()
 
@@ -174,7 +174,8 @@ class MailParser(object):
                         payload = p.get_payload(decode=False)
                     else:
                         payload = self._force_unicode(
-                            p.get_payload(decode=True))
+                            string=p.get_payload(decode=True),
+                            encoding=charset)
 
                     self._attachments.append(
                         {
@@ -186,7 +187,8 @@ class MailParser(object):
                     )
                 else:
                     payload = self._force_unicode(
-                        p.get_payload(decode=True))
+                        string=p.get_payload(decode=True),
+                        encoding=charset)
                     self._text_plain.append(payload)
 
         # Parsed object mail
@@ -256,10 +258,6 @@ class MailParser(object):
     @property
     def attachments_list(self):
         return self._attachments
-
-    @property
-    def charset(self):
-        return self._message.get_content_charset('utf-8')
 
     @property
     def date_mail(self):
