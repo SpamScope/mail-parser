@@ -3,11 +3,8 @@
 
 from os.path import join, dirname
 from setuptools import setup
+from mailparser import __versionstr__
 
-
-VERSION = (0, 4, 0)
-__version__ = VERSION
-__versionstr__ = '.'.join(map(str, VERSION))
 
 long_description = open(join(dirname(__file__), 'README')).read().strip()
 requires = open(join(dirname(__file__),

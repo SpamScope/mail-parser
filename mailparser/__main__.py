@@ -30,7 +30,7 @@ current = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(current, '..')
 sys.path.append(root)
 
-from mailparser import MailParser
+from mailparser import MailParser, __versionstr__
 
 
 def get_args():
@@ -114,6 +114,12 @@ def get_args():
         action="store_true",
         help="Print the anomalies of mail")
 
+    parser.add_argument(
+        '-v',
+        '--version',
+        action='version',
+        version='%(prog)s {}'.format(__versionstr__))
+
     return parser.parse_args()
 
 
@@ -132,27 +138,27 @@ def main():
         print(json.dumps(j, ensure_ascii=False, indent=4))
 
     if args.body:
-        print(parser.body)
+        print(parser.body.encode('utf-8'))
 
     if args.headers:
-        print(parser.headers)
+        print(parser.headers.encode('utf-8'))
 
     if args.to:
-        print(parser.to_)
+        print(parser.to_.encode('utf-8'))
 
     if args.from_:
-        print(parser.from_)
+        print(parser.from_.encode('utf-8'))
 
     if args.subject:
-        print(parser.subject)
+        print(parser.subject.encode('utf-8'))
 
     if args.defects:
         for i in parser.defects_category:
-            print(i)
+            print(i.encode('utf-8'))
 
     if args.anomalies:
         for i in parser.anomalies:
-            print(i)
+            print(i.encode('utf-8'))
 
     if args.attachments:
         for i in parser.attachments_list:

@@ -118,6 +118,7 @@ optional arguments:
   -u, --subject         Print the subject of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -n, --anomalies       Print the anomalies of mail (default: False)
+  -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
 ```

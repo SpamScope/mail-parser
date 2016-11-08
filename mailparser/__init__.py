@@ -34,6 +34,10 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+VERSION = (0, 4, 1)
+__version__ = VERSION
+__versionstr__ = '.'.join(map(str, VERSION))
+
 
 class MailParser(object):
     """Tokenizer for raw mails. """
@@ -236,20 +240,17 @@ class MailParser(object):
     @property
     def to_(self):
         return self._decode_header_part(
-            self._message.get('to', self._message.get('delivered-to'))
-        )
+            self._message.get('to', self._message.get('delivered-to')))
 
     @property
     def from_(self):
         return self._decode_header_part(
-            self._message.get('from')
-        )
+            self._message.get('from'))
 
     @property
     def subject(self):
         return self._decode_header_part(
-            self._message.get('subject')
-        )
+            self._message.get('subject'))
 
     @property
     def text_plain_list(self):
@@ -285,8 +286,7 @@ class MailParser(object):
         return json.dumps(
             self._mail,
             ensure_ascii=False,
-            indent=None,
-        )
+            indent=None)
 
     @property
     def defects(self):
