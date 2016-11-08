@@ -88,7 +88,6 @@ Then you can get all parts
     parser.subject
     parser.text_plain_list: only text plain mail parts in a list
     parser.attachments_list: list of all attachments
-    parser.charset
     parser.date_mail
     parser.parsed_mail_obj: tokenized mail in a object
     parser.parsed_mail_json: tokenized mail in a JSON
