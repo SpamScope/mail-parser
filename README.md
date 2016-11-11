@@ -93,7 +93,7 @@ parser.has_anomalies
 
 ## Usage from command-line
 
-If you installed mailparser with `pip` or `setup.py` you can it with command-line.
+If you installed mailparser with `pip` or `setup.py` you can use it with command-line.
 
 These are all swithes:
 

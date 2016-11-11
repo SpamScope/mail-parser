@@ -43,12 +43,12 @@ def get_args():
     parsing_group.add_argument(
         "-f",
         "--file",
-        dest="file_",
+        dest="file",
         help="Raw email file")
     parsing_group.add_argument(
         "-s",
         "--string",
-        dest="string_",
+        dest="string",
         help="Raw email string")
 
     parser.add_argument(
@@ -128,10 +128,10 @@ def main():
 
     parser = MailParser()
 
-    if args.file_:
-        parser.parse_from_file(args.file_)
-    elif args.string_:
-        parser.parse_from_string(args.string_)
+    if args.file:
+        parser.parse_from_file(args.file)
+    elif args.string:
+        parser.parse_from_string(args.string)
 
     if args.json:
         j = json.loads(parser.parsed_mail_json)
