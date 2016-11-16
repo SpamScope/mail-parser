@@ -30,7 +30,9 @@ current = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(current, '..')
 sys.path.append(root)
 
-from mailparser import MailParser, __versionstr__
+from mailparser import MailParser
+
+__version__ = open(os.path.join(root, 'version')).read().strip()
 
 
 def get_args():
@@ -115,10 +117,17 @@ def get_args():
         help="Print the anomalies of mail")
 
     parser.add_argument(
+        "-i",
+        "--senderip",
+        dest="senderip",
+        metavar="Trust mail server string",
+        help="Extract a reliable sender IP address heuristically")
+
+    parser.add_argument(
         '-v',
         '--version',
         action='version',
-        version='%(prog)s {}'.format(__versionstr__))
+        version='%(prog)s {}'.format(__version__))
 
     return parser.parse_args()
 
@@ -159,6 +168,13 @@ def main():
     if args.anomalies:
         for i in parser.anomalies:
             print(i.encode('utf-8'))
+
+    if args.senderip:
+        r = parser.get_server_ipaddress(args.senderip)
+        if r:
+            print(r.encode('utf-8'))
+        else:
+            print("Not Found")
 
     if args.attachments:
         for i in parser.attachments_list:
