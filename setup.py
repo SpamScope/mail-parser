@@ -19,12 +19,11 @@ limitations under the License.
 
 from os.path import join, dirname
 from setuptools import setup
-from mailparser import __versionstr__
-
+from mailparser_version import __version__
 
 long_description = open(join(dirname(__file__), 'README')).read().strip()
-requires = open(join(dirname(__file__),
-                     'requirements.txt')).read().splitlines()
+requires = open(join(
+    dirname(__file__), 'requirements.txt')).read().splitlines()
 
 
 setup(
@@ -33,12 +32,12 @@ setup(
     license="Apache License, Version 2.0",
     url="https://github.com/SpamScope/mail-parser",
     long_description=long_description,
-    version=__versionstr__,
+    version=__version__,
     author="Fedele Mantuano",
     author_email="mantuano.fedele@gmail.com",
     maintainer="Fedele Mantuano",
     maintainer_email='mantuano.fedele@gmail.com',
-    packages=["mailparser"],
+    packages=["mailparser", "mailparser_version"],
     platforms=["Linux", ],
     keywords=['mail', 'email', 'parser', 'wrapper'],
     classifiers=[

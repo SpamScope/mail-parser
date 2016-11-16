@@ -1,1 +1,2 @@
+ipaddress==1.0.17
 simplejson==3.10.0

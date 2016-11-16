@@ -53,8 +53,13 @@ class TestMailParser(unittest.TestCase):
     def test_parsing_know_values(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
+        trust = "smtp.customers.net"
 
         self.assertEqual(False, parser.has_defects)
+
+        raw = "217.76.210.112"
+        result = parser.get_server_ipaddress(trust)
+        self.assertEqual(raw, result)
 
         raw = "<4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>"
         result = parser.message_id
@@ -88,6 +93,7 @@ class TestMailParser(unittest.TestCase):
     def test_types(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
+        trust = "smtp.customers.net"
 
         self.assertEqual(False, parser.has_defects)
 
@@ -95,6 +101,9 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
+
+        result = parser.get_server_ipaddress(trust)
+        self.assertIsInstance(result, unicode)
 
         result = parser.parsed_mail_json
         self.assertIsInstance(result, unicode)
