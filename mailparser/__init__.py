@@ -18,14 +18,15 @@ limitations under the License.
 """
 
 from __future__ import unicode_literals
+from .exceptions import InvalidMail, NotUnicodeError
 from email.errors import HeaderParseError
 from email.header import decode_header
-from .exceptions import InvalidMail, NotUnicodeError
 import datetime
 import email
+import ipaddress
 import logging
+import re
 import time
-
 
 try:
     import simplejson as json
@@ -34,7 +35,7 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-VERSION = (0, 4, 4)
+VERSION = (0, 4, 6)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
@@ -215,6 +216,45 @@ class MailParser(object):
             return text[start:end].strip()
         except ValueError:
             return
+
+    def get_server_ipaddress(self, trust):
+        """ Return ip address  of sender
+
+        Extract a reliable sender IP address heuristically for each message.
+        Although the message format dictates a chain of relaying IP
+        addresses in each message, a malicious relay can easily alter that.
+        Therefore we cannot simply take the first IP in
+        the chain. Instead, our method is as follows.
+        First we trust the sender IP reported by our mail server in the
+        Received headers, and if the previous relay IP address is on our trust
+        list (e.g. other well-known mail services), we continue to
+        follow the previous Received line, till we reach the first unrecognized
+        IP address in the email header.
+
+        From article Characterizing Botnets from Email Spam Records:
+            Li Zhuang, J. D. Tygar
+
+        In our case we trust only our mail server with the trust string.
+
+
+        Keyword arguments:
+            trust -- String that identify our mail server
+        """
+
+        received = self._message.get_all("received", [])
+        r = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+
+        for i in received:
+            if trust in i:
+                check = r.findall(i[0:i.find("by")])
+                if check:
+                    try:
+                        ip = ipaddress.ip_address(unicode(check[-1]))
+                    except ValueError:
+                        return
+
+                    if not ip.is_private:
+                        return unicode(check[-1])
 
     @property
     def body(self):

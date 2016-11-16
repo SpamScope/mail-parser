@@ -16,6 +16,7 @@ mail-parser takes as input a raw mail and generates a parsed object. This object
   - message id
   - date
   - charset mail
+  - sender IP address
 
 We have also two indicator:
   - anomalies: mail without message id or date
@@ -89,6 +90,7 @@ parser.defects_category: only defects categories
 parser.has_defects
 parser.anomalies
 parser.has_anomalies
+parser.get_server_ipaddress(trust="my_server_mail_trust")
 ```
 
 ## Usage from command-line
@@ -118,6 +120,9 @@ optional arguments:
   -u, --subject         Print the subject of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -n, --anomalies       Print the anomalies of mail (default: False)
+  -i Trust mail server string, --senderip Trust mail server string
+                        Extract a reliable sender IP address heuristically
+                        (default: None)
   -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
