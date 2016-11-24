@@ -35,10 +35,6 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
-VERSION = (0, 4, 6)
-__version__ = VERSION
-__versionstr__ = '.'.join(map(str, VERSION))
-
 
 class MailParser(object):
     """Tokenizer for raw mails. """

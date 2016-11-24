@@ -31,8 +31,7 @@ root = os.path.join(current, '..')
 sys.path.append(root)
 
 from mailparser import MailParser
-
-__version__ = open(os.path.join(root, 'version')).read().strip()
+from mailparser_version import __version__
 
 
 def get_args():
