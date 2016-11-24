@@ -19,9 +19,9 @@ limitations under the License.
 
 from os.path import join, dirname
 from setuptools import setup
+from mailparser_version import __version__
 
 long_description = open(join(dirname(__file__), 'README')).read().strip()
-__version__ = open(join(dirname(__file__), 'version')).read().strip()
 requires = open(join(
     dirname(__file__), 'requirements.txt')).read().splitlines()
 
@@ -37,7 +37,7 @@ setup(
     author_email="mantuano.fedele@gmail.com",
     maintainer="Fedele Mantuano",
     maintainer_email='mantuano.fedele@gmail.com',
-    packages=["mailparser"],
+    packages=["mailparser", "mailparser_version"],
     platforms=["Linux", ],
     keywords=['mail', 'email', 'parser', 'wrapper'],
     classifiers=[
