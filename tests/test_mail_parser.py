@@ -93,6 +93,7 @@ class TestMailParser(unittest.TestCase):
     def test_types(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_2)
+        trust = "smtp.customers.net"
 
         self.assertEqual(False, parser.has_defects)
 
@@ -100,6 +101,9 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
+
+        result = parser.get_server_ipaddress(trust)
+        self.assertIsInstance(result, unicode)
 
         result = parser.parsed_mail_json
         self.assertIsInstance(result, unicode)
