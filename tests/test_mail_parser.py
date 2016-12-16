@@ -34,6 +34,7 @@ mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 sys.path.append(root)
 import mailparser
 
+py_version = sys.version_info[0]
 
 class TestMailParser(unittest.TestCase):
 
@@ -150,7 +151,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        if py_version == 2:
+            self.assertIsInstance(parser.parsed_mail_json, unicode)
+        elif py_version == 3:
+            self.assertIsInstance(parser.parsed_mail_json, str)
 
         result = len(parser.attachments_list)
         self.assertEqual(1, result)
@@ -170,7 +174,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        if py_version == 2:
+            self.assertIsInstance(parser.parsed_mail_json, unicode)
+        elif py_version == 3:
+            self.assertIsInstance(parser.parsed_mail_json, str)
 
         result = len(parser.attachments_list)
         self.assertEqual(0, result)
@@ -187,14 +194,26 @@ class TestMailParser(unittest.TestCase):
             len(result["attachments"]),
             1
         )
-        self.assertIsInstance(
-            result["attachments"][0]["mail_content_type"],
-            unicode
-        )
-        self.assertIsInstance(
-            result["attachments"][0]["payload"],
-            unicode
-        )
+        if py_version == 2:
+            self.assertIsInstance(
+                result["attachments"][0]["mail_content_type"],
+                unicode
+            )
+        elif py_version == 3:
+            self.assertIsInstance(
+                result["attachments"][0]["mail_content_type"],
+                str 
+            )
+        if py_version == 2:
+            self.assertIsInstance(
+                result["attachments"][0]["payload"],
+                unicode
+            )
+        elif py_version == 3:
+            self.assertIsInstance(
+                result["attachments"][0]["payload"],
+                str 
+            )
         self.assertEqual(
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable",

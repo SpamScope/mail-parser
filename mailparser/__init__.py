@@ -27,6 +27,9 @@ import ipaddress
 import logging
 import re
 import time
+import sys
+
+py_version = sys.version_info[0]
 
 try:
     import simplejson as json
@@ -63,28 +66,48 @@ class MailParser(object):
         try:
             for i in decode_header(header):
                 if i[1]:
-                    output += unicode(i[0], i[1], errors='ignore').strip()
+                    if py_version == 2:
+                        output += unicode(i[0], i[1], errors='ignore').strip()
+                    elif py_version == 3:
+                        output += str(i[0], i[1],).lstrip()
                 else:
-                    output += unicode(i[0], errors='ignore').strip()
+                    if py_version == 2:
+                        output += unicode(i[0], errors='ignore').strip()
+                    elif py_version == 3:
+                        output += str(i[0],).lstrip()
 
         # Header parsing failed, when header has charset Shift_JIS
         except HeaderParseError:
             log.error("Failed decoding header part: {}".format(header))
             output += header
 
-        if not isinstance(output, unicode):
-            raise NotUnicodeError("Header part is not unicode")
+        if py_version == 2:
+            if not isinstance(output, unicode):
+                raise NotUnicodeError("Header part is not unicode")
+        elif py_version == 3:
+            if not isinstance(output, str):
+                raise NotUnicodeError("Header part is not unicode")
 
         return output
 
     def _force_unicode(self, string, encoding):
         try:
-            u = unicode(string, encoding=encoding, errors='ignore')
+            if py_version == 2:
+                u = unicode(string, encoding=encoding, errors='ignore')
+            elif py_version == 3:
+                u = str(string, encoding=encoding, errors='ignore')
         except:
-            u = unicode(string, errors='ignore',)
+            if py_version == 2:
+                u = unicode(string, errors='ignore',)
+            elif py_version == 3:
+                u = str(string, errors='ignore',)
 
-        if not isinstance(u, unicode):
-            raise NotUnicodeError("Body part is not unicode")
+        if py_version == 2:
+            if not isinstance(u, unicode):
+                raise NotUnicodeError("Body part is not unicode")
+        elif py_version == 3:
+            if not isinstance(u, str):
+                raise NotUnicodeError("Body part is not unicode")
 
         return u
 
@@ -168,8 +191,10 @@ class MailParser(object):
                     filename = self._decode_header_part(f)
                     mail_content_type = self._decode_header_part(
                         p.get_content_type())
-                    transfer_encoding = \
-                        unicode(p.get('content-transfer-encoding', '')).lower()
+                    if py_version == 2:
+                        transfer_encoding = unicode(p.get('content-transfer-encoding', '')).lower()
+                    elif py_version == 3:
+                        transfer_encoding = str(p.get('content-transfer-encoding', '')).lower()
 
                     if transfer_encoding == "base64":
                         payload = p.get_payload(decode=False)
