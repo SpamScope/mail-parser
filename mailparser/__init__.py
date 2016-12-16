@@ -50,7 +50,7 @@ class MailParser(object):
     def parse_from_file(self, fd):
         """Parsing mail from file. """
 
-        with open(fd) as mail:
+        with open(fd, encoding='utf-8', errors='replace') as mail:
             self._message = email.message_from_file(mail)
             self._parse()
 
@@ -270,12 +270,18 @@ class MailParser(object):
                 check = r.findall(i[0:i.find("by")])
                 if check:
                     try:
-                        ip = ipaddress.ip_address(unicode(check[-1]))
+                        if py_version == 2:
+                            ip = ipaddress.ip_address(unicode(check[-1]))
+                        elif py_version == 3:
+                            ip = ipaddress.ip_address(str(check[-1]))
                     except ValueError:
                         return
 
                     if not ip.is_private:
-                        return unicode(check[-1])
+                        if py_version == 2:
+                            return unicode(check[-1])
+                        elif py_version == 3:
+                            return str(check[-1])
 
     @property
     def body(self):

@@ -102,33 +102,37 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
+        if py_version == 2:
+            check = unicode
+        elif py_version == 3:
+            check = str
 
         result = parser.get_server_ipaddress(trust)
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.parsed_mail_json
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.headers
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.body
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
         result = parser.from_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.to_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.subject
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.message_id
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.attachments_list
         self.assertIsInstance(result, list)
