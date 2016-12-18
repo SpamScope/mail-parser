@@ -49,10 +49,14 @@ class MailParser(object):
 
     def parse_from_file(self, fd):
         """Parsing mail from file. """
-
-        with open(fd, encoding='utf-8', errors='replace') as mail:
-            self._message = email.message_from_file(mail)
-            self._parse()
+        if py_version == 2:
+            with open(fd) as mail:
+                self._message = email.message_from_file(mail)
+                self._parse()
+        elif py_version == 3:
+            with open(fd, encoding='utf-8', errors='replace') as mail:
+                self._message = email.message_from_file(mail)
+                self._parse()
 
     def parse_from_string(self, s):
         """Parsing mail from string. """
