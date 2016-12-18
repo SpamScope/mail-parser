@@ -34,6 +34,7 @@ mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 sys.path.append(root)
 import mailparser
 
+py_version = sys.version_info[0]
 
 class TestMailParser(unittest.TestCase):
 
@@ -101,33 +102,37 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
+        if py_version == 2:
+            check = unicode
+        elif py_version == 3:
+            check = str
 
         result = parser.get_server_ipaddress(trust)
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.parsed_mail_json
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.headers
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.body
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
         result = parser.from_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.to_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.subject
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.message_id
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, check)
 
         result = parser.attachments_list
         self.assertIsInstance(result, list)
@@ -150,7 +155,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        if py_version == 2:
+            self.assertIsInstance(parser.parsed_mail_json, unicode)
+        elif py_version == 3:
+            self.assertIsInstance(parser.parsed_mail_json, str)
 
         result = len(parser.attachments_list)
         self.assertEqual(1, result)
@@ -170,7 +178,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        if py_version == 2:
+            self.assertIsInstance(parser.parsed_mail_json, unicode)
+        elif py_version == 3:
+            self.assertIsInstance(parser.parsed_mail_json, str)
 
         result = len(parser.attachments_list)
         self.assertEqual(0, result)
@@ -187,14 +198,26 @@ class TestMailParser(unittest.TestCase):
             len(result["attachments"]),
             1
         )
-        self.assertIsInstance(
-            result["attachments"][0]["mail_content_type"],
-            unicode
-        )
-        self.assertIsInstance(
-            result["attachments"][0]["payload"],
-            unicode
-        )
+        if py_version == 2:
+            self.assertIsInstance(
+                result["attachments"][0]["mail_content_type"],
+                unicode
+            )
+        elif py_version == 3:
+            self.assertIsInstance(
+                result["attachments"][0]["mail_content_type"],
+                str 
+            )
+        if py_version == 2:
+            self.assertIsInstance(
+                result["attachments"][0]["payload"],
+                unicode
+            )
+        elif py_version == 3:
+            self.assertIsInstance(
+                result["attachments"][0]["payload"],
+                str 
+            )
         self.assertEqual(
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable",
