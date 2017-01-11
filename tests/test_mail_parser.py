@@ -19,6 +19,7 @@ limitations under the License.
 
 import datetime
 import os
+import six
 import sys
 import unittest
 
@@ -45,10 +46,7 @@ class TestMailParser(unittest.TestCase):
     def test_valid_date_mail(self):
         parser = mailparser.MailParser()
         parser.parse_from_file(mail_test_1),
-        self.assertIn(
-            "mail_without_date",
-            parser.anomalies,
-        )
+        self.assertIn("mail_without_date", parser.anomalies)
 
     def test_parsing_know_values(self):
         parser = mailparser.MailParser()
@@ -84,9 +82,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(3, result)
 
         raw = "Sun, 29 Nov 2015 09:45:18 +0100"
-        raw_utc = datetime.datetime(
-            2015, 11, 29, 8, 45, 18, 0
-        ).isoformat()
+        raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
         result = parser.date_mail.isoformat()
         self.assertEqual(raw_utc, result)
 
@@ -103,31 +99,31 @@ class TestMailParser(unittest.TestCase):
         self.assertNotIn("anomalies", result)
 
         result = parser.get_server_ipaddress(trust)
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.parsed_mail_json
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.headers
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.body
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
         result = parser.from_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.to_
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.subject
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.message_id
-        self.assertIsInstance(result, unicode)
+        self.assertIsInstance(result, six.text_type)
 
         result = parser.attachments_list
         self.assertIsInstance(result, list)
@@ -150,13 +146,23 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        self.assertIsInstance(parser.parsed_mail_json, six.text_type)
 
         result = len(parser.attachments_list)
         self.assertEqual(1, result)
 
         parser.parse_from_file(mail_test_1)
-        self.assertEqual(False, parser.has_defects)
+        if six.PY2:
+            self.assertEqual(False, parser.has_defects)
+            self.assertNotIn("defects", parser.parsed_mail_obj)
+        elif six.PY3:
+            self.assertEqual(True, parser.has_defects)
+            self.assertEqual(1, len(parser.defects))
+            self.assertEqual(1, len(parser.defects_category))
+            self.assertIn("defects", parser.parsed_mail_obj)
+            self.assertIn(
+                "CloseBoundaryNotFoundDefect", parser.defects_category)
+
         self.assertEqual(True, parser.has_anomalies)
         self.assertEqual(2, len(parser.anomalies))
         self.assertIn("anomalies", parser.parsed_mail_obj)
@@ -170,7 +176,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(parser.defects_category))
         self.assertIn("defects", parser.parsed_mail_obj)
         self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, unicode)
+        self.assertIsInstance(parser.parsed_mail_json, six.text_type)
 
         result = len(parser.attachments_list)
         self.assertEqual(0, result)
@@ -183,22 +189,14 @@ class TestMailParser(unittest.TestCase):
 
         result = parser.parsed_mail_obj
 
-        self.assertEqual(
-            len(result["attachments"]),
-            1
-        )
+        self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(
-            result["attachments"][0]["mail_content_type"],
-            unicode
-        )
+            result["attachments"][0]["mail_content_type"], six.text_type)
         self.assertIsInstance(
-            result["attachments"][0]["payload"],
-            unicode
-        )
+            result["attachments"][0]["payload"], six.text_type)
         self.assertEqual(
             result["attachments"][0]["content_transfer_encoding"],
-            "quoted-printable",
-        )
+            "quoted-printable")
 
 
 if __name__ == '__main__':
