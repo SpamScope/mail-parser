@@ -4,6 +4,8 @@
 
 mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
 
+From version 1.0.0rc1 mail-parser supports Python 3.
+
 ## Description
 
 mail-parser takes as input a raw mail and generates a parsed object. This object is a tokenized mail with the all parts of mail and some indicator:
