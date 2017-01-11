@@ -131,6 +131,13 @@ def get_args():
     return parser.parse_args()
 
 
+def safe_print(data):
+    try:
+        print(data)
+    except UnicodeEncodeError:
+        print(data.encode('utf-8'))
+
+
 def main():
     args = get_args()
 
@@ -143,41 +150,42 @@ def main():
 
     if args.json:
         j = json.loads(parser.parsed_mail_json)
-        print(json.dumps(j, ensure_ascii=False, indent=4).encode('utf-8'))
+        safe_print(json.dumps(j, ensure_ascii=False, indent=4))
 
     if args.body:
-        print(parser.body.encode('utf-8'))
+        # safe_print(parser.body)
+        safe_print(parser.body)
 
     if args.headers:
-        print(parser.headers.encode('utf-8'))
+        safe_print(parser.headers)
 
     if args.to:
-        print(parser.to_.encode('utf-8'))
+        safe_print(parser.to_)
 
     if args.from_:
-        print(parser.from_.encode('utf-8'))
+        safe_print(parser.from_)
 
     if args.subject:
-        print(parser.subject.encode('utf-8'))
+        safe_print(parser.subject)
 
     if args.defects:
         for i in parser.defects_category:
-            print(i.encode('utf-8'))
+            safe_print(i)
 
     if args.anomalies:
         for i in parser.anomalies:
-            print(i.encode('utf-8'))
+            safe_print(i)
 
     if args.senderip:
         r = parser.get_server_ipaddress(args.senderip)
         if r:
-            print(r.encode('utf-8'))
+            safe_print(r)
         else:
-            print("Not Found")
+            safe_print("Not Found")
 
     if args.attachments:
         for i in parser.attachments_list:
-            print(json.dumps(i, ensure_ascii=False, indent=4).encode('utf-8'))
+            safe_print(json.dumps(i, ensure_ascii=False, indent=4))
 
 
 if __name__ == '__main__':
