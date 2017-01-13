@@ -97,6 +97,8 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
+        self.assertIn("has_defects", result)
+        self.assertIn("has_anomalies", result)
 
         result = parser.get_server_ipaddress(trust)
         self.assertIsInstance(result, six.text_type)
@@ -166,6 +168,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(True, parser.has_anomalies)
         self.assertEqual(2, len(parser.anomalies))
         self.assertIn("anomalies", parser.parsed_mail_obj)
+        self.assertIn("has_anomalies", parser.parsed_mail_obj)
 
     def test_defects_bug(self):
         parser = mailparser.MailParser()
