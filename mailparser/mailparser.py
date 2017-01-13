@@ -125,11 +125,7 @@ class MailParser(object):
         for e in part.defects:
             defects = "{}: {}".format(e.__class__.__name__, e.__doc__)
             self._defects_category.add(e.__class__.__name__)
-
-            if part_defects:
-                part_defects[part_content_type].append(defects)
-            else:
-                part_defects[part_content_type] = [defects]
+            part_defects.setdefault(part_content_type, []).append(defects)
 
         # Tag mail with defect
         if part_defects:
@@ -148,6 +144,7 @@ class MailParser(object):
         self._anomalies = list()
 
     def _make_mail(self):
+        # mail object
         self._mail = {
             "attachments": self.attachments_list,
             "body": self.body,
@@ -157,9 +154,17 @@ class MailParser(object):
             "message_id": self.message_id,
             "subject": self.subject,
             "to": self.to_,
-            "has_defects": self._has_defects,
-            "has_anomalies": self._has_anomalies,
-        }
+            "has_defects": self.has_defects,
+            "has_anomalies": self.has_anomalies}
+
+        # Add defects
+        if self.has_defects:
+            self._mail["defects"] = self.defects
+            self._mail["defects_category"] = list(self._defects_category)
+
+        # Add anomalies
+        if self.has_anomalies:
+            self._mail["anomalies"] = self.anomalies
 
     def _parse(self):
         if not self._message.keys():
@@ -177,7 +182,7 @@ class MailParser(object):
             parts.append(p)
 
         # If defects are in epilogue defects get epilogue
-        if self.epilogue_defects & self._defects_category:
+        if self.defects_category & self.epilogue_defects:
             epilogue = find_between(
                 self._message.epilogue,
                 "{}".format("--" + self._message.get_boundary()),
@@ -206,14 +211,11 @@ class MailParser(object):
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
 
-                    self._attachments.append(
-                        {
-                            "filename": filename,
-                            "payload": payload,
-                            "mail_content_type": mail_content_type,
-                            "content_transfer_encoding": transfer_encoding,
-                        }
-                    )
+                    self._attachments.append({
+                        "filename": filename,
+                        "payload": payload,
+                        "mail_content_type": mail_content_type,
+                        "content_transfer_encoding": transfer_encoding})
                 else:
                     payload = ported_string(
                         p.get_payload(decode=True), encoding=charset)
@@ -222,16 +224,6 @@ class MailParser(object):
 
         # Parsed object mail
         self._make_mail()
-
-        # Add defects
-        if self.has_defects:
-            self._mail["defects"] = self.defects
-            self._mail["defects_category"] = list(self._defects_category)
-
-        # Add anomalies
-        if self.has_anomalies:
-            self._mail["anomalies"] = self.anomalies
-            self._mail["has_anomalies"] = True
 
     def get_server_ipaddress(self, trust):
         """ Return ip address  of sender
@@ -274,7 +266,6 @@ class MailParser(object):
 
     @property
     def body(self):
-        # print(self.text_plain_list)
         return "\n".join(self.text_plain_list)
 
     @property
