@@ -20,6 +20,7 @@ limitations under the License.
 from __future__ import unicode_literals
 from email.errors import HeaderParseError
 from email.header import decode_header
+from unicodedata import normalize
 import datetime
 import email
 import ipaddress
@@ -40,6 +41,15 @@ class InvalidMail(ValueError):
     pass
 
 
+def sanitize(func):
+    """ NFC is the normalization form recommended by W3C. """
+
+    def wrapper(*args, **kwargs):
+        return normalize('NFC', func(*args, **kwargs))
+    return wrapper
+
+
+@sanitize
 def ported_string(raw_data, encoding='utf-8', errors='ignore'):
     """ Give as input raw data and output a str in Python 3
     and unicode in Python 2.
@@ -87,7 +97,7 @@ def ported_open(file_):
     if six.PY2:
         return open(file_)
     elif six.PY3:
-        return open(file_, errors='ignore')
+        return open(file_, encoding="utf-8", errors='ignore')
 
 
 def find_between(text, first_token, last_token):
