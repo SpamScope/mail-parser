@@ -97,7 +97,7 @@ def ported_open(file_):
     if six.PY2:
         return open(file_)
     elif six.PY3:
-        return open(file_, errors='ignore')
+        return open(file_, encoding="utf-8", errors='ignore')
 
 
 def find_between(text, first_token, last_token):
