@@ -68,13 +68,19 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
         return six.text_type()
 
     if six.PY2:
-        return six.text_type(raw_data, encoding, errors).strip()
+        try:
+            return six.text_type(raw_data, encoding, errors).strip()
+        except LookupError:
+            return six.text_type(raw_data, "utf-8", errors).strip()
 
     elif six.PY3:
         if isinstance(raw_data, str):
             return raw_data.strip()
         else:
-            return six.text_type(raw_data, encoding).strip()
+            try:
+                return six.text_type(raw_data, encoding).strip()
+            except LookupError:
+                return six.text_type(raw_data, "utf-8", errors).strip()
 
 
 def decode_header_part(header):
