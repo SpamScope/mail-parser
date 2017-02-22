@@ -36,6 +36,10 @@ except ImportError:
 
 log = logging.getLogger(__name__)
 
+REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+
+__version__ = "1.1.2-dev"
+
 
 class InvalidMail(ValueError):
     pass
@@ -266,11 +270,11 @@ class MailParser(object):
         """
 
         received = self._message.get_all("received", [])
-        r = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
         for i in received:
             if trust in i:
-                check = r.findall(i[0:i.find("by")])
+                check = REGXIP.findall(i[0:i.find("by")])
+
                 if check:
                     try:
                         ip = ipaddress.ip_address(six.text_type(check[-1]))

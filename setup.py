@@ -19,7 +19,7 @@ limitations under the License.
 
 from os.path import join, dirname
 from setuptools import setup
-from mailparser_version import __version__
+from mailparser import __version__
 
 long_description = open(join(dirname(__file__), 'README')).read().strip()
 requires = open(join(
@@ -37,8 +37,8 @@ setup(
     author_email="mantuano.fedele@gmail.com",
     maintainer="Fedele Mantuano",
     maintainer_email='mantuano.fedele@gmail.com',
-    packages=["mailparser", "mailparser_version"],
-    platforms=["Linux", ],
+    packages=["mailparser"],
+    platforms=["Linux"],
     keywords=['mail', 'email', 'parser', 'wrapper'],
     classifiers=[
         "License :: OSI Approved :: Apache Software License",
