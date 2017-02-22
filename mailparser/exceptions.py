@@ -17,4 +17,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from .mailparser import __version__, MailParser
+
+__all__ = ["InvalidMail"]
+
+
+class InvalidMail(ValueError):
+    pass
