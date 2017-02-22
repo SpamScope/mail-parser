@@ -30,8 +30,7 @@ current = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(current, '..')
 sys.path.append(root)
 
-from mailparser import MailParser
-from mailparser_version import __version__
+from mailparser import MailParser, __version__
 
 
 def get_args():
