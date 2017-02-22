@@ -33,23 +33,24 @@ mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 
 sys.path.append(root)
-import mailparser
+from mailparser import MailParser
+from mailparser.exceptions import InvalidMail
 
 
 class TestMailParser(unittest.TestCase):
 
     def test_valid_mail(self):
-        with self.assertRaises(mailparser.InvalidMail):
-            parser = mailparser.MailParser()
+        with self.assertRaises(InvalidMail):
+            parser = MailParser()
             parser.parse_from_string("fake mail")
 
     def test_valid_date_mail(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_test_1),
         self.assertIn("mail_without_date", parser.anomalies)
 
     def test_parsing_know_values(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
@@ -87,7 +88,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(raw_utc, result)
 
     def test_types(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
@@ -140,7 +141,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, list)
 
     def test_defects_anomalies(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_malformed_1)
 
         self.assertEqual(True, parser.has_defects)
@@ -171,7 +172,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("has_anomalies", parser.parsed_mail_obj)
 
     def test_defects_bug(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_malformed_2)
 
         self.assertEqual(True, parser.has_defects)
@@ -185,7 +186,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(0, result)
 
     def test_add_content_type(self):
-        parser = mailparser.MailParser()
+        parser = MailParser()
         parser.parse_from_file(mail_test_3)
 
         self.assertEqual(False, parser.has_defects)
