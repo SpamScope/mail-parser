@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
-__version__ = "1.1.2-dev"
+__version__ = "1.1.2"
 
 
 class InvalidMail(ValueError):
