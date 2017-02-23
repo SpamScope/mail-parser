@@ -19,6 +19,7 @@ limitations under the License.
 
 import argparse
 import os
+import runpy
 import sys
 
 try:
@@ -30,7 +31,10 @@ current = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(current, '..')
 sys.path.append(root)
 
-from mailparser import MailParser, __version__
+from mailparser import MailParser
+
+__version__ = runpy.run_path(
+    os.path.join(current, "version.py"))["__version__"]
 
 
 def get_args():
