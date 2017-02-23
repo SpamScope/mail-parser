@@ -20,18 +20,15 @@ limitations under the License.
 import argparse
 import os
 import runpy
-import sys
 
 try:
     import simplejson as json
 except ImportError:
     import json
 
-current = os.path.realpath(os.path.dirname(__file__))
-root = os.path.join(current, '..')
-sys.path.append(root)
-
 from mailparser import MailParser
+
+current = os.path.realpath(os.path.dirname(__file__))
 
 __version__ = runpy.run_path(
     os.path.join(current, "version.py"))["__version__"]
