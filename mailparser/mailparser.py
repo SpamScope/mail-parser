@@ -38,8 +38,6 @@ from .utils import (ported_string, decode_header_part,
 log = logging.getLogger(__name__)
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
-__version__ = "1.1.2"
-
 
 class MailParser(object):
     """Tokenizer for raw mails. """

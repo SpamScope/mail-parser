@@ -17,14 +17,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from os.path import join, dirname
+import os
+import runpy
 from setuptools import setup
-from mailparser import __version__
 
-long_description = open(join(dirname(__file__), 'README')).read().strip()
-requires = open(join(
-    dirname(__file__), 'requirements.txt')).read().splitlines()
 
+current = os.path.realpath(os.path.dirname(__file__))
+
+with open(os.path.join(current, 'README')) as f:
+    long_description = f.read().strip()
+
+with open(os.path.join(current, 'requirements.txt')) as f:
+    requires = f.read().splitlines()
+
+__version__ = runpy.run_path(
+    os.path.join(current, "mailparser", "version.py"))["__version__"]
 
 setup(
     name='mail-parser',
