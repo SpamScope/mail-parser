@@ -33,6 +33,7 @@ with open(os.path.join(current, 'requirements.txt')) as f:
 __version__ = runpy.run_path(
     os.path.join(current, "mailparser", "version.py"))["__version__"]
 
+
 setup(
     name='mail-parser',
     description="Wrapper for email standard library",
