@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg)](https://travis-ci.org/SpamScope/mail-parser)
+
 # mail-parser
 
 ## Overview
