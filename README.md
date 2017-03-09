@@ -1,3 +1,4 @@
+[![PyPI version](https://badge.fury.io/py/mail-parser.svg)](https://badge.fury.io/py/mail-parser)
 [![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg)](https://travis-ci.org/SpamScope/mail-parser)
 
 # mail-parser
