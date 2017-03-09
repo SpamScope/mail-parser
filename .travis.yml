@@ -14,7 +14,8 @@ install:
 
 # command to run tests
 script: 
-    - coverage run --source mailparser tests/test_mail_parser.py
+    - coverage run --source=mailparser/ --omit=mailparser/__main__.py tests/test_mail_parser.py
+    - python tests/test_main.py
     - python -m mailparser -v
     - python -m mailparser -h
 

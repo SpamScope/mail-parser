@@ -128,7 +128,7 @@ def get_args():
         action='version',
         version='%(prog)s {}'.format(__version__))
 
-    return parser.parse_args()
+    return parser
 
 
 def safe_print(data):
@@ -139,7 +139,7 @@ def safe_print(data):
 
 
 def main():
-    args = get_args()
+    args = get_args().parse_args()
 
     parser = MailParser()
 
