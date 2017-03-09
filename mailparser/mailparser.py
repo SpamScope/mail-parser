@@ -24,7 +24,6 @@ import ipaddress
 import logging
 import re
 import six
-import time
 
 try:
     import simplejson as json
@@ -257,8 +256,8 @@ class MailParser(object):
             return None
 
         try:
-            d = email.utils.parsedate(date_)
-            t = time.mktime(d)
+            d = email.utils.parsedate_tz(date_)
+            t = email.utils.mktime_tz(d)
             return datetime.datetime.utcfromtimestamp(t)
         except:
             return None
