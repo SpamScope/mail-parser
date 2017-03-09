@@ -1,5 +1,5 @@
 [![PyPI version](https://badge.fury.io/py/mail-parser.svg)](https://badge.fury.io/py/mail-parser)
-[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg)](https://travis-ci.org/SpamScope/mail-parser)
+[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop)](https://travis-ci.org/SpamScope/mail-parser)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
 
 # mail-parser
