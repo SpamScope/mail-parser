@@ -29,6 +29,7 @@ root = os.path.join(base_path, '..')
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
+mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 
@@ -39,159 +40,164 @@ from mailparser.exceptions import InvalidMail
 
 class TestMailParser(unittest.TestCase):
 
+    def setUp(self):
+        # Init
+        self.parser = MailParser()
+
+    def test_type_error(self):
+        self.parser.parse_from_file(mail_test_5)
+        self.assertEqual(len(self.parser.attachments_list), 5)
+        for i in self.parser.attachments_list:
+            self.assertIsInstance(i["filename"], six.text_type)
+
     def test_valid_mail(self):
         with self.assertRaises(InvalidMail):
-            parser = MailParser()
-            parser.parse_from_string("fake mail")
+            self.parser.parse_from_string("fake mail")
 
     def test_valid_date_mail(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_test_1),
-        self.assertIn("mail_without_date", parser.anomalies)
+        self.parser.parse_from_file(mail_test_1),
+        self.assertIn("mail_without_date", self.parser.anomalies)
 
     def test_parsing_know_values(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_test_2)
+        self.parser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, parser.has_defects)
+        self.assertEqual(False, self.parser.has_defects)
 
         raw = "217.76.210.112"
-        result = parser.get_server_ipaddress(trust)
+        result = self.parser.get_server_ipaddress(trust)
         self.assertEqual(raw, result)
 
         raw = "<4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>"
-        result = parser.message_id
+        result = self.parser.message_id
         self.assertEqual(raw, result)
 
         raw = "mporcile@server_mail.it"
-        result = parser.to_
+        result = self.parser.to_
         self.assertEqual(raw, result)
 
         raw = "<meteo@regione.vda.it>"
-        result = parser.from_
+        result = self.parser.from_
         self.assertEqual(raw, result)
 
         raw = "Bollettino Meteorologico del 29/11/2015"
-        result = parser.subject
+        result = self.parser.subject
         self.assertEqual(raw, result)
 
-        result = parser.has_defects
+        result = self.parser.has_defects
         self.assertEqual(False, result)
 
-        result = len(parser.attachments_list)
+        result = len(self.parser.attachments_list)
         self.assertEqual(3, result)
 
         raw = "Sun, 29 Nov 2015 09:45:18 +0100"
         raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
-        result = parser.date_mail.isoformat()
+        result = self.parser.date_mail.isoformat()
         self.assertEqual(raw_utc, result)
 
     def test_types(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_test_2)
+        self.parser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, parser.has_defects)
+        self.assertEqual(False, self.parser.has_defects)
 
-        result = parser.parsed_mail_obj
+        result = self.parser.parsed_mail_obj
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
         self.assertIn("has_defects", result)
         self.assertIn("has_anomalies", result)
 
-        result = parser.get_server_ipaddress(trust)
+        result = self.parser.get_server_ipaddress(trust)
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.parsed_mail_json
+        result = self.parser.parsed_mail_json
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.headers
+        result = self.parser.headers
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.body
+        result = self.parser.body
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.date_mail
+        result = self.parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
-        result = parser.from_
+        result = self.parser.from_
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.to_
+        result = self.parser.to_
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.subject
+        result = self.parser.subject
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.message_id
+        result = self.parser.message_id
         self.assertIsInstance(result, six.text_type)
 
-        result = parser.attachments_list
+        result = self.parser.attachments_list
         self.assertIsInstance(result, list)
 
-        result = parser.date_mail
+        result = self.parser.date_mail
         self.assertIsInstance(result, datetime.datetime)
 
-        result = parser.defects
+        result = self.parser.defects
         self.assertIsInstance(result, list)
 
-        result = parser.anomalies
+        result = self.parser.anomalies
         self.assertIsInstance(result, list)
 
     def test_defects_anomalies(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_malformed_1)
+        self.parser.parse_from_file(mail_malformed_1)
 
-        self.assertEqual(True, parser.has_defects)
-        self.assertEqual(1, len(parser.defects))
-        self.assertEqual(1, len(parser.defects_category))
-        self.assertIn("defects", parser.parsed_mail_obj)
-        self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, six.text_type)
+        self.assertEqual(True, self.parser.has_defects)
+        self.assertEqual(1, len(self.parser.defects))
+        self.assertEqual(1, len(self.parser.defects_category))
+        self.assertIn("defects", self.parser.parsed_mail_obj)
+        self.assertIn("StartBoundaryNotFoundDefect",
+                      self.parser.defects_category)
+        self.assertIsInstance(self.parser.parsed_mail_json, six.text_type)
 
-        result = len(parser.attachments_list)
+        result = len(self.parser.attachments_list)
         self.assertEqual(1, result)
 
-        parser.parse_from_file(mail_test_1)
+        self.parser.parse_from_file(mail_test_1)
         if six.PY2:
-            self.assertEqual(False, parser.has_defects)
-            self.assertNotIn("defects", parser.parsed_mail_obj)
+            self.assertEqual(False, self.parser.has_defects)
+            self.assertNotIn("defects", self.parser.parsed_mail_obj)
         elif six.PY3:
-            self.assertEqual(True, parser.has_defects)
-            self.assertEqual(1, len(parser.defects))
-            self.assertEqual(1, len(parser.defects_category))
-            self.assertIn("defects", parser.parsed_mail_obj)
+            self.assertEqual(True, self.parser.has_defects)
+            self.assertEqual(1, len(self.parser.defects))
+            self.assertEqual(1, len(self.parser.defects_category))
+            self.assertIn("defects", self.parser.parsed_mail_obj)
             self.assertIn(
-                "CloseBoundaryNotFoundDefect", parser.defects_category)
+                "CloseBoundaryNotFoundDefect", self.parser.defects_category)
 
-        self.assertEqual(True, parser.has_anomalies)
-        self.assertEqual(2, len(parser.anomalies))
-        self.assertIn("anomalies", parser.parsed_mail_obj)
-        self.assertIn("has_anomalies", parser.parsed_mail_obj)
+        self.assertEqual(True, self.parser.has_anomalies)
+        self.assertEqual(2, len(self.parser.anomalies))
+        self.assertIn("anomalies", self.parser.parsed_mail_obj)
+        self.assertIn("has_anomalies", self.parser.parsed_mail_obj)
 
     def test_defects_bug(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_malformed_2)
+        self.parser.parse_from_file(mail_malformed_2)
 
-        self.assertEqual(True, parser.has_defects)
-        self.assertEqual(1, len(parser.defects))
-        self.assertEqual(1, len(parser.defects_category))
-        self.assertIn("defects", parser.parsed_mail_obj)
-        self.assertIn("StartBoundaryNotFoundDefect", parser.defects_category)
-        self.assertIsInstance(parser.parsed_mail_json, six.text_type)
+        self.assertEqual(True, self.parser.has_defects)
+        self.assertEqual(1, len(self.parser.defects))
+        self.assertEqual(1, len(self.parser.defects_category))
+        self.assertIn("defects", self.parser.parsed_mail_obj)
+        self.assertIn("StartBoundaryNotFoundDefect",
+                      self.parser.defects_category)
+        self.assertIsInstance(self.parser.parsed_mail_json, six.text_type)
 
-        result = len(parser.attachments_list)
+        result = len(self.parser.attachments_list)
         self.assertEqual(0, result)
 
     def test_add_content_type(self):
-        parser = MailParser()
-        parser.parse_from_file(mail_test_3)
+        self.parser.parse_from_file(mail_test_3)
 
-        self.assertEqual(False, parser.has_defects)
+        self.assertEqual(False, self.parser.has_defects)
 
-        result = parser.parsed_mail_obj
+        result = self.parser.parsed_mail_obj
 
         self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(
