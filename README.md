@@ -92,7 +92,7 @@ parser.attachments_list: list of all attachments
 parser.date_mail
 parser.parsed_mail_obj: tokenized mail in a object
 parser.parsed_mail_json: tokenized mail in a JSON
-parser.defects: defect RFC non compliance
+parser.defects: defect RFC not compliance
 parser.defects_category: only defects categories
 parser.has_defects
 parser.anomalies
