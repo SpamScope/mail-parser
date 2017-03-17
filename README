@@ -1,3 +1,5 @@
+|PyPI version| |Build Status| |Coverage Status|
+
 mail-parser
 ===========
 
@@ -148,3 +150,11 @@ Example:
     $ mailparser -f example_mail -j
 
 This example will show you the tokenized mail in a JSON pretty format.
+
+
+.. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
+   :target: https://badge.fury.io/py/mail-parser
+.. |Build Status| image:: https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop
+   :target: https://travis-ci.org/SpamScope/mail-parser
+.. |Coverage Status| image:: https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop
+   :target: https://coveralls.io/github/SpamScope/mail-parser?branch=develop
