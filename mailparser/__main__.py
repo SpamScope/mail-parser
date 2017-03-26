@@ -27,6 +27,7 @@ except ImportError:
     import json
 
 from mailparser import MailParser
+from .utils import fingerprints
 
 current = os.path.realpath(os.path.dirname(__file__))
 
@@ -123,6 +124,13 @@ def get_args():
         help="Extract a reliable sender IP address heuristically")
 
     parser.add_argument(
+        "-p",
+        "--mail-hash",
+        dest="mail_hash",
+        action="store_true",
+        help="Print mail fingerprints without headers")
+
+    parser.add_argument(
         '-v',
         '--version',
         action='version',
@@ -136,6 +144,14 @@ def safe_print(data):
         print(data)
     except UnicodeEncodeError:
         print(data.encode('utf-8'))
+
+
+def print_mail_fingerprints(data):
+    md5, sha1, sha256, sha512 = fingerprints(data)
+    print("md5:\t{}".format(md5))
+    print("sha1:\t{}".format(sha1))
+    print("sha256:\t{}".format(sha256))
+    print("sha512:\t{}".format(sha512))
 
 
 def main():
@@ -186,6 +202,9 @@ def main():
     if args.attachments:
         for i in parser.attachments_list:
             safe_print(json.dumps(i, ensure_ascii=False, indent=4))
+
+    if args.mail_hash:
+        print_mail_fingerprints(parser.body.encode("utf-8"))
 
 
 if __name__ == '__main__':

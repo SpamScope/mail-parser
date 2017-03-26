@@ -36,6 +36,7 @@ mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 sys.path.append(root)
 from mailparser import MailParser
 from mailparser.exceptions import InvalidMail
+from mailparser.utils import fingerprints
 
 
 class TestMailParser(unittest.TestCase):
@@ -43,6 +44,22 @@ class TestMailParser(unittest.TestCase):
     def setUp(self):
         # Init
         self.parser = MailParser()
+
+    def test_fingerprints_body(self):
+        self.parser.parse_from_file(mail_test_1)
+        md5, sha1, sha256, sha512 = fingerprints(
+            self.parser.body.encode("utf-8"))
+        self.assertEqual(md5, "1bbdb7dcf511113bbc0c1b214aeac392")
+        self.assertEqual(sha1, "ce9e62b50fa4e2168278880b14460b905b24eb4b")
+        self.assertEqual(sha256, ("1e9b96e3f1bc74702f9703391e8ba0715b849"
+                                  "7127a7ff857013ab33385898574"))
+        self.assertEqual(sha512, ("ad858f7b5ec5549e55650fd13df7683e403489"
+                                  "77522995851fb6b625ac54744cf3a4bf652784"
+                                  "dba971ef99afeec4e6caf2fdd10be72eabb730"
+                                  "c312ffbe1c4de3"))
+
+    def test_fingerprints_attachments(self):
+        pass
 
     def test_type_error(self):
         self.parser.parse_from_file(mail_test_5)
