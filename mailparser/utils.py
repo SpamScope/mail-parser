@@ -21,6 +21,9 @@ from __future__ import unicode_literals
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
+
+from collections import namedtuple
+import hashlib
 import logging
 import six
 
@@ -100,3 +103,38 @@ def find_between(text, first_token, last_token):
         return text[start:end].strip()
     except ValueError:
         return
+
+
+def fingerprints(data):
+    """This function return the fingerprints of data.
+
+    Args:
+        data (string): raw data
+
+    Returns:
+        namedtuple: fingerprints md5, sha1, sha256, sha512
+    """
+
+    Hashes = namedtuple('Hashes', "md5 sha1 sha256 sha512")
+
+    # md5
+    md5 = hashlib.md5()
+    md5.update(data)
+    md5 = md5.hexdigest()
+
+    # sha1
+    sha1 = hashlib.sha1()
+    sha1.update(data)
+    sha1 = sha1.hexdigest()
+
+    # sha256
+    sha256 = hashlib.sha256()
+    sha256.update(data)
+    sha256 = sha256.hexdigest()
+
+    # sha512
+    sha512 = hashlib.sha512()
+    sha512.update(data)
+    sha512 = sha512.hexdigest()
+
+    return Hashes(md5, sha1, sha256, sha512)
