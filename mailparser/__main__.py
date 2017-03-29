@@ -27,6 +27,7 @@ except ImportError:
     import json
 
 from mailparser import MailParser
+from .utils import fingerprints
 
 current = os.path.realpath(os.path.dirname(__file__))
 
@@ -123,6 +124,20 @@ def get_args():
         help="Extract a reliable sender IP address heuristically")
 
     parser.add_argument(
+        "-p",
+        "--mail-hash",
+        dest="mail_hash",
+        action="store_true",
+        help="Print mail fingerprints without headers")
+
+    parser.add_argument(
+        "-z",
+        "--attachments-hash",
+        dest="attachments_hash",
+        action="store_true",
+        help="Print attachments with fingerprints")
+
+    parser.add_argument(
         '-v',
         '--version',
         action='version',
@@ -136,6 +151,29 @@ def safe_print(data):
         print(data)
     except UnicodeEncodeError:
         print(data.encode('utf-8'))
+
+
+def print_mail_fingerprints(data):
+    md5, sha1, sha256, sha512 = fingerprints(data)
+    print("md5:\t{}".format(md5))
+    print("sha1:\t{}".format(sha1))
+    print("sha256:\t{}".format(sha256))
+    print("sha512:\t{}".format(sha512))
+
+
+def print_attachments(attachments, flag_hash):
+    if flag_hash:
+        for i in attachments:
+            if i.get("content_transfer_encoding") == "base64":
+                payload = i["payload"].decode("base64")
+            else:
+                payload = i["payload"]
+
+            i["md5"], i["sha1"], i["sha256"], i["sha512"] = \
+                fingerprints(payload)
+
+    for i in attachments:
+        safe_print(json.dumps(i, ensure_ascii=False, indent=4))
 
 
 def main():
@@ -183,9 +221,11 @@ def main():
         else:
             safe_print("Not Found")
 
-    if args.attachments:
-        for i in parser.attachments_list:
-            safe_print(json.dumps(i, ensure_ascii=False, indent=4))
+    if args.attachments or args.attachments_hash:
+        print_attachments(parser.attachments_list, args.attachments_hash)
+
+    if args.mail_hash:
+        print_mail_fingerprints(parser.body.encode("utf-8"))
 
 
 if __name__ == '__main__':

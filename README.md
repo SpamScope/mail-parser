@@ -92,7 +92,7 @@ parser.attachments_list: list of all attachments
 parser.date_mail
 parser.parsed_mail_obj: tokenized mail in a object
 parser.parsed_mail_json: tokenized mail in a JSON
-parser.defects: defect RFC non compliance
+parser.defects: defect RFC not compliance
 parser.defects_category: only defects categories
 parser.has_defects
 parser.anomalies
@@ -107,16 +107,15 @@ If you installed mailparser with `pip` or `setup.py` you can use it with command
 These are all swithes:
 
 ```
-usage: mailparser [-h] (-f FILE_ | -s STRING_) [-j] [-b] [-a] [-r] [-t] [-m]
-                  [-u] [-d] [-n]
+usage: mailparser.py [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
+                   [-u] [-d] [-n] [-i Trust mail server string] [-p] [-z] [-v]
 
 Wrapper for email Python Standard Library
 
 optional arguments:
   -h, --help            show this help message and exit
-  -f FILE_, --file FILE_
-                        Raw email file (default: None)
-  -s STRING_, --string STRING_
+  -f FILE, --file FILE  Raw email file (default: None)
+  -s STRING, --string STRING
                         Raw email string (default: None)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
@@ -130,6 +129,10 @@ optional arguments:
   -i Trust mail server string, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
                         (default: None)
+  -p, --mail-hash       Print mail fingerprints without headers (default:
+                        False)
+  -z, --attachments-hash
+                        Print attachments with fingerprints (default: False)
   -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
