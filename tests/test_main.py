@@ -82,6 +82,13 @@ class TestMain(unittest.TestCase):
             "--file", "mail.eml", "--senderip", "trust"])
         self.assertTrue(parsed.senderip)
 
+        parsed = self.parser.parse_args(["--file", "mail.eml", "-p"])
+        self.assertTrue(parsed.mail_hash)
+
+        parsed = self.parser.parse_args([
+            "--file", "mail.eml", "--attachments-hash"])
+        self.assertTrue(parsed.attachments_hash)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

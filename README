@@ -1,3 +1,5 @@
+|PyPI version| |Build Status| |Coverage Status|
+
 mail-parser
 ===========
 
@@ -93,7 +95,7 @@ Then you can get all parts
     parser.date_mail
     parser.parsed_mail_obj: tokenized mail in a object
     parser.parsed_mail_json: tokenized mail in a JSON
-    parser.defects: defect RFC non compliance
+    parser.defects: defect RFC not compliance
     parser.defects_category: only defects categories
     parser.has_defects
     parser.anomalies
@@ -114,8 +116,8 @@ These are all swithes:
 
 ::
 
-    usage: mailparser [-h] (-f FILE_ | -s STRING_) [-j] [-b] [-a] [-r] [-t] [-m]
-                      [-u] [-d] [-n]
+    usage: mailparser [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
+                      [-u] [-d] [-n] [-i Trust mail server string] [-p] [-z] [-v]
 
     Wrapper for email Python Standard Library
 
@@ -137,6 +139,10 @@ These are all swithes:
       -i Trust mail server string, --senderip Trust mail server string
                             Extract a reliable sender IP address heuristically
                             (default: None)
+      -p, --mail-hash       Print mail fingerprints without headers (default:
+                            False)
+      -z, --attachments-hash
+                            Print attachments with fingerprints (default: False)
       -v, --version         show program's version number and exit
 
     It takes as input a raw mail and generates a parsed object.
@@ -148,3 +154,11 @@ Example:
     $ mailparser -f example_mail -j
 
 This example will show you the tokenized mail in a JSON pretty format.
+
+
+.. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
+   :target: https://badge.fury.io/py/mail-parser
+.. |Build Status| image:: https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop
+   :target: https://travis-ci.org/SpamScope/mail-parser
+.. |Coverage Status| image:: https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop
+   :target: https://coveralls.io/github/SpamScope/mail-parser?branch=develop
