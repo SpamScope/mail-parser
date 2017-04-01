@@ -32,6 +32,7 @@ mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
 mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
+mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
 
 sys.path.append(root)
 from mailparser import MailParser
@@ -58,8 +59,11 @@ class TestMailParser(unittest.TestCase):
                                   "dba971ef99afeec4e6caf2fdd10be72eabb730"
                                   "c312ffbe1c4de3"))
 
-    def test_fingerprints_attachments(self):
-        pass
+    def test_malformed_mail(self):
+        self.parser.parse_from_file(mail_malformed_3)
+        defects_category = self.parser.defects_category
+        self.assertIn("StartBoundaryNotFoundDefect", defects_category)
+        self.assertIn("MultipartInvariantViolationDefect", defects_category)
 
     def test_type_error(self):
         self.parser.parse_from_file(mail_test_5)
