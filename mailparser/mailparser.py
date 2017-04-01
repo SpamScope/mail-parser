@@ -131,7 +131,7 @@ class MailParser(object):
                 p = email.message_from_string(epilogue)
                 parts.append(p)
             except:
-                log.error("Failed to get epilogue part")
+                log.exception("Failed to get epilogue part")
 
         # walk all mail parts
         for p in parts:
