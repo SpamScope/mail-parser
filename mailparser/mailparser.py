@@ -130,8 +130,12 @@ class MailParser(object):
             try:
                 p = email.message_from_string(epilogue)
                 parts.append(p)
+            except TypeError:
+                log.warning(
+                    "Failed to get epilogue part. Probably malformed.")
             except:
-                log.exception("Failed to get epilogue part")
+                log.error(
+                    "Failed to get epilogue part. Should check raw mail.")
 
         # walk all mail parts
         for p in parts:
