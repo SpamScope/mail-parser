@@ -46,6 +46,22 @@ class TestMailParser(unittest.TestCase):
         # Init
         self.parser = MailParser()
 
+    def test_ipaddress(self):
+        self.parser.parse_from_file(mail_test_2)
+        trust = "smtp.customers.net"
+
+        ip = "217.76.210.112"
+        result = self.parser.get_server_ipaddress(trust)
+        self.assertEqual(result, ip)
+
+        trust = ""
+        result = self.parser.get_server_ipaddress(trust)
+        self.assertEqual(result, None)
+
+        trust = "   "
+        result = self.parser.get_server_ipaddress(trust)
+        self.assertEqual(result, None)
+
     def test_fingerprints_body(self):
         self.parser.parse_from_file(mail_test_1)
         md5, sha1, sha256, sha512 = fingerprints(
