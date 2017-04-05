@@ -192,6 +192,9 @@ class MailParser(object):
             trust -- String that identify our mail server
         """
 
+        if not trust.strip():
+            return
+
         received = self._message.get_all("received", [])
 
         for i in received:
