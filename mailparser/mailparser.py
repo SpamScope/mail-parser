@@ -233,8 +233,12 @@ class MailParser(object):
 
     @property
     def to_(self):
-        return decode_header_part(
-            self._message.get('to', self._message.get('delivered-to')))
+        to_ = self._message.get('to')        
+        if not to_:
+            return None
+        else:
+            return decode_header_part(
+                self._message.get('to', self._message.get('delivered-to')))
 
     @property
     def from_(self):
