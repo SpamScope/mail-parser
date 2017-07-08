@@ -57,7 +57,13 @@ class MailParser(object):
 
         self._message = email.message_from_string(s)
         self._parse()
+        
+    def parse_from_bytes(self, bt):
+        """Parsing mail from bytes. """
 
+        self._message = email.message_from_bytes(bt)
+        self._parse()
+        
     def _append_defects(self, part, part_content_type):
         part_defects = {}
 
