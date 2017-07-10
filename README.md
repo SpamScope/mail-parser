@@ -12,7 +12,7 @@ From version 1.0.0rc1 mail-parser supports Python 3.
 
 ## Description
 
-mail-parser takes as input a raw email and generates a parsed object. This object is a tokenized mail with the all parts of mail and some indicator:
+mail-parser takes as input a raw email and generates a parsed object. This object is a tokenized email with some indicator:
   - body
   - headers
   - subject
@@ -24,7 +24,7 @@ mail-parser takes as input a raw email and generates a parsed object. This objec
   - charset mail
   - sender IP address
 
-We have also two indicator:
+We have also two types of indicator:
   - anomalies: mail without message id or date
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
 
