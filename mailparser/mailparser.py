@@ -34,43 +34,7 @@ from .utils import (ported_string, decode_header_part,
 log = logging.getLogger(__name__)
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
-epilogue_defects = {"StartBoundaryNotFoundDefect"}
-
-
-def parse_from_file(fp):
-    """Parsing email from file.
-
-    Args:
-        fp (string): file path of raw email
-
-    Returns:
-        Instance of MailParser with raw email parsed
-    """
-    return MailParser.from_file(fp).parse()
-
-
-def parse_from_string(s):
-    """Parsing email from string.
-
-    Args:
-        s (string): raw email
-
-    Returns:
-        Instance of MailParser with raw email parsed
-    """
-    return MailParser.from_string(s).parse()
-
-
-def parse_from_bytes(self, bt):
-    """Parsing email from bytes. Only for Python 3
-
-    Args:
-        bt (bytes-like object): raw email as bytes-like object
-
-    Returns:
-        Instance of MailParser with raw email parsed
-    """
-    return MailParser.from_bytes(bt).parse()
+EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
 
 class MailParser(object):
@@ -79,7 +43,7 @@ class MailParser(object):
     MailParser handles the enconding of email and split the raw email for you.
     """
 
-    def __init__(self, message):
+    def __init__(self, message=None):
         """Init a new object from a message object structure. """
         self._message = message
 
@@ -94,8 +58,8 @@ class MailParser(object):
             Instance of MailParser
         """
 
-        with ported_open(fp) as mail:
-            message = email.message_from_file(mail)
+        with ported_open(fp) as f:
+            message = email.message_from_file(f)
         return cls(message)
 
     @classmethod
@@ -123,10 +87,54 @@ class MailParser(object):
             Instance of MailParser
         """
         if six.PY2:
-            raise("Parsing from bytes is valid only for Python 3.x version")
+            raise EnvironmentError(
+                "Parsing from bytes is valid only for Python 3.x version")
 
         message = email.message_from_bytes(bt)
         return cls(message)
+
+    def parse_from_file(self, fp):
+        """Parse the raw email from a file path.
+
+        Args:
+            fp (string): file path of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        with ported_open(fp) as f:
+            self._message = email.message_from_file(f)
+        return self.parse()
+
+    def parse_from_string(self, s):
+        """Parse the raw email from a string.
+
+        Args:
+            s (string): raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        self._message = email.message_from_string(s)
+        return self.parse()
+
+    def parse_from_bytes(self, bt):
+        """Parse the raw mail from bytes.
+
+        Args:
+            bt (bytes-like object): raw email as bytes-like object
+
+        Returns:
+            Instance of MailParser
+        """
+        if six.PY2:
+            raise EnvironmentError(
+                "Parsing from bytes is valid only for Python 3.x version")
+
+        self._message = email.message_from_bytes(bt)
+        return self.parse()
 
     def _append_defects(self, part, part_content_type):
         """The defects attribute contains a list of all the problems found
@@ -196,7 +204,7 @@ class MailParser(object):
 
         # Reset for new mail
         self._reset()
-        parts = list()  # Normal parts plus defects
+        parts = []  # Normal parts plus defects
 
         # walk all mail parts to search defects
         for p in self.message.walk():
@@ -205,7 +213,7 @@ class MailParser(object):
             parts.append(p)
 
         # If defects are in epilogue defects get epilogue
-        if self.defects_category & epilogue_defects:
+        if self.defects_category & EPILOGUE_DEFECTS:
             epilogue = find_between(
                 self.message.epilogue,
                 "{}".format("--" + self.message.get_boundary()),
@@ -254,7 +262,7 @@ class MailParser(object):
         return self
 
     def get_server_ipaddress(self, trust):
-        """ Return the ip address of sender
+        """Return the ip address of sender
 
         Extract a reliable sender IP address heuristically for each message.
         Although the message format dictates a chain of relaying IP
