@@ -21,12 +21,9 @@ import argparse
 import os
 import runpy
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
+import simplejson as json
 
-from mailparser import MailParser
+import mailparser
 from .utils import fingerprints
 
 current = os.path.realpath(os.path.dirname(__file__))
@@ -179,12 +176,10 @@ def print_attachments(attachments, flag_hash):
 def main():
     args = get_args().parse_args()
 
-    parser = MailParser()
-
     if args.file:
-        parser.parse_from_file(args.file)
+        parser = mailparser.parse_from_file(args.file)
     elif args.string:
-        parser.parse_from_string(args.string)
+        parser = mailparser.parse_from_string(args.string)
 
     if args.json:
         j = json.loads(parser.parsed_mail_json)
