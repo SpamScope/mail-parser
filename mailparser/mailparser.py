@@ -20,45 +20,163 @@ limitations under the License.
 from __future__ import unicode_literals
 import datetime
 import email
-import ipaddress
 import logging
 import re
+
+import ipaddress
 import six
+import simplejson as json
 
-try:
-    import simplejson as json
-except ImportError:
-    import json
-
-from .exceptions import InvalidMail
 from .utils import (ported_string, decode_header_part,
                     ported_open, find_between)
 
+
 log = logging.getLogger(__name__)
+
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
+
+
+def parse_from_file(fp):
+    """Parsing email from file.
+
+    Args:
+        fp (string): file path of raw email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_file(fp).parse()
+
+
+def parse_from_string(s):
+    """Parsing email from string.
+
+    Args:
+        s (string): raw email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_string(s).parse()
+
+
+def parse_from_bytes(bt):
+    """Parsing email from bytes. Only for Python 3
+
+    Args:
+        bt (bytes-like object): raw email as bytes-like object
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_bytes(bt).parse()
 
 
 class MailParser(object):
-    """Tokenizer for raw mails. """
+    """MailParser package provides a standard parser that understands
+    most email document structures like official email package.
+    MailParser handles the enconding of email and split the raw email for you.
+    """
 
-    # With these defect bad payload is on epilogue
-    epilogue_defects = {"StartBoundaryNotFoundDefect"}
+    def __init__(self, message=None):
+        """Init a new object from a message object structure. """
+        self._message = message
 
-    def parse_from_file(self, fd):
-        """Parsing mail from file. """
+    @classmethod
+    def from_file(cls, fp):
+        """Init a new object from a file path.
 
-        # with open(fd, encoding='utf-8', errors='ignore') as mail:
-        with ported_open(fd) as mail:
-            self._message = email.message_from_file(mail)
-            self._parse()
+        Args:
+            fp (string): file path of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        with ported_open(fp) as f:
+            message = email.message_from_file(f)
+        return cls(message)
+
+    @classmethod
+    def from_string(cls, s):
+        """Init a new object from a string.
+
+        Args:
+            s (string): raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        message = email.message_from_string(s)
+        return cls(message)
+
+    @classmethod
+    def from_bytes(cls, bt):
+        """Init a new object from bytes.
+
+        Args:
+            bt (bytes-like object): raw email as bytes-like object
+
+        Returns:
+            Instance of MailParser
+        """
+        if six.PY2:
+            raise EnvironmentError(
+                "Parsing from bytes is valid only for Python 3.x version")
+
+        message = email.message_from_bytes(bt)
+        return cls(message)
+
+    def parse_from_file(self, fp):
+        """Parse the raw email from a file path.
+
+        Args:
+            fp (string): file path of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        with ported_open(fp) as f:
+            self._message = email.message_from_file(f)
+        return self.parse()
 
     def parse_from_string(self, s):
-        """Parsing mail from string. """
+        """Parse the raw email from a string.
+
+        Args:
+            s (string): raw email
+
+        Returns:
+            Instance of MailParser
+        """
 
         self._message = email.message_from_string(s)
-        self._parse()
+        return self.parse()
+
+    def parse_from_bytes(self, bt):
+        """Parse the raw mail from bytes.
+
+        Args:
+            bt (bytes-like object): raw email as bytes-like object
+
+        Returns:
+            Instance of MailParser
+        """
+        if six.PY2:
+            raise EnvironmentError(
+                "Parsing from bytes is valid only for Python 3.x version")
+
+        self._message = email.message_from_bytes(bt)
+        return self.parse()
 
     def _append_defects(self, part, part_content_type):
+        """The defects attribute contains a list of all the problems found
+        when parsing this message.
+        """
+
         part_defects = {}
 
         for e in part.defects:
@@ -74,6 +192,8 @@ class MailParser(object):
             self._defects.append(part_defects)
 
     def _reset(self):
+        """Reset the state of object. """
+
         self._attachments = list()
         self._text_plain = list()
         self._defects = list()
@@ -83,6 +203,8 @@ class MailParser(object):
         self._anomalies = list()
 
     def _make_mail(self):
+        """This method assigns the right values to all tokens of email. """
+
         # mail object
         self._mail = {
             "attachments": self.attachments_list,
@@ -105,27 +227,33 @@ class MailParser(object):
         if self.has_anomalies:
             self._mail["anomalies"] = self.anomalies
 
-    def _parse(self):
-        if not self._message.keys():
-            raise InvalidMail("Mail without headers: {}".format(
-                self._message.as_string()))
+    def parse(self):
+        """This method parses the raw email and makes the tokens.
+
+        Returns:
+            Instance of MailParser with raw email parsed
+        """
+
+        if not self.message.keys():
+            raise ValueError("This email doesn't have headers:\n\n{}".format(
+                self.message_as_string))
 
         # Reset for new mail
         self._reset()
-        parts = list()  # Normal parts plus defects
+        parts = []  # Normal parts plus defects
 
         # walk all mail parts to search defects
-        for p in self._message.walk():
+        for p in self.message.walk():
             part_content_type = p.get_content_type()
             self._append_defects(p, part_content_type)
             parts.append(p)
 
         # If defects are in epilogue defects get epilogue
-        if self.defects_category & self.epilogue_defects:
+        if self.defects_category & EPILOGUE_DEFECTS:
             epilogue = find_between(
-                self._message.epilogue,
-                "{}".format("--" + self._message.get_boundary()),
-                "{}".format("--" + self._message.get_boundary() + "--"))
+                self.message.epilogue,
+                "{}".format("--" + self.message.get_boundary()),
+                "{}".format("--" + self.message.get_boundary() + "--"))
 
             try:
                 p = email.message_from_string(epilogue)
@@ -167,9 +295,10 @@ class MailParser(object):
 
         # Parsed object mail
         self._make_mail()
+        return self
 
     def get_server_ipaddress(self, trust):
-        """ Return ip address  of sender
+        """Return the ip address of sender
 
         Extract a reliable sender IP address heuristically for each message.
         Although the message format dictates a chain of relaying IP
@@ -188,14 +317,17 @@ class MailParser(object):
         In our case we trust only our mail server with the trust string.
 
 
-        Keyword arguments:
-            trust -- String that identify our mail server
+        Args:
+            trust (string): String that identify our mail server
+
+        Return:
+            string with the ip address
         """
 
         if not trust.strip():
             return
 
-        received = self._message.get_all("received", [])
+        received = self.message.get_all("received", [])
 
         for i in received:
             if trust in i:
@@ -211,20 +343,33 @@ class MailParser(object):
                         return six.text_type(check[-1])
 
     @property
+    def message(self):
+        """email.message.Message class. """
+        return self._message
+
+    @property
+    def message_as_string(self):
+        """Return the entire message flattened as a string. """
+        return self.message.as_string()
+
+    @property
     def body(self):
+        """Return the only the body. """
         return "\n".join(self.text_plain_list)
 
     @property
     def headers(self):
+        """Return the only the headers. """
         s = ""
-        for k, v in self._message.items():
+        for k, v in self.message.items():
             v_u = decode_header_part(v)
             s += k + " " + v_u + "\n"
         return s
 
     @property
     def message_id(self):
-        message_id = self._message.get('message-id', None)
+        """Return the message id. """
+        message_id = self.message.get('message-id', None)
         if not message_id:
             self._anomalies.append('mail_without_message-id')
             return None
@@ -233,30 +378,36 @@ class MailParser(object):
 
     @property
     def to_(self):
+        """Return the receiver of message. """
         return decode_header_part(
-            self._message.get('to', self._message.get('delivered-to')))
+            self.message.get('to', self.message.get('delivered-to')))
 
     @property
     def from_(self):
+        """Return the sender of message. """
         return decode_header_part(
-            self._message.get('from'))
+            self.message.get('from'))
 
     @property
     def subject(self):
+        """Return the subject of message. """
         return decode_header_part(
-            self._message.get('subject'))
+            self.message.get('subject'))
 
     @property
     def text_plain_list(self):
+        """Return a list of all text plain part of email. """
         return self._text_plain
 
     @property
     def attachments_list(self):
+        """Return the attachments list of email. """
         return self._attachments
 
     @property
     def date_mail(self):
-        date_ = self._message.get('date')
+        """Return the date of email as datetime.datetime. """
+        date_ = self.message.get('date')
 
         if not date_:
             self._anomalies.append('mail_without_date')
@@ -271,10 +422,12 @@ class MailParser(object):
 
     @property
     def parsed_mail_obj(self):
+        """Return an Python object with all tokens of email. """
         return self._mail
 
     @property
     def parsed_mail_json(self):
+        """Return a json with all tokens of email. """
         self._mail["date"] = self.date_mail.isoformat() \
             if self.date_mail else ""
         return json.dumps(
@@ -294,7 +447,7 @@ class MailParser(object):
 
     @property
     def has_defects(self):
-        """Boolean: True if mail has defects. """
+        """Return a boolean: True if mail has defects. """
         return self._has_defects
 
     @property
@@ -308,4 +461,5 @@ class MailParser(object):
 
     @property
     def has_anomalies(self):
+        """Return a boolean: True if mail has anomalies. """
         return True if self.anomalies else False
