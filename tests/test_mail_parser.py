@@ -240,6 +240,36 @@ class TestMailParser(unittest.TestCase):
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable")
 
+    def test_from_bytes(self):
+        if six.PY2:
+            with self.assertRaises(EnvironmentError):
+                mailparser.MailParser.from_bytes(b"")
+
+    def test_classmethods(self):
+        # MailParser.from_file
+        m = mailparser.MailParser.from_file(mail_test_3)
+        m.parse()
+        result = m.parsed_mail_obj
+        self.assertEqual(len(result["attachments"]), 1)
+
+        # MailParser.from_string
+        m = mailparser.MailParser.from_string(m.message_as_string)
+        m.parse()
+        result = m.parsed_mail_obj
+        self.assertEqual(len(result["attachments"]), 1)
+
+    def test_parser_methods(self):
+        m = mailparser.MailParser()
+        self.assertIsNone(m.message)
+
+        m.parse_from_file(mail_test_3)
+        result = m.parsed_mail_obj
+        self.assertEqual(len(result["attachments"]), 1)
+
+        n = mailparser.MailParser()
+        n.parse_from_string(m.message_as_string)
+        self.assertEqual(len(result["attachments"]), 1)
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
