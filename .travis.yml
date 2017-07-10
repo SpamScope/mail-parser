@@ -18,6 +18,13 @@ script:
     - python tests/test_main.py
     - python -m mailparser -v
     - python -m mailparser -h
+    - python -m mailparser -f tests/mails/mail_malformed_3 -j
 
 after_success:
     coveralls
+
+notifications:
+    email: false
+    slack:
+        secure: eawY0ibL+ldzr+lL+QQHicUaoQwom01P7g57avv9ebZ256VMzTuiIYkkNuyetTmjU7oACgrzmIJiuYdeyYYqJDfGBLS/Z6KeIb11iAa9vAmAjmoarP1eyR6XcyIOpAxRXDFDGaqjEqyjikI3P8HQvnv24YFRdpR0jd8kf9rZ9DHVMIOKRi4okBmZvCCgS5YhZJEdOujHwPlF71ZIOk26S7dGRu4gJeLRMPnhwcM2TKqcsU+cZaaRP9n/0sQ/gqDbb+SKtENGLNfTuTuJvhrhsGcbGpFH4M5RDpvJvvlUZQhJBc3ordFXYGT0IQcAn4Os4gOXgcy0JD+74uh/uICohvWKJio5diwH91FVkTF/gODOKSfyEfO2nAKHLF8KRkYoPitecR9KdUbEALeHRxNxWLfumivzJxOK4QLo94qx6LvSIA9j3o137U0POA7gRHYmZCSdDrkxBI5eFqBbivLNGKN6v0a5tZIRSCLfNsr6ZiNcxM5KO9vUIMJ6HdpNTZDqKsd9JFdV2wI/q/yy7vhoocxAtk+H88jdvrqiA9B5jwoHaQ7lGsgmkvPNLeuNsarr3VDGZGzMmqnssx9G4F8jQP52n4t2RfZqe6xE2867J4tt1H/5YkWJiacoxquAe7DcCn1qXko9q9Mbs6lDN9fumb3J5HmG7R/yeX79zAGPE5w=
+

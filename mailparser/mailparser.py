@@ -37,6 +37,42 @@ REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
 
+def parse_from_file(fp):
+    """Parsing email from file.
+
+    Args:
+        fp (string): file path of raw email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_file(fp).parse()
+
+
+def parse_from_string(s):
+    """Parsing email from string.
+
+    Args:
+        s (string): raw email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_string(s).parse()
+
+
+def parse_from_bytes(bt):
+    """Parsing email from bytes. Only for Python 3
+
+    Args:
+        bt (bytes-like object): raw email as bytes-like object
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_bytes(bt).parse()
+
+
 class MailParser(object):
     """MailParser package provides a standard parser that understands
     most email document structures like official email package.
