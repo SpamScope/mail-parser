@@ -392,7 +392,7 @@ class MailParser(object):
     def subject(self):
         """Return the subject of message. """
         return decode_header_part(
-            self.message.get('subject'))
+            self.message.get('subject', ''))
 
     @property
     def text_plain_list(self):
