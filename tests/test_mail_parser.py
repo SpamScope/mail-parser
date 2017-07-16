@@ -30,6 +30,7 @@ mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
 mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
+mail_test_6 = os.path.join(base_path, 'mails', 'mail_test_6')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -269,6 +270,11 @@ class TestMailParser(unittest.TestCase):
         n = mailparser.MailParser()
         n.parse_from_string(m.message_as_string)
         self.assertEqual(len(result["attachments"]), 1)
+
+    def test_bug_UnicodeDecodeError(self):
+        m = mailparser.parse_from_file(mail_test_6)
+        self.assertIsInstance(m.parsed_mail_obj, dict)
+        self.assertIsInstance(m.parsed_mail_json, six.text_type)
 
 
 if __name__ == '__main__':
