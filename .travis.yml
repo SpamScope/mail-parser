@@ -19,6 +19,7 @@ script:
     - python -m mailparser -v
     - python -m mailparser -h
     - python -m mailparser -f tests/mails/mail_malformed_3 -j
+    - python -m mailparser -f tests/mails/mail_test_6 -j
 
 after_success:
     coveralls

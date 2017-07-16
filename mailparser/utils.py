@@ -69,8 +69,8 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
     if six.PY3:
         try:
             return six.text_type(raw_data, encoding).strip()
-        except LookupError:
-            return six.text_type(raw_data, "utf-8").strip()
+        except (LookupError, UnicodeDecodeError):
+            return six.text_type(raw_data, "utf-8", errors).strip()
 
 
 def decode_header_part(header):
