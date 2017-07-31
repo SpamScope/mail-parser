@@ -380,13 +380,13 @@ class MailParser(object):
     def to_(self):
         """Return the receiver of message. """
         return decode_header_part(
-            self.message.get('to', self.message.get('delivered-to')))
+            self.message.get('to', self.message.get('delivered-to', '')))
 
     @property
     def from_(self):
         """Return the sender of message. """
         return decode_header_part(
-            self.message.get('from'))
+            self.message.get('from', ''))
 
     @property
     def subject(self):
