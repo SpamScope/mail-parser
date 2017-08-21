@@ -117,6 +117,13 @@ def fingerprints(data):
 
     Hashes = namedtuple('Hashes', "md5 sha1 sha256 sha512")
 
+    if six.PY2:
+        if not isinstance(data, str):
+            data = data.encode("utf-8")
+    elif six.PY3:
+        if not isinstance(data, bytes) and not isinstance(data, buffer):
+            data = data.encode("utf-8")
+
     # md5
     md5 = hashlib.md5()
     md5.update(data)
