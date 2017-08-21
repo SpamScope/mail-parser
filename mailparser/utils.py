@@ -121,7 +121,7 @@ def fingerprints(data):
         if not isinstance(data, str):
             data = data.encode("utf-8")
     elif six.PY3:
-        if not isinstance(data, bytes) and not isinstance(data, buffer):
+        if not isinstance(data, bytes):
             data = data.encode("utf-8")
 
     # md5
