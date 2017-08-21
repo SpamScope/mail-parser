@@ -31,6 +31,7 @@ mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
 mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
 mail_test_6 = os.path.join(base_path, 'mails', 'mail_test_6')
+mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -70,6 +71,11 @@ class TestMailParser(unittest.TestCase):
                                   "77522995851fb6b625ac54744cf3a4bf652784"
                                   "dba971ef99afeec4e6caf2fdd10be72eabb730"
                                   "c312ffbe1c4de3"))
+
+    def test_fingerprints_unicodeencodeerror(self):
+        mail = mailparser.parse_from_file(mail_test_7)
+        for i in mail.attachments_list:
+            fingerprints(i["payload"])
 
     def test_malformed_mail(self):
         mail = mailparser.parse_from_file(mail_malformed_3)
