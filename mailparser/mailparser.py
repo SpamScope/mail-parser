@@ -363,7 +363,7 @@ class MailParser(object):
         s = ""
         for k, v in self.message.items():
             v_u = decode_header_part(v)
-            s += k + " " + v_u + "\n"
+            s += k + ": " + v_u + "\n"
         return s
 
     @property
