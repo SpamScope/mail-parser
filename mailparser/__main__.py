@@ -100,6 +100,13 @@ def get_args():
         help="Print the subject of mail")
 
     parser.add_argument(
+        "-c",
+        "--receiveds",
+        dest="receiveds",
+        action="store_true",
+        help="Print all receiveds of mail")
+
+    parser.add_argument(
         "-d",
         "--defects",
         dest="defects",
@@ -200,6 +207,9 @@ def main():
 
     if args.subject:
         safe_print(parser.subject)
+
+    if args.receiveds:
+        safe_print(parser.receiveds)
 
     if args.defects:
         for i in parser.defects_category:
