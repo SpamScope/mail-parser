@@ -97,6 +97,13 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertIn("mail_without_date", mail.anomalies)
 
+    def test_receiveds(self):
+        mail = mailparser.parse_from_file(mail_test_1)
+        self.assertIsInstance(mail.receiveds_obj, list)
+        self.assertEqual(len(mail.receiveds_obj), 4)
+        self.assertIsInstance(mail.receiveds, six.text_type)
+        self.assertIn("Received:", mail.receiveds)
+
     def test_parsing_know_values(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"

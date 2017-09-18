@@ -343,6 +343,34 @@ class MailParser(object):
                         return six.text_type(check[-1])
 
     @property
+    def receiveds_obj(self):
+        """Return all headers receiveds as object
+
+        Return:
+            list of receiveds
+        """
+
+        output = []
+        receiveds = self.message.get_all("received", [])
+
+        for i in receiveds:
+            output.append(decode_header_part(i))
+
+        return output
+
+    @property
+    def receiveds(self):
+        """Return all headers receiveds as json
+
+        Return:
+            string of all receiveds
+        """
+        s = ""
+        for i in self.receiveds_obj:
+            s += "Received: " + i + "\n"
+        return s.strip()
+
+    @property
     def message(self):
         """email.message.Message class. """
         return self._message
