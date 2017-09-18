@@ -24,6 +24,7 @@ mail-parser takes as input a raw email and generates a parsed object. This objec
   - date
   - charset mail
   - sender IP address
+  - receiveds
 
 We have also two types of indicator:
   - anomalies: mail without message id or date
@@ -99,6 +100,7 @@ mail.has_defects
 mail.anomalies
 mail.has_anomalies
 mail.get_server_ipaddress(trust="my_server_mail_trust")
+mail.receiveds
 ```
 
 ## Usage from command-line
@@ -109,7 +111,8 @@ These are all swithes:
 
 ```
 usage: mailparser.py [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
-                   [-u] [-d] [-n] [-i Trust mail server string] [-p] [-z] [-v]
+                   [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
+                   [-v]
 
 Wrapper for email Python Standard Library
 
@@ -125,6 +128,7 @@ optional arguments:
   -t, --to              Print the to of mail (default: False)
   -m, --from            Print the from of mail (default: False)
   -u, --subject         Print the subject of mail (default: False)
+  -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -n, --anomalies       Print the anomalies of mail (default: False)
   -i Trust mail server string, --senderip Trust mail server string
