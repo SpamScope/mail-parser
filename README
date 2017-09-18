@@ -1,4 +1,4 @@
-|PyPI version| |Build Status| |Coverage Status|
+|PyPI version| |Build Status| |Coverage Status| |BCH compliance|
 
 mail-parser
 ===========
@@ -162,3 +162,5 @@ This example will show you the tokenized mail in a JSON pretty format.
    :target: https://travis-ci.org/SpamScope/mail-parser
 .. |Coverage Status| image:: https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop
    :target: https://coveralls.io/github/SpamScope/mail-parser?branch=develop
+.. |BCH compliance| image:: https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=devel
+   :target: https://bettercodehub.com/
