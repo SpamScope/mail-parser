@@ -144,6 +144,7 @@ optional arguments:
   -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -n, --anomalies       Print the anomalies of mail (default: False)
+  -o, --outlook         Analyze Outlook msg (default: False)
   -i Trust mail server string, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
                         (default: None)
