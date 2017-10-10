@@ -18,13 +18,17 @@ limitations under the License.
 """
 
 from __future__ import unicode_literals
+
+from collections import namedtuple
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
-
-from collections import namedtuple
 import hashlib
 import logging
+import os
+import subprocess
+import tempfile
+
 import six
 
 
@@ -145,3 +149,38 @@ def fingerprints(data):
     sha512 = sha512.hexdigest()
 
     return Hashes(md5, sha1, sha256, sha512)
+
+
+def msgconvert(email):
+    """Exec msgconvert tool, to convert msg Outlook
+    mail in eml mail format
+
+    Args:
+        email (string): file path of Outlook msg mail
+
+    Return:
+        tuple with file path of mail converted and
+        standard output data (unicode Python 2, str Python 3)
+    """
+    temp = tempfile.mkstemp(prefix="outlook_")[-1]
+    command = ["msgconvert", "--mbox", temp, email]
+
+    try:
+        if six.PY2:
+            with open(os.devnull, "w") as devnull:
+                out = subprocess.Popen(
+                    command, stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE, stderr=devnull)
+        elif six.PY3:
+            out = subprocess.Popen(
+                command, stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    except OSError:
+        message = "To use this function you must install 'msgconvert' tool"
+        log.exception(message)
+        raise OSError(message)
+
+    else:
+        stdoutdata, _ = out.communicate()
+        return temp, stdoutdata.decode("utf-8").strip()
