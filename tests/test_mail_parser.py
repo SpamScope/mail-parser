@@ -35,10 +35,11 @@ mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
+mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
-from mailparser.utils import fingerprints
+from mailparser.utils import fingerprints, msgconvert
 
 
 class TestMailParser(unittest.TestCase):
@@ -248,6 +249,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(
             result["attachments"][0]["mail_content_type"], six.text_type)
+        self.assertFalse(result["attachments"][0]["binary"])
         self.assertIsInstance(
             result["attachments"][0]["payload"], six.text_type)
         self.assertEqual(
@@ -288,6 +290,41 @@ class TestMailParser(unittest.TestCase):
         m = mailparser.parse_from_file(mail_test_6)
         self.assertIsInstance(m.parsed_mail_obj, dict)
         self.assertIsInstance(m.parsed_mail_json, six.text_type)
+
+    def test_parse_from_file_msg(self):
+        """
+        Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
+
+        The email used for unittest were found randomly on VirusTotal and
+        then already publicly available so can not be considered
+        as privacy violation
+        """
+
+        m = mailparser.parse_from_file_msg(mail_outlook_1)
+        email = m.parsed_mail_obj
+        self.assertIn("attachments", email)
+        self.assertEqual(len(email["attachments"]), 5)
+        self.assertIn("from", email)
+        self.assertEqual(email["from"], "<NueblingV@w-vwa.de>")
+        self.assertIn("subject", email)
+
+        m = mailparser.MailParser()
+        m = m.parse_from_file_msg(mail_outlook_1)
+        self.assertEqual(email["body"], m.body)
+
+    def test_msgconvert(self):
+        """
+        Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
+
+        The email used for unittest were found randomly on VirusTotal and
+        then already publicly available so can not be considered
+        as privacy violation
+        """
+
+        f, _ = msgconvert(mail_outlook_1)
+        self.assertTrue(os.path.exists(f))
+        m = mailparser.parse_from_file(f)
+        self.assertEqual(m.from_, "<NueblingV@w-vwa.de>")
 
 
 if __name__ == '__main__':

@@ -18,5 +18,5 @@ limitations under the License.
 """
 
 
-from .mailparser import (MailParser, parse_from_file,
+from .mailparser import (MailParser, parse_from_file, parse_from_file_msg,
                          parse_from_string, parse_from_bytes)
