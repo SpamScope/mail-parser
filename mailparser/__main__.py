@@ -121,6 +121,13 @@ def get_args():
         help="Print the anomalies of mail")
 
     parser.add_argument(
+        "-o",
+        "--outlook",
+        dest="outlook",
+        action="store_true",
+        help="Analyze Outlook msg")
+
+    parser.add_argument(
         "-i",
         "--senderip",
         dest="senderip",
@@ -184,7 +191,10 @@ def main():
     args = get_args().parse_args()
 
     if args.file:
-        parser = mailparser.parse_from_file(args.file)
+        if args.outlook:
+            parser = mailparser.parse_from_file_msg(args.file)
+        else:
+            parser = mailparser.parse_from_file(args.file)
     elif args.string:
         parser = mailparser.parse_from_string(args.string)
 

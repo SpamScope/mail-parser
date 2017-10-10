@@ -21,14 +21,16 @@ from __future__ import unicode_literals
 import datetime
 import email
 import logging
+import os
 import re
 
 import ipaddress
 import six
 import simplejson as json
 
-from .utils import (ported_string, decode_header_part,
-                    ported_open, find_between)
+from .utils import (
+    ported_string, decode_header_part, ported_open,
+    find_between, msgconvert)
 
 
 log = logging.getLogger(__name__)
@@ -47,6 +49,18 @@ def parse_from_file(fp):
         Instance of MailParser with raw email parsed
     """
     return MailParser.from_file(fp).parse()
+
+
+def parse_from_file_msg(fp):
+    """Parsing email from file Outlook msg.
+
+    Args:
+        fp (string): file path of raw Outlook email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_file_msg(fp).parse()
 
 
 def parse_from_string(s):
@@ -74,7 +88,8 @@ def parse_from_bytes(bt):
 
 
 class MailParser(object):
-    """MailParser package provides a standard parser that understands
+    """
+    MailParser package provides a standard parser that understands
     most email document structures like official email package.
     MailParser handles the enconding of email and split the raw email for you.
     """
@@ -84,11 +99,12 @@ class MailParser(object):
         self._message = message
 
     @classmethod
-    def from_file(cls, fp):
+    def from_file(cls, fp, is_outlook=False):
         """Init a new object from a file path.
 
         Args:
             fp (string): file path of raw email
+            is_outlook (boolean): if True is an Outlook email
 
         Returns:
             Instance of MailParser
@@ -96,7 +112,26 @@ class MailParser(object):
 
         with ported_open(fp) as f:
             message = email.message_from_file(f)
+
+        if is_outlook:
+            os.remove(fp)
+
         return cls(message)
+
+    @classmethod
+    def from_file_msg(cls, fp):
+        """
+        Init a new object from a Outlook message file,
+        mime type: application/vnd.ms-outlook
+
+        Args:
+            fp (string): file path of raw Outlook email
+
+        Returns:
+            Instance of MailParser
+        """
+        f, _ = msgconvert(fp)
+        return cls.from_file(f, True)
 
     @classmethod
     def from_string(cls, s):
@@ -141,6 +176,21 @@ class MailParser(object):
 
         with ported_open(fp) as f:
             self._message = email.message_from_file(f)
+        return self.parse()
+
+    def parse_from_file_msg(self, fp):
+        """Parse the raw email from a file Outlook.
+
+        Args:
+            fp (string): file path of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+        t, _ = msgconvert(fp)
+        with ported_open(t) as f:
+            self._message = email.message_from_file(f)
+        os.remove(t)
         return self.parse()
 
     def parse_from_string(self, s):
@@ -215,6 +265,7 @@ class MailParser(object):
             "message_id": self.message_id,
             "subject": self.subject,
             "to": self.to_,
+            "receiveds": self.receiveds_obj,
             "has_defects": self.has_defects,
             "has_anomalies": self.has_anomalies}
 
@@ -270,14 +321,26 @@ class MailParser(object):
             if not p.is_multipart():
                 filename = ported_string(p.get_filename())
                 charset = p.get_content_charset('utf-8')
+                binary = False
 
                 if filename:
                     mail_content_type = ported_string(p.get_content_type())
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
 
-                    if transfer_encoding == "base64":
+                    if transfer_encoding in ("base64"):
                         payload = p.get_payload(decode=False)
+                        binary = True
+                    elif transfer_encoding in ("quoted-printable"):
+                        d = p.get_payload(decode=True)
+                        e = p.get_payload(decode=False)
+
+                        # In this case maybe is a binary with malformed base64
+                        if d == e:
+                            payload = e
+                            binary = True
+                        else:
+                            payload = ported_string(d, encoding=charset)
                     else:
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
@@ -285,6 +348,7 @@ class MailParser(object):
                     self._attachments.append({
                         "filename": filename,
                         "payload": payload,
+                        "binary": binary,
                         "mail_content_type": mail_content_type,
                         "content_transfer_encoding": transfer_encoding})
                 else:
@@ -390,7 +454,7 @@ class MailParser(object):
         """Return the only the headers. """
         s = ""
         for k, v in self.message.items():
-            v_u = decode_header_part(v)
+            v_u = re.sub(" +", " ", decode_header_part(v))
             s += k + ": " + v_u + "\n"
         return s
 

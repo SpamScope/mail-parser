@@ -7,9 +7,22 @@
 
 ## Overview
 
-mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
+mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. 
+It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
 
-From version 1.0.0rc1 mail-parser supports Python 3.
+mail-parser can parse Outlook email format (.msg). To use this feature, you need to install `libemail-outlook-message-perl` package. For Debian based systems:
+
+```
+$ apt-get install libemail-outlook-message-perl
+```
+
+For more details:
+
+```
+$ apt-cache show libemail-outlook-message-perl
+```
+
+mail-parser supports Python 3.
 
 ## Description
 
@@ -57,15 +70,15 @@ git clone https://github.com/SpamScope/mail-parser.git
 and install mail-parser with `setup.py`:
 
 ```
-cd mail-parser
+$ cd mail-parser
 
-python setup.py install
+$ python setup.py install
 ```
 
 or use `pip`:
 
 ```
-pip install mail-parser
+$ pip install mail-parser
 ```
 
 ## Usage in a project
