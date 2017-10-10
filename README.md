@@ -7,9 +7,22 @@
 
 ## Overview
 
-mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
+mail-parser is a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library. 
+It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
 
-From version 1.0.0rc1 mail-parser supports Python 3.
+mail-parser can parse Outlook email format (.msg). To use this feature, you need to install `libemail-outlook-message-perl` package. For Debian based systems:
+
+```
+$ apt-get install libemail-outlook-message-perl
+```
+
+For more details:
+
+```
+$ apt-cache show libemail-outlook-message-perl
+```
+
+mail-parser supports Python 3.
 
 ## Description
 
@@ -24,6 +37,7 @@ mail-parser takes as input a raw email and generates a parsed object. This objec
   - date
   - charset mail
   - sender IP address
+  - receiveds
 
 We have also two types of indicator:
   - anomalies: mail without message id or date
@@ -56,15 +70,15 @@ git clone https://github.com/SpamScope/mail-parser.git
 and install mail-parser with `setup.py`:
 
 ```
-cd mail-parser
+$ cd mail-parser
 
-python setup.py install
+$ python setup.py install
 ```
 
 or use `pip`:
 
 ```
-pip install mail-parser
+$ pip install mail-parser
 ```
 
 ## Usage in a project
@@ -99,6 +113,7 @@ mail.has_defects
 mail.anomalies
 mail.has_anomalies
 mail.get_server_ipaddress(trust="my_server_mail_trust")
+mail.receiveds
 ```
 
 ## Usage from command-line
@@ -109,7 +124,8 @@ These are all swithes:
 
 ```
 usage: mailparser.py [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
-                   [-u] [-d] [-n] [-i Trust mail server string] [-p] [-z] [-v]
+                   [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
+                   [-v]
 
 Wrapper for email Python Standard Library
 
@@ -125,8 +141,10 @@ optional arguments:
   -t, --to              Print the to of mail (default: False)
   -m, --from            Print the from of mail (default: False)
   -u, --subject         Print the subject of mail (default: False)
+  -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -n, --anomalies       Print the anomalies of mail (default: False)
+  -o, --outlook         Analyze Outlook msg (default: False)
   -i Trust mail server string, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
                         (default: None)

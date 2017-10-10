@@ -1,3 +1,5 @@
+sudo: required
+
 language: python
 
 python:
@@ -7,8 +9,18 @@ python:
     - "3.5"
     - "3.6"
 
+before_install:
+    - sudo apt-get -qq update
+
+    # Install msgconvert
+    - sudo apt-get install -y libemail-outlook-message-perl
+
 # command to install dependencies
 install: 
+    # Install msgconvert
+    - export PERL_MM_USE_DEFAULT=1
+    - sudo cpan -f -i Email::Outlook::Message
+
     - pip install -r requirements.txt
     - pip install coveralls
 
