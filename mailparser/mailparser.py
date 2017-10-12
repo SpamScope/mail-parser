@@ -328,19 +328,11 @@ class MailParser(object):
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
 
-                    if transfer_encoding in ("base64"):
+                    if transfer_encoding == "base64" or \
+                            (transfer_encoding == "quoted-printable" and
+                             "application" in mail_content_type):
                         payload = p.get_payload(decode=False)
                         binary = True
-                    elif transfer_encoding in ("quoted-printable"):
-                        d = p.get_payload(decode=True)
-                        e = p.get_payload(decode=False)
-
-                        # In this case maybe is a binary with malformed base64
-                        if d == e:
-                            payload = e
-                            binary = True
-                        else:
-                            payload = ported_string(d, encoding=charset)
                     else:
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
