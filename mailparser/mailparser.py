@@ -286,8 +286,7 @@ class MailParser(object):
         """
 
         if not self.message.keys():
-            raise ValueError("This email doesn't have headers:\n\n{}".format(
-                self.message_as_string))
+            raise ValueError("This email doesn't have headers")
 
         # Reset for new mail
         self._reset()
@@ -321,9 +320,9 @@ class MailParser(object):
             if not p.is_multipart():
                 filename = ported_string(p.get_filename())
                 charset = p.get_content_charset('utf-8')
-                binary = False
 
                 if filename:
+                    binary = False
                     mail_content_type = ported_string(p.get_content_type())
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
