@@ -140,12 +140,13 @@ class MailParser(object):
         Returns:
             Instance of MailParser
         """
-
-        with ported_open(fp) as f:
-            message = email.message_from_file(f)
-
-        if is_outlook:
-            os.remove(fp)
+        if type(fp) == str:
+            with ported_open(fp) as f:
+                message = email.message_from_file(f)
+            if is_outlook:
+                os.remove(fp)
+        else:
+            message = email.message_from_file(fp)
 
         return cls(message)
 
