@@ -20,6 +20,7 @@ limitations under the License.
 import argparse
 import os
 import runpy
+import sys
 
 import simplejson as json
 
@@ -49,6 +50,12 @@ def get_args():
         "--string",
         dest="string",
         help="Raw email string")
+    parsing_group.add_argument(
+        "-k",
+        "--stdin",
+        dest="stdin",
+        action="store_true",
+        help="Enable parsing from stdin")
 
     parser.add_argument(
         "-j",
@@ -197,6 +204,8 @@ def main():
             parser = mailparser.parse_from_file(args.file)
     elif args.string:
         parser = mailparser.parse_from_string(args.string)
+    elif args.stdin:
+        parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:
         j = json.loads(parser.parsed_mail_json)
