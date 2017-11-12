@@ -111,19 +111,16 @@ class MailParser(object):
         self._message = message
 
     @classmethod
-    def from_file_obj(cls, fp, is_outlook=False):
+    def from_file_obj(cls, fp):
         """Init a new object from a file-like object.
+        Not for Outlook msg.
 
         Args:
             fp (file-like object): file-like object of raw email
-            is_outlook (boolean): if True is an Outlook email
 
         Returns:
             Instance of MailParser
         """
-
-        if is_outlook:
-            raise RuntimeError("Outlook parsing for this function not active")
 
         message = email.message_from_file(fp)
 

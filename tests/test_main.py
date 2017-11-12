@@ -39,6 +39,9 @@ class TestMain(unittest.TestCase):
             self.parser.parse_args(["--file", "test", "--string", "test"])
 
         with self.assertRaises(SystemExit):
+            self.parser.parse_args(["--file", "test", "--stdin"])
+
+        with self.assertRaises(SystemExit):
             self.parser.parse_args(["--file"])
 
         with self.assertRaises(SystemExit):

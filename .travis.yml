@@ -31,6 +31,7 @@ script:
     - python -m mailparser -v
     - python -m mailparser -h
     - python -m mailparser -f tests/mails/mail_malformed_3 -j
+    - cat tests/mails/mail_malformed_3 | python -m mailparser -k -j 
     - python -m mailparser -f tests/mails/mail_test_6 -j
 
 after_success:

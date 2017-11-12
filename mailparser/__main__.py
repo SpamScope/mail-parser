@@ -205,6 +205,8 @@ def main():
     elif args.string:
         parser = mailparser.parse_from_string(args.string)
     elif args.stdin:
+        if args.outlook:
+            raise RuntimeError("You can't use stdin with msg Outlook")
         parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:
