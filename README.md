@@ -89,6 +89,7 @@ Import `mailparser` module:
 import mailparser
 
 mail = mailparser.parse_from_file(f)
+mail = mailparser.parse_from_file_obj(fp)
 mail = mailparser.parse_from_string(raw_mail)
 mail = mailparser.parse_from_bytes(byte_mail)
 ```
@@ -123,7 +124,7 @@ If you installed mailparser with `pip` or `setup.py` you can use it with command
 These are all swithes:
 
 ```
-usage: mailparser.py [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
+usage: mailparser.py [-h] (-f FILE | -s STRING | -k) [-j] [-b] [-a] [-r] [-t] [-m]
                    [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
                    [-v]
 
@@ -134,6 +135,7 @@ optional arguments:
   -f FILE, --file FILE  Raw email file (default: None)
   -s STRING, --string STRING
                         Raw email string (default: None)
+  -k, --stdin           Enable parsing from stdin (default: False)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
   -a, --attachments     Print the attachments of mail (default: False)

@@ -84,6 +84,7 @@ Import ``mailparser`` module:
     import mailparser
 
     mail = mailparser.parse_from_file(f)
+    mail = mailparser.parse_from_file_obj(fp)
     mail = mailparser.parse_from_string(raw_mail)
     mail = mailparser.parse_from_bytes(byte_mail)
 
@@ -124,7 +125,7 @@ These are all swithes:
 
 ::
 
-    usage: mailparser [-h] (-f FILE | -s STRING) [-j] [-b] [-a] [-r] [-t] [-m]
+    usage: mailparser [-h] (-f FILE | -s STRING | -k) [-j] [-b] [-a] [-r] [-t] [-m]
                       [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
                       [-v]
 
@@ -136,6 +137,7 @@ These are all swithes:
                             Raw email file (default: None)
       -s STRING_, --string STRING_
                             Raw email string (default: None)
+      -k, --stdin           Enable parsing from stdin (default: False)
       -j, --json            Show the JSON of parsed mail (default: False)
       -b, --body            Print the body of mail (default: False)
       -a, --attachments     Print the attachments of mail (default: False)
