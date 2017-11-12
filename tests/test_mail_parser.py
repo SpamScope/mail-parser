@@ -39,7 +39,7 @@ mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
-from mailparser.utils import fingerprints, msgconvert
+from mailparser.utils import fingerprints, msgconvert, ported_open
 
 
 class TestMailParser(unittest.TestCase):
@@ -332,7 +332,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(m.from_, "<NueblingV@w-vwa.de>")
 
     def test_from_file_obj(self):
-        with open(mail_test_2) as fp:
+        with ported_open(mail_test_2) as fp:
             mail = mailparser.parse_from_file_obj(fp)
         trust = "smtp.customers.net"
 
