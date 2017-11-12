@@ -39,7 +39,7 @@ mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
-from mailparser.utils import fingerprints, msgconvert
+from mailparser.utils import fingerprints, msgconvert, ported_open
 
 
 class TestMailParser(unittest.TestCase):
@@ -286,6 +286,11 @@ class TestMailParser(unittest.TestCase):
         n.parse_from_string(m.message_as_string)
         self.assertEqual(len(result["attachments"]), 1)
 
+        o = mailparser.MailParser()
+        with open(mail_test_3) as fp:
+            o.parse_from_file_obj(fp)
+        self.assertEqual(len(result["attachments"]), 1)
+
     def test_bug_UnicodeDecodeError(self):
         m = mailparser.parse_from_file(mail_test_6)
         self.assertIsInstance(m.parsed_mail_obj, dict)
@@ -325,6 +330,59 @@ class TestMailParser(unittest.TestCase):
         self.assertTrue(os.path.exists(f))
         m = mailparser.parse_from_file(f)
         self.assertEqual(m.from_, "<NueblingV@w-vwa.de>")
+
+    def test_from_file_obj(self):
+        with ported_open(mail_test_2) as fp:
+            mail = mailparser.parse_from_file_obj(fp)
+        trust = "smtp.customers.net"
+
+        self.assertEqual(False, mail.has_defects)
+
+        result = mail.parsed_mail_obj
+        self.assertIsInstance(result, dict)
+        self.assertNotIn("defects", result)
+        self.assertNotIn("anomalies", result)
+        self.assertIn("has_defects", result)
+        self.assertIn("has_anomalies", result)
+
+        result = mail.get_server_ipaddress(trust)
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.parsed_mail_json
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.headers
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.body
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.date_mail
+        self.assertIsInstance(result, datetime.datetime)
+
+        result = mail.from_
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.to_
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.subject
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.message_id
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.attachments_list
+        self.assertIsInstance(result, list)
+
+        result = mail.date_mail
+        self.assertIsInstance(result, datetime.datetime)
+
+        result = mail.defects
+        self.assertIsInstance(result, list)
+
+        result = mail.anomalies
+        self.assertIsInstance(result, list)
 
 
 if __name__ == '__main__':

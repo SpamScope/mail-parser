@@ -39,6 +39,18 @@ REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
 
+def parse_from_file_obj(fp):
+    """Parsing email from a file-like object.
+
+    Args:
+        fp (file-like object): file-like object of raw email
+
+    Returns:
+        Instance of MailParser with raw email parsed
+    """
+    return MailParser.from_file_obj(fp).parse()
+
+
 def parse_from_file(fp):
     """Parsing email from file.
 
@@ -97,6 +109,22 @@ class MailParser(object):
     def __init__(self, message=None):
         """Init a new object from a message object structure. """
         self._message = message
+
+    @classmethod
+    def from_file_obj(cls, fp):
+        """Init a new object from a file-like object.
+        Not for Outlook msg.
+
+        Args:
+            fp (file-like object): file-like object of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        message = email.message_from_file(fp)
+
+        return cls(message)
 
     @classmethod
     def from_file(cls, fp, is_outlook=False):
@@ -164,6 +192,19 @@ class MailParser(object):
         message = email.message_from_bytes(bt)
         return cls(message)
 
+    def parse_from_file_obj(self, fp):
+        """Parse the raw email from a file path.
+
+        Args:
+            fp (file-like object): file-like object of raw email
+
+        Returns:
+            Instance of MailParser
+        """
+
+        self._message = email.message_from_file(fp)
+        return self.parse()
+
     def parse_from_file(self, fp):
         """Parse the raw email from a file path.
 
@@ -179,7 +220,7 @@ class MailParser(object):
         return self.parse()
 
     def parse_from_file_msg(self, fp):
-        """Parse the raw email from a file Outlook.
+        """Parse the raw email from a file path Outlook.
 
         Args:
             fp (string): file path of raw email
@@ -286,8 +327,7 @@ class MailParser(object):
         """
 
         if not self.message.keys():
-            raise ValueError("This email doesn't have headers:\n\n{}".format(
-                self.message_as_string))
+            raise ValueError("This email doesn't have headers")
 
         # Reset for new mail
         self._reset()
@@ -321,9 +361,9 @@ class MailParser(object):
             if not p.is_multipart():
                 filename = ported_string(p.get_filename())
                 charset = p.get_content_charset('utf-8')
-                binary = False
 
                 if filename:
+                    binary = False
                     mail_content_type = ported_string(p.get_content_type())
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
