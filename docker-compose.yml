@@ -1,0 +1,9 @@
+# Docker Compose build manifest.
+# Usage:
+# $ docker-compose up --build
+
+mailparser:
+  build: .
+  command: --json -f /mails/mail_test_1
+  volumes:
+    - ./tests/mails/:/mails/:ro
