@@ -81,6 +81,23 @@ or use `pip`:
 $ pip install mail-parser
 ```
 
+### Building with Docker
+Complete working Docker workflow is possible allowing you to start hacking and building without any other requirements or dependencies. All the required libs and build tools are handled by Docker build process.
+Using the provided Dockerfile you can build a complete working image with all the required dependencies. If you're not familiar with Docker, better use Docker Compose to both build and run your source easy and effortlessly.
+
+From the ```docker-compose.yml``` directory, run:
+```
+$ docker-compose up --build
+```
+Skip the ```--build``` switch to launch the last built container image without rebuilding again.
+
+The provided ```docker-compose.yml``` file is configured to:
+
+* Mount your host's ```tests/mails/``` dir from your source tree inside the container at ```/data/``` (read-only).
+* A command line test example.
+
+See the ```docker-compose.yml``` to view and tweak the launch parameters.
+
 ## Usage in a project
 
 Import `mailparser` module:
