@@ -303,7 +303,7 @@ class MailParser(object):
             "body": self.body,
             "date": self.date_mail,
             "from": self.from_,
-            "headers": self.headers,
+            "headers": self.headers_obj,
             "message_id": self.message_id,
             "subject": self.subject,
             "to": email.utils.getaddresses([self.to_]),
@@ -479,14 +479,24 @@ class MailParser(object):
 
     @property
     def body(self):
-        """Return the only the body. """
+        """Return only the body. """
         return "\n".join(self.text_plain_list)
 
     @property
+    def headers_obj(self):
+        """Return all headers as object
+
+        Return:
+            list of headers
+        """
+
+        return self.message.items()
+
+    @property
     def headers(self):
-        """Return the only the headers. """
+        """Return only the headers. """
         s = ""
-        for k, v in self.message.items():
+        for k, v in self.headers_obj:
             v_u = re.sub(" +", " ", decode_header_part(v))
             s += k + ": " + v_u + "\n"
         return s
