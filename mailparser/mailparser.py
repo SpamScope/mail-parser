@@ -306,7 +306,7 @@ class MailParser(object):
             "headers": self.headers,
             "message_id": self.message_id,
             "subject": self.subject,
-            "to": email.utils.getaddresses([self.to_]),
+            "to": self.to_,
             "receiveds": self.receiveds_obj,
             "has_defects": self.has_defects,
             "has_anomalies": self.has_anomalies}
@@ -504,8 +504,9 @@ class MailParser(object):
     @property
     def to_(self):
         """Return the receiver of message. """
-        return decode_header_part(
-            self.message.get('to', self.message.get('delivered-to', '')))
+        to_ = decode_header_part(self.message.get(
+            'to', self.message.get('delivered-to', '')))
+        return email.utils.parseaddr([to_]),
 
     @property
     def from_(self):

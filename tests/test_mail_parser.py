@@ -121,7 +121,7 @@ class TestMailParser(unittest.TestCase):
 
         raw = "mporcile@server_mail.it"
         result = mail.to_
-        self.assertEqual(raw, result)
+        self.assertEqual(raw, result[0][1])
 
         raw = "<meteo@regione.vda.it>"
         result = mail.from_
@@ -174,7 +174,10 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, six.text_type)
 
         result = mail.to_
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, tuple)
+        self.assertEquals(len(result), 1)
+        self.assertIsInstance(result[0], tuple)
+        self.assertEquals(len(result[0]), 2)
 
         result = mail.subject
         self.assertIsInstance(result, six.text_type)
@@ -364,7 +367,10 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, six.text_type)
 
         result = mail.to_
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, tuple)
+        self.assertEquals(len(result), 1)
+        self.assertIsInstance(result[0], tuple)
+        self.assertEquals(len(result[0]), 2)
 
         result = mail.subject
         self.assertIsInstance(result, six.text_type)
