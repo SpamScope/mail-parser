@@ -285,7 +285,6 @@ class MailParser(object):
     def _reset(self):
         """Reset the state of object. """
 
-        self._to = list()
         self._attachments = list()
         self._text_plain = list()
         self._defects = list()
