@@ -515,7 +515,7 @@ class MailParser(object):
         """Return the receiver of message. """
         to_ = decode_header_part(self.message.get(
             'to', self.message.get('delivered-to', '')))
-        return email.utils.parseaddr([to_]),
+        return email.utils.getaddresses([to_])
 
     @property
     def from_(self):
