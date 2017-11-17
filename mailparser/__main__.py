@@ -18,6 +18,7 @@ limitations under the License.
 """
 
 import argparse
+import logging
 import os
 import runpy
 import sys
@@ -31,6 +32,15 @@ current = os.path.realpath(os.path.dirname(__file__))
 
 __version__ = runpy.run_path(
     os.path.join(current, "version.py"))["__version__"]
+
+# Logging
+log = logging.getLogger()
+log.setLevel(logging.WARNING)
+ch = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter(
+    "%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+ch.setFormatter(formatter)
+log.addHandler(ch)
 
 
 def get_args():
@@ -221,7 +231,7 @@ def main():
         safe_print(parser.headers)
 
     if args.to:
-        safe_print(parser.to_)
+        safe_print(json.dumps(parser.to_))
 
     if args.from_:
         safe_print(parser.from_)
