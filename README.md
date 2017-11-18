@@ -32,6 +32,7 @@ mail-parser takes as input a raw email and generates a parsed object. This objec
   - subject
   - from
   - to
+  - delivered_to
   - attachments
   - message id
   - date
@@ -118,6 +119,7 @@ mail.body
 mail.headers
 mail.message_id
 mail.to_
+mail.delivered_to_
 mail.from_
 mail.subject
 mail.text_plain_list: only text plain mail parts in a list
@@ -141,7 +143,7 @@ If you installed mailparser with `pip` or `setup.py` you can use it with command
 These are all swithes:
 
 ```
-usage: mailparser.py [-h] (-f FILE | -s STRING | -k) [-j] [-b] [-a] [-r] [-t] [-m]
+usage: mailparser.py [-h] (-f FILE | -s STRING | -k) [-j] [-b] [-a] [-r] [-t] [-dt] [-m]
                    [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
                    [-v]
 
@@ -158,6 +160,7 @@ optional arguments:
   -a, --attachments     Print the attachments of mail (default: False)
   -r, --headers         Print the headers of mail (default: False)
   -t, --to              Print the to of mail (default: False)
+  -dt, --delivered-to   Print the delivered-to of mail (default: False)
   -m, --from            Print the from of mail (default: False)
   -u, --subject         Print the subject of mail (default: False)
   -c, --receiveds       Print all receiveds of mail (default: False)
