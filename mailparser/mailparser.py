@@ -20,6 +20,7 @@ limitations under the License.
 from __future__ import unicode_literals
 import datetime
 import email
+from email.header import decode_header
 import logging
 import os
 import re
@@ -285,7 +286,6 @@ class MailParser(object):
     def _reset(self):
         """Reset the state of object. """
 
-        self._to = list()
         self._attachments = list()
         self._text_plain = list()
         self._defects = list()
@@ -303,10 +303,11 @@ class MailParser(object):
             "body": self.body,
             "date": self.date_mail,
             "from": self.from_,
-            "headers": self.headers,
+            "headers": self.headers_obj,
             "message_id": self.message_id,
             "subject": self.subject,
             "to": self.to_,
+            "delivered_to": self.delivered_to_,
             "receiveds": self.receiveds_obj,
             "has_defects": self.has_defects,
             "has_anomalies": self.has_anomalies}
@@ -479,14 +480,24 @@ class MailParser(object):
 
     @property
     def body(self):
-        """Return the only the body. """
+        """Return only the body. """
         return "\n".join(self.text_plain_list)
 
     @property
+    def headers_obj(self):
+        """Return all headers as object
+
+        Return:
+            list of headers
+        """
+
+        return self.message.items()
+
+    @property
     def headers(self):
-        """Return the only the headers. """
+        """Return only the headers. """
         s = ""
-        for k, v in self.message.items():
+        for k, v in self.headers_obj:
             v_u = re.sub(" +", " ", decode_header_part(v))
             s += k + ": " + v_u + "\n"
         return s
@@ -506,7 +517,14 @@ class MailParser(object):
         """Return the receiver of message. """
         to_ = decode_header_part(self.message.get(
             'to', self.message.get('delivered-to', '')))
-        return email.utils.parseaddr([to_]),
+        return email.utils.getaddresses([to_])
+
+    @property
+    def delivered_to_(self):
+        """Return the receiver of message. """
+        delivered_to_ = decode_header_part(
+            self.message.get('delivered-to', ''))
+        return email.utils.getaddresses([delivered_to_])
 
     @property
     def from_(self):
