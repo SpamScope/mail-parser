@@ -20,7 +20,6 @@ limitations under the License.
 from __future__ import unicode_literals
 import datetime
 import email
-from email.header import decode_header
 import logging
 import os
 import re
