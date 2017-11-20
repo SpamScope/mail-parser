@@ -20,6 +20,7 @@ limitations under the License.
 from __future__ import unicode_literals
 import datetime
 import email
+from email.header import decode_header
 import logging
 import os
 import re
@@ -285,7 +286,6 @@ class MailParser(object):
     def _reset(self):
         """Reset the state of object. """
 
-        self._to = list()
         self._attachments = list()
         self._text_plain = list()
         self._defects = list()
@@ -307,6 +307,7 @@ class MailParser(object):
             "message_id": self.message_id,
             "subject": self.subject,
             "to": self.to_,
+            "delivered_to": self.delivered_to_,
             "receiveds": self.receiveds_obj,
             "has_defects": self.has_defects,
             "has_anomalies": self.has_anomalies}
@@ -516,7 +517,14 @@ class MailParser(object):
         """Return the receiver of message. """
         to_ = decode_header_part(self.message.get(
             'to', self.message.get('delivered-to', '')))
-        return email.utils.parseaddr([to_]),
+        return email.utils.getaddresses([to_])
+
+    @property
+    def delivered_to_(self):
+        """Return the receiver of message. """
+        delivered_to_ = decode_header_part(
+            self.message.get('delivered-to', ''))
+        return email.utils.getaddresses([delivered_to_])
 
     @property
     def from_(self):

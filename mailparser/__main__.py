@@ -103,6 +103,13 @@ def get_args():
         help="Print the to of mail")
 
     parser.add_argument(
+        "-dt",
+        "--delivered-to",
+        dest="delivered_to",
+        action="store_true",
+        help="Print the delivered-to of mail")
+
+    parser.add_argument(
         "-m",
         "--from",
         dest="from_",
@@ -232,6 +239,9 @@ def main():
 
     if args.to:
         safe_print(json.dumps(parser.to_))
+
+    if args.delivered_to:
+        safe_print(json.dumps(parser.delivered_to_))
 
     if args.from_:
         safe_print(parser.from_)
