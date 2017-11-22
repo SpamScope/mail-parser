@@ -44,6 +44,7 @@ from mailparser.utils import fingerprints, msgconvert, ported_open
 
 class TestMailParser(unittest.TestCase):
 
+    @unittest.skip("skip")
     def test_ipaddress(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
@@ -60,6 +61,7 @@ class TestMailParser(unittest.TestCase):
         result = mail.get_server_ipaddress(trust)
         self.assertEqual(result, None)
 
+    @unittest.skip("skip")
     def test_fingerprints_body(self):
         mail = mailparser.parse_from_file(mail_test_1)
         md5, sha1, sha256, sha512 = fingerprints(
@@ -73,31 +75,37 @@ class TestMailParser(unittest.TestCase):
                                   "dba971ef99afeec4e6caf2fdd10be72eabb730"
                                   "c312ffbe1c4de3"))
 
+    @unittest.skip("skip")
     def test_fingerprints_unicodeencodeerror(self):
         mail = mailparser.parse_from_file(mail_test_7)
         for i in mail.attachments_list:
             fingerprints(i["payload"])
 
+    @unittest.skip("skip")
     def test_malformed_mail(self):
         mail = mailparser.parse_from_file(mail_malformed_3)
         defects_category = mail.defects_category
         self.assertIn("StartBoundaryNotFoundDefect", defects_category)
         self.assertIn("MultipartInvariantViolationDefect", defects_category)
 
+    @unittest.skip("skip")
     def test_type_error(self):
         mail = mailparser.parse_from_file(mail_test_5)
         self.assertEqual(len(mail.attachments_list), 5)
         for i in mail.attachments_list:
             self.assertIsInstance(i["filename"], six.text_type)
 
+    @unittest.skip("skip")
     def test_valid_mail(self):
         with self.assertRaises(ValueError):
             mailparser.parse_from_string("fake mail")
 
+    @unittest.skip("skip")
     def test_valid_date_mail(self):
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertIn("mail_without_date", mail.anomalies)
 
+    @unittest.skip("skip")
     def test_receiveds(self):
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertIsInstance(mail.receiveds_obj, list)
@@ -105,6 +113,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.receiveds, six.text_type)
         self.assertIn("Received:", mail.receiveds)
 
+    @unittest.skip("skip")
     def test_parsing_know_values(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
@@ -142,6 +151,7 @@ class TestMailParser(unittest.TestCase):
         result = mail.date_mail.isoformat()
         self.assertEqual(raw_utc, result)
 
+    @unittest.skip("skip")
     def test_types(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
@@ -197,6 +207,7 @@ class TestMailParser(unittest.TestCase):
         result = mail.anomalies
         self.assertIsInstance(result, list)
 
+    @unittest.skip("skip")
     def test_defects_anomalies(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
 
@@ -228,6 +239,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("anomalies", mail.parsed_mail_obj)
         self.assertIn("has_anomalies", mail.parsed_mail_obj)
 
+    @unittest.skip("skip")
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
 
@@ -242,6 +254,7 @@ class TestMailParser(unittest.TestCase):
         result = len(mail.attachments_list)
         self.assertEqual(0, result)
 
+    @unittest.skip("skip")
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
 
@@ -259,11 +272,13 @@ class TestMailParser(unittest.TestCase):
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable")
 
+    @unittest.skip("skip")
     def test_from_bytes(self):
         if six.PY2:
             with self.assertRaises(EnvironmentError):
                 mailparser.MailParser.from_bytes(b"")
 
+    @unittest.skip("skip")
     def test_classmethods(self):
         # MailParser.from_file
         m = mailparser.MailParser.from_file(mail_test_3)
@@ -277,6 +292,7 @@ class TestMailParser(unittest.TestCase):
         result = m.parsed_mail_obj
         self.assertEqual(len(result["attachments"]), 1)
 
+    @unittest.skip("skip")
     def test_parser_methods(self):
         m = mailparser.MailParser()
         self.assertIsNone(m.message)
@@ -294,11 +310,13 @@ class TestMailParser(unittest.TestCase):
             o.parse_from_file_obj(fp)
         self.assertEqual(len(result["attachments"]), 1)
 
+    @unittest.skip("skip")
     def test_bug_UnicodeDecodeError(self):
         m = mailparser.parse_from_file(mail_test_6)
         self.assertIsInstance(m.parsed_mail_obj, dict)
         self.assertIsInstance(m.parsed_mail_json, six.text_type)
 
+    @unittest.skip("skip")
     def test_parse_from_file_msg(self):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
@@ -320,6 +338,7 @@ class TestMailParser(unittest.TestCase):
         m = m.parse_from_file_msg(mail_outlook_1)
         self.assertEqual(email["body"], m.body)
 
+    @unittest.skip("skip")
     def test_msgconvert(self):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
@@ -334,6 +353,7 @@ class TestMailParser(unittest.TestCase):
         m = mailparser.parse_from_file(f)
         self.assertEqual(m.from_, "<NueblingV@w-vwa.de>")
 
+    @unittest.skip("skip")
     def test_from_file_obj(self):
         with ported_open(mail_test_2) as fp:
             mail = mailparser.parse_from_file_obj(fp)
@@ -389,6 +409,14 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.anomalies
         self.assertIsInstance(result, list)
+
+    def test_getattr(self):
+        mail = mailparser.parse_from_file(mail_test_2)
+        print("\n\n")
+        print mail.date_json
+        print("\n\n")
+        print mail.date_raw
+        print("\n\n")
 
 
 if __name__ == '__main__':

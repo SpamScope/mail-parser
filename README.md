@@ -119,7 +119,7 @@ mail.body
 mail.headers
 mail.message_id
 mail.to_
-mail.delivered_to_
+mail.delivered_to
 mail.from_
 mail.subject
 mail.text_plain_list: only text plain mail parts in a list
