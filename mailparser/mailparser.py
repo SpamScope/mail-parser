@@ -292,8 +292,7 @@ class MailParser(object):
                 p = email.message_from_string(epilogue)
                 parts.append(p)
             except TypeError:
-                log.warning(
-                    "Failed to get epilogue part. Probably malformed.")
+                pass
             except:
                 log.error(
                     "Failed to get epilogue part. Should check raw mail.")
@@ -397,7 +396,8 @@ class MailParser(object):
         # raw headers
         elif name.endswith("_raw"):
             name = name[:-4]
-            return self.message.get(name)
+            raw = self.message.get_all(name)
+            return json.dumps(raw, ensure_ascii=False)
 
     @property
     def subject(self):
@@ -451,6 +451,13 @@ class MailParser(object):
         return d
 
     @property
+    def headers_json(self):
+        """
+        Return the JSON of headers
+        """
+        return json.dumps(self.headers, ensure_ascii=False, indent=2)
+
+    @property
     def text_plain(self):
         """
         Return a list of all text plain parts of email.
@@ -472,6 +479,14 @@ class MailParser(object):
             return None
 
     @property
+    def date_json(self):
+        """
+        Return the JSON of date
+        """
+        if self.date:
+            return json.dumps(self.date.isoformat(), ensure_ascii=False)
+
+    @property
     def mail(self):
         """
         Return the Python object of mail parsed
@@ -485,15 +500,7 @@ class MailParser(object):
         """
         if self.mail.get("date"):
             self._mail["date"] = self.date.isoformat()
-        return json.dumps(self.mail, ensure_ascii=False)
-
-    @property
-    def date_json(self):
-        """
-        Return the JSON of date
-        """
-        if self.date:
-            return json.dumps(self.date.isoformat())
+        return json.dumps(self.mail, ensure_ascii=False, indent=2)
 
     @property
     def defects(self):
