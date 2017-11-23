@@ -44,7 +44,6 @@ from mailparser.utils import fingerprints, msgconvert, ported_open
 
 class TestMailParser(unittest.TestCase):
 
-    @unittest.skip("skip")
     def test_ipaddress(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
@@ -61,7 +60,6 @@ class TestMailParser(unittest.TestCase):
         result = mail.get_server_ipaddress(trust)
         self.assertEqual(result, None)
 
-    @unittest.skip("skip")
     def test_fingerprints_body(self):
         mail = mailparser.parse_from_file(mail_test_1)
         md5, sha1, sha256, sha512 = fingerprints(
@@ -75,45 +73,34 @@ class TestMailParser(unittest.TestCase):
                                   "dba971ef99afeec4e6caf2fdd10be72eabb730"
                                   "c312ffbe1c4de3"))
 
-    @unittest.skip("skip")
     def test_fingerprints_unicodeencodeerror(self):
         mail = mailparser.parse_from_file(mail_test_7)
-        for i in mail.attachments_list:
+        for i in mail.attachments:
             fingerprints(i["payload"])
 
-    @unittest.skip("skip")
     def test_malformed_mail(self):
         mail = mailparser.parse_from_file(mail_malformed_3)
-        defects_category = mail.defects_category
-        self.assertIn("StartBoundaryNotFoundDefect", defects_category)
-        self.assertIn("MultipartInvariantViolationDefect", defects_category)
+        defects_categories = mail.defects_categories
+        self.assertIn("StartBoundaryNotFoundDefect", defects_categories)
+        self.assertIn("MultipartInvariantViolationDefect", defects_categories)
 
-    @unittest.skip("skip")
     def test_type_error(self):
         mail = mailparser.parse_from_file(mail_test_5)
-        self.assertEqual(len(mail.attachments_list), 5)
-        for i in mail.attachments_list:
+        self.assertEqual(len(mail.attachments), 5)
+        for i in mail.attachments:
             self.assertIsInstance(i["filename"], six.text_type)
 
-    @unittest.skip("skip")
     def test_valid_mail(self):
         with self.assertRaises(ValueError):
             mailparser.parse_from_string("fake mail")
 
-    @unittest.skip("skip")
-    def test_valid_date_mail(self):
-        mail = mailparser.parse_from_file(mail_test_1)
-        self.assertIn("mail_without_date", mail.anomalies)
-
-    @unittest.skip("skip")
     def test_receiveds(self):
         mail = mailparser.parse_from_file(mail_test_1)
-        self.assertIsInstance(mail.receiveds_obj, list)
-        self.assertEqual(len(mail.receiveds_obj), 4)
-        self.assertIsInstance(mail.receiveds, six.text_type)
-        self.assertIn("Received:", mail.receiveds)
+        self.assertEqual(len(mail.received), 4)
+        self.assertIsInstance(mail.received, list)
+        self.assertIsInstance(mail.received_json, six.text_type)
+        self.assertIsInstance(mail.received_raw, six.text_type)
 
-    @unittest.skip("skip")
     def test_parsing_know_values(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
@@ -128,13 +115,18 @@ class TestMailParser(unittest.TestCase):
         result = mail.message_id
         self.assertEqual(raw, result)
 
-        raw = "mporcile@server_mail.it"
-        result = mail.to_
+        raw = "echo@tu-berlin.de"
+        result = mail.to
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], tuple)
+        self.assertIsInstance(mail.to_json, six.text_type)
+        self.assertIsInstance(mail.to_raw, six.text_type)
         self.assertEqual(raw, result[0][1])
 
-        raw = "<meteo@regione.vda.it>"
+        raw = "meteo@regione.vda.it"
         result = mail.from_
-        self.assertEqual(raw, result)
+        self.assertEqual(raw, result[0][1])
 
         raw = "Bollettino Meteorologico del 29/11/2015"
         result = mail.subject
@@ -143,49 +135,51 @@ class TestMailParser(unittest.TestCase):
         result = mail.has_defects
         self.assertEqual(False, result)
 
-        result = len(mail.attachments_list)
+        result = len(mail.attachments)
         self.assertEqual(3, result)
 
-        raw = "Sun, 29 Nov 2015 09:45:18 +0100"
+        # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
+        self.assertIsInstance(mail.date_raw, six.text_type)
+        self.assertIsInstance(mail.date_json, six.text_type)
         raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
-        result = mail.date_mail.isoformat()
+        result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
-    @unittest.skip("skip")
     def test_types(self):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
         self.assertEqual(False, mail.has_defects)
 
-        result = mail.parsed_mail_obj
+        result = mail.mail
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
-        self.assertNotIn("anomalies", result)
         self.assertIn("has_defects", result)
-        self.assertIn("has_anomalies", result)
 
         result = mail.get_server_ipaddress(trust)
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.parsed_mail_json
+        result = mail.mail_json
+        self.assertIsInstance(result, six.text_type)
+
+        result = mail.headers_json
         self.assertIsInstance(result, six.text_type)
 
         result = mail.headers
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, dict)
 
         result = mail.body
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.date_mail
+        result = mail.date
         self.assertIsInstance(result, datetime.datetime)
 
         result = mail.from_
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, list)
 
-        result = mail.to_
-        self.assertIsInstance(result, tuple)
-        self.assertEquals(len(result), 1)
+        result = mail.to
+        self.assertIsInstance(result, list)
+        self.assertEquals(len(result), 2)
         self.assertIsInstance(result[0], tuple)
         self.assertEquals(len(result[0]), 2)
 
@@ -195,63 +189,53 @@ class TestMailParser(unittest.TestCase):
         result = mail.message_id
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.attachments_list
+        result = mail.attachments
         self.assertIsInstance(result, list)
 
-        result = mail.date_mail
+        result = mail.date
         self.assertIsInstance(result, datetime.datetime)
 
         result = mail.defects
         self.assertIsInstance(result, list)
 
-        result = mail.anomalies
-        self.assertIsInstance(result, list)
-
-    @unittest.skip("skip")
-    def test_defects_anomalies(self):
+    def test_defects(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
 
         self.assertEqual(True, mail.has_defects)
         self.assertEqual(1, len(mail.defects))
-        self.assertEqual(1, len(mail.defects_category))
-        self.assertIn("defects", mail.parsed_mail_obj)
+        self.assertEqual(1, len(mail.defects_categories))
+        self.assertIn("defects", mail.mail)
         self.assertIn("StartBoundaryNotFoundDefect",
-                      mail.defects_category)
-        self.assertIsInstance(mail.parsed_mail_json, six.text_type)
+                      mail.defects_categories)
+        self.assertIsInstance(mail.mail_json, six.text_type)
 
-        result = len(mail.attachments_list)
+        result = len(mail.attachments)
         self.assertEqual(1, result)
 
         mail = mailparser.parse_from_file(mail_test_1)
         if six.PY2:
             self.assertEqual(False, mail.has_defects)
-            self.assertNotIn("defects", mail.parsed_mail_obj)
+            self.assertNotIn("defects", mail.mail)
         elif six.PY3:
             self.assertEqual(True, mail.has_defects)
             self.assertEqual(1, len(mail.defects))
-            self.assertEqual(1, len(mail.defects_category))
-            self.assertIn("defects", mail.parsed_mail_obj)
+            self.assertEqual(1, len(mail.defects_categories))
+            self.assertIn("defects", mail.mail)
             self.assertIn(
-                "CloseBoundaryNotFoundDefect", mail.defects_category)
+                "CloseBoundaryNotFoundDefect", mail.defects_categories)
 
-        self.assertEqual(True, mail.has_anomalies)
-        self.assertEqual(2, len(mail.anomalies))
-        self.assertIn("anomalies", mail.parsed_mail_obj)
-        self.assertIn("has_anomalies", mail.parsed_mail_obj)
-
-    @unittest.skip("skip")
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
 
         self.assertEqual(True, mail.has_defects)
         self.assertEqual(1, len(mail.defects))
-        self.assertEqual(1, len(mail.defects_category))
-        self.assertIn("defects", mail.parsed_mail_obj)
+        self.assertEqual(1, len(mail.defects_categories))
+        self.assertIn("defects", mail.mail)
         self.assertIn("StartBoundaryNotFoundDefect",
-                      mail.defects_category)
+                      mail.defects_categories)
         self.assertIsInstance(mail.parsed_mail_json, six.text_type)
 
-        result = len(mail.attachments_list)
+        result = len(mail.attachments)
         self.assertEqual(0, result)
 
     @unittest.skip("skip")
@@ -409,14 +393,6 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.anomalies
         self.assertIsInstance(result, list)
-
-    def test_getattr(self):
-        mail = mailparser.parse_from_file(mail_test_2)
-        print("\n\n")
-        print mail.date_json
-        print("\n\n")
-        print mail.date_raw
-        print("\n\n")
 
 
 if __name__ == '__main__':
