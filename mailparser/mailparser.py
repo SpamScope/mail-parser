@@ -385,7 +385,8 @@ class MailParser(object):
 
         # object headers
         if name in ADDRESSES_HEADERS:
-            h = decode_header_part(self.message.get(name, six.text_type()))
+            h = decode_header_part(
+                self.message.get(name.replace("_", "-"), six.text_type()))
             return email.utils.getaddresses([h])
 
         # json headers
