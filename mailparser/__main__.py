@@ -138,13 +138,6 @@ def get_args():
         help="Print the defects of mail")
 
     parser.add_argument(
-        "-n",
-        "--anomalies",
-        dest="anomalies",
-        action="store_true",
-        help="Print the anomalies of mail")
-
-    parser.add_argument(
         "-o",
         "--outlook",
         dest="outlook",
@@ -227,37 +220,31 @@ def main():
         parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:
-        j = json.loads(parser.parsed_mail_json)
-        safe_print(json.dumps(j, ensure_ascii=False, indent=4))
+        safe_print(parser.mail_json)
 
     if args.body:
-        # safe_print(parser.body)
         safe_print(parser.body)
 
     if args.headers:
-        safe_print(parser.headers)
+        safe_print(parser.headers_json)
 
     if args.to:
-        safe_print(json.dumps(parser.to_))
+        safe_print(parser.to_json)
 
     if args.delivered_to:
-        safe_print(json.dumps(parser.delivered_to_))
+        safe_print(parser.delivered_to_json)
 
     if args.from_:
-        safe_print(parser.from_)
+        safe_print(parser.from_json)
 
     if args.subject:
         safe_print(parser.subject)
 
     if args.receiveds:
-        safe_print(parser.receiveds)
+        safe_print(parser.received_json)
 
     if args.defects:
-        for i in parser.defects_category:
-            safe_print(i)
-
-    if args.anomalies:
-        for i in parser.anomalies:
+        for i in parser.defects_categories:
             safe_print(i)
 
     if args.senderip:
@@ -268,7 +255,7 @@ def main():
             safe_print("Not Found")
 
     if args.attachments or args.attachments_hash:
-        print_attachments(parser.attachments_list, args.attachments_hash)
+        print_attachments(parser.attachments, args.attachments_hash)
 
     if args.mail_hash:
         print_mail_fingerprints(parser.body.encode("utf-8"))

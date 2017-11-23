@@ -425,6 +425,13 @@ class MailParser(object):
         return output
 
     @property
+    def received_json(self):
+        """
+        Return a JSON of all received headers
+        """
+        return json.dumps(self.received, ensure_ascii=False, indent=2)
+
+    @property
     def message_id(self):
         """
         Return the message id.
