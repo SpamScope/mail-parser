@@ -21,12 +21,11 @@ import os
 import runpy
 from setuptools import setup
 
-from mailparser.utils import markdown2rst
 
 current = os.path.realpath(os.path.dirname(__file__))
-readme_file = os.path.join(current, 'README.md')
 
-long_description = markdown2rst(readme_file)
+with open(os.path.join(current, 'README.rst')) as f:
+    long_description = f.read()
 
 with open(os.path.join(current, 'requirements.txt')) as f:
     requires = f.read().splitlines()
