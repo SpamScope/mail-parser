@@ -187,8 +187,6 @@ def msgconvert(email):
 
 
 def markdown2rst(file_path):
-    import pandoc
-    doc = pandoc.Document()
-    with open(file_path) as f:
-        doc.markdown = f.read()
-    return doc.rst
+    import pypandoc
+    output = pypandoc.convert_file(file_path, 'rst')
+    return output

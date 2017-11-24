@@ -399,7 +399,7 @@ class TestMailParser(unittest.TestCase):
         current = os.path.realpath(os.path.dirname(__file__))
         readme = os.path.join(current, "..", "README.md")
         rst = markdown2rst(readme)
-        self.assertIsInstance(rst, str)
+        self.assertIsInstance(rst, six.text_type)
 
 
 if __name__ == '__main__':
