@@ -1,9 +1,10 @@
-# Docker Compose build manifest.
-# Usage:
-# $ docker-compose up --build
+version: '2.1'
 
-mailparser:
-  build: .
-  command: --json -f /mails/mail_test_1
-  volumes:
-    - ./tests/mails/:/mails/:ro
+services:
+
+  mailparser:
+    image: fmantuano/spamscope-mail-parser:develop
+    command: --json -f /mails/mail_test_1
+    container_name: mailparser
+    volumes:
+      - ~/mails/:/mails/:ro
