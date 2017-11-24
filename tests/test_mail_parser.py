@@ -39,7 +39,8 @@ mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
-from mailparser.utils import fingerprints, msgconvert, ported_open
+from mailparser.utils import (
+    fingerprints, msgconvert, ported_open, markdown2rst)
 
 
 class TestMailParser(unittest.TestCase):
@@ -393,6 +394,12 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.anomalies
         self.assertIsInstance(result, list)
+
+    def test_markdown2rst(self):
+        current = os.path.realpath(os.path.dirname(__file__))
+        readme = os.path.join(current, "..", "README.md")
+        rst = markdown2rst(readme)
+        self.assertIsInstance(rst, str)
 
 
 if __name__ == '__main__':
