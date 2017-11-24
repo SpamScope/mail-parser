@@ -239,13 +239,12 @@ class TestMailParser(unittest.TestCase):
         result = len(mail.attachments)
         self.assertEqual(0, result)
 
-    @unittest.skip("skip")
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
 
         self.assertEqual(False, mail.has_defects)
 
-        result = mail.parsed_mail_obj
+        result = mail.mail
 
         self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(
@@ -257,51 +256,29 @@ class TestMailParser(unittest.TestCase):
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable")
 
-    @unittest.skip("skip")
     def test_from_bytes(self):
         if six.PY2:
             with self.assertRaises(EnvironmentError):
                 mailparser.MailParser.from_bytes(b"")
 
-    @unittest.skip("skip")
     def test_classmethods(self):
         # MailParser.from_file
         m = mailparser.MailParser.from_file(mail_test_3)
         m.parse()
-        result = m.parsed_mail_obj
+        result = m.mail
         self.assertEqual(len(result["attachments"]), 1)
 
         # MailParser.from_string
         m = mailparser.MailParser.from_string(m.message_as_string)
         m.parse()
-        result = m.parsed_mail_obj
+        result = m.mail
         self.assertEqual(len(result["attachments"]), 1)
 
-    @unittest.skip("skip")
-    def test_parser_methods(self):
-        m = mailparser.MailParser()
-        self.assertIsNone(m.message)
-
-        m.parse_from_file(mail_test_3)
-        result = m.parsed_mail_obj
-        self.assertEqual(len(result["attachments"]), 1)
-
-        n = mailparser.MailParser()
-        n.parse_from_string(m.message_as_string)
-        self.assertEqual(len(result["attachments"]), 1)
-
-        o = mailparser.MailParser()
-        with open(mail_test_3) as fp:
-            o.parse_from_file_obj(fp)
-        self.assertEqual(len(result["attachments"]), 1)
-
-    @unittest.skip("skip")
     def test_bug_UnicodeDecodeError(self):
         m = mailparser.parse_from_file(mail_test_6)
-        self.assertIsInstance(m.parsed_mail_obj, dict)
-        self.assertIsInstance(m.parsed_mail_json, six.text_type)
+        self.assertIsInstance(m.mail, dict)
+        self.assertIsInstance(m.mail_json, six.text_type)
 
-    @unittest.skip("skip")
     def test_parse_from_file_msg(self):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
@@ -312,18 +289,13 @@ class TestMailParser(unittest.TestCase):
         """
 
         m = mailparser.parse_from_file_msg(mail_outlook_1)
-        email = m.parsed_mail_obj
+        email = m.mail
         self.assertIn("attachments", email)
         self.assertEqual(len(email["attachments"]), 5)
         self.assertIn("from", email)
-        self.assertEqual(email["from"], "<NueblingV@w-vwa.de>")
+        self.assertEqual(email["from"][0][1], "NueblingV@w-vwa.de")
         self.assertIn("subject", email)
 
-        m = mailparser.MailParser()
-        m = m.parse_from_file_msg(mail_outlook_1)
-        self.assertEqual(email["body"], m.body)
-
-    @unittest.skip("skip")
     def test_msgconvert(self):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
@@ -336,9 +308,8 @@ class TestMailParser(unittest.TestCase):
         f, _ = msgconvert(mail_outlook_1)
         self.assertTrue(os.path.exists(f))
         m = mailparser.parse_from_file(f)
-        self.assertEqual(m.from_, "<NueblingV@w-vwa.de>")
+        self.assertEqual(m.from_[0][1], "NueblingV@w-vwa.de")
 
-    @unittest.skip("skip")
     def test_from_file_obj(self):
         with ported_open(mail_test_2) as fp:
             mail = mailparser.parse_from_file_obj(fp)
@@ -346,34 +317,36 @@ class TestMailParser(unittest.TestCase):
 
         self.assertEqual(False, mail.has_defects)
 
-        result = mail.parsed_mail_obj
+        result = mail.mail
         self.assertIsInstance(result, dict)
         self.assertNotIn("defects", result)
         self.assertNotIn("anomalies", result)
         self.assertIn("has_defects", result)
-        self.assertIn("has_anomalies", result)
 
         result = mail.get_server_ipaddress(trust)
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.parsed_mail_json
+        result = mail.mail_json
         self.assertIsInstance(result, six.text_type)
 
         result = mail.headers
+        self.assertIsInstance(result, dict)
+
+        result = mail.headers_json
         self.assertIsInstance(result, six.text_type)
 
         result = mail.body
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.date_mail
+        result = mail.date
         self.assertIsInstance(result, datetime.datetime)
 
         result = mail.from_
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, list)
 
-        result = mail.to_
-        self.assertIsInstance(result, tuple)
-        self.assertEquals(len(result), 1)
+        result = mail.to
+        self.assertIsInstance(result, list)
+        self.assertEquals(len(result), 2)
         self.assertIsInstance(result[0], tuple)
         self.assertEquals(len(result[0]), 2)
 
@@ -383,16 +356,13 @@ class TestMailParser(unittest.TestCase):
         result = mail.message_id
         self.assertIsInstance(result, six.text_type)
 
-        result = mail.attachments_list
+        result = mail.attachments
         self.assertIsInstance(result, list)
 
-        result = mail.date_mail
+        result = mail.date
         self.assertIsInstance(result, datetime.datetime)
 
         result = mail.defects
-        self.assertIsInstance(result, list)
-
-        result = mail.anomalies
         self.assertIsInstance(result, list)
 
     def test_markdown2rst(self):
