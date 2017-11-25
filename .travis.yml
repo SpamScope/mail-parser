@@ -14,6 +14,23 @@ before_install:
 
     # Install msgconvert
     - sudo apt-get install -y libemail-outlook-message-perl pandoc
+    
+    # Build latest images spamscope-root, spamscope-elasticsearch
+
+    # make images
+    - if [ "$TRAVIS_BRANCH" == "master" ]; then
+        cd docker && 
+        docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
+        docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser &&
+        cd -;
+      fi
+      
+    - if [ "$TRAVIS_BRANCH" == "develop" ]; then
+        cd docker && 
+        docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
+        docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH &&
+        cd -;
+      fi
 
 # command to install dependencies
 install: 
@@ -36,6 +53,16 @@ script:
 
 after_success:
     coveralls
+
+    - if [ "$TRAVIS_BRANCH" == "master" ]; then
+        docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+        docker push $DOCKER_USERNAME/spamscope-mail-parser;
+      fi
+
+    - if [ "$TRAVIS_BRANCH" == "develop" ]; then
+        docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+        docker push $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH;
+      fi
 
 notifications:
     email: false
