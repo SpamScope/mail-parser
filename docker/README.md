@@ -10,7 +10,7 @@ sudo docker run -i -t --rm -v ~/mails:/mails fmantuano/spamscope-mail-parser
 
 This command runs mail-parser help as default, but you can use all others options.
 
-To share the "mails" directory between your host and the container, create a "mails" directory on your host. Then run the tool like this.
+To share the "mails" directory between your host and the container, create a "mails" directory on your host.
 
 There also is an example of `docker-compose` 
 

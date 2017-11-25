@@ -18,7 +18,7 @@ before_install:
     # Build latest images spamscope-root, spamscope-elasticsearch
 
     # make images
-    - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then
+    - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
 
           if [ "$TRAVIS_BRANCH" == "master" ]; then
             cd docker && 
@@ -57,7 +57,7 @@ script:
 after_success:
     - coveralls
 
-    - if [ "$TRAVIS_PYTHON_VERSION" == "3.6" ]; then
+    - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
       
           if [ "$TRAVIS_BRANCH" == "master" ]; then
             docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
