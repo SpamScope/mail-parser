@@ -52,7 +52,7 @@ def parse_from_file_obj(fp):
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file_obj(fp).parse()
+    return MailParser.from_file_obj(fp)
 
 
 def parse_from_file(fp):
@@ -65,7 +65,7 @@ def parse_from_file(fp):
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file(fp).parse()
+    return MailParser.from_file(fp)
 
 
 def parse_from_file_msg(fp):
@@ -78,7 +78,7 @@ def parse_from_file_msg(fp):
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file_msg(fp).parse()
+    return MailParser.from_file_msg(fp)
 
 
 def parse_from_string(s):
@@ -91,7 +91,7 @@ def parse_from_string(s):
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_string(s).parse()
+    return MailParser.from_string(s)
 
 
 def parse_from_bytes(bt):
@@ -104,7 +104,7 @@ def parse_from_bytes(bt):
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_bytes(bt).parse()
+    return MailParser.from_bytes(bt)
 
 
 class MailParser(object):
@@ -122,6 +122,13 @@ class MailParser(object):
         Init a new object from a message object structure.
         """
         self._message = message
+        self.parse()
+
+    def __str__(self):
+        if self.message:
+            return self.subject
+        else:
+            return six.text_type()
 
     @classmethod
     def from_file_obj(cls, fp):
@@ -267,9 +274,8 @@ class MailParser(object):
             Instance of MailParser with raw email parsed
         """
 
-        # check if a valid mail
-        if not self.message.keys():
-            raise ValueError("This email doesn't have headers")
+        if not self.message:
+            return self
 
         # reset and start parsing
         self._reset()
