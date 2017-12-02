@@ -91,8 +91,8 @@ class TestMailParser(unittest.TestCase):
             self.assertIsInstance(i["filename"], six.text_type)
 
     def test_valid_mail(self):
-        with self.assertRaises(ValueError):
-            mailparser.parse_from_string("fake mail")
+        m = mailparser.parse_from_string("fake mail")
+        self.assertFalse(m.message)
 
     def test_receiveds(self):
         mail = mailparser.parse_from_file(mail_test_1)
