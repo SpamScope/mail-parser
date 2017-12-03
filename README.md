@@ -78,7 +78,7 @@ mail-parser can be downloaded, used, and modified free of charge. It is availabl
 ## Authors
 
 ### Main Author
-Fedele Mantuano (**Twitter**: [@fedelemantuano](https://twitter.com/fedelemantuano))
+**Fedele Mantuano**: [LinkedIn](https://www.linkedin.com/in/fmantuano/)
 
 
 ## Installation

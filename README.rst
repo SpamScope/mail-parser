@@ -85,8 +85,8 @@ Authors
 Main Author
 ~~~~~~~~~~~
 
-Fedele Mantuano (**Twitter**:
-[@fedelemantuano](https://twitter.com/fedelemantuano))
+**Fedele Mantuano**:
+`LinkedIn <https://www.linkedin.com/in/fmantuano/>`__
 
 Installation
 ------------
