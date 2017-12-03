@@ -78,9 +78,6 @@ class TestMain(unittest.TestCase):
         parsed = self.parser.parse_args(["--file", "mail.eml", "-d"])
         self.assertTrue(parsed.defects)
 
-        parsed = self.parser.parse_args(["--file", "mail.eml", "--anomalies"])
-        self.assertTrue(parsed.anomalies)
-
         parsed = self.parser.parse_args([
             "--file", "mail.eml", "--senderip", "trust"])
         self.assertTrue(parsed.senderip)
