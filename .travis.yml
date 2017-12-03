@@ -21,7 +21,7 @@ before_install:
 
           if [ "$TRAVIS_BRANCH" == "master" ]; then
             cd docker &&
-            docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
+            docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser . &&
             docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser &&
             cd -;
           fi
