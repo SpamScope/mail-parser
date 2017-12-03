@@ -36,12 +36,12 @@ before_install:
 
 # command to install dependencies
 install:
+    - pip install -r requirements.txt
+    - pip install coveralls
+
     # Install msgconvert
     - export PERL_MM_USE_DEFAULT=1
     - sudo cpan -f -i Email::Outlook::Message
-
-    - pip install -r requirements.txt
-    - pip install coveralls
 
 # command to run tests
 script:
