@@ -13,7 +13,7 @@ before_install:
     - sudo apt-get -qq update
 
     # Install msgconvert
-    - sudo apt-get install -y libemail-outlook-message-perl pandoc
+    - sudo apt-get install -y libemail-outlook-message-perl
     
     # Build latest images spamscope-root, spamscope-elasticsearch
 
