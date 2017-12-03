@@ -24,8 +24,8 @@ from setuptools import setup
 
 current = os.path.realpath(os.path.dirname(__file__))
 
-with open(os.path.join(current, 'README')) as f:
-    long_description = f.read().strip()
+with open(os.path.join(current, 'README.rst')) as f:
+    long_description = f.read()
 
 with open(os.path.join(current, 'requirements.txt')) as f:
     requires = f.read().splitlines()

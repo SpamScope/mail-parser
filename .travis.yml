@@ -13,7 +13,27 @@ before_install:
     - sudo apt-get -qq update
 
     # Install msgconvert
-    - sudo apt-get install -y libemail-outlook-message-perl
+    - sudo apt-get install -y libemail-outlook-message-perl pandoc
+    
+    # Build latest images spamscope-root, spamscope-elasticsearch
+
+    # make images
+    - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
+
+          if [ "$TRAVIS_BRANCH" == "master" ]; then
+            cd docker && 
+            docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
+            docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser &&
+            cd -;
+          fi
+          
+          if [ "$TRAVIS_BRANCH" == "develop" ]; then
+            cd docker && 
+            docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
+            docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH &&
+            cd -;
+          fi
+      fi
 
 # command to install dependencies
 install: 
@@ -35,7 +55,20 @@ script:
     - python -m mailparser -f tests/mails/mail_test_6 -j
 
 after_success:
-    coveralls
+    - coveralls
+
+    - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
+      
+          if [ "$TRAVIS_BRANCH" == "master" ]; then
+            docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+            docker push $DOCKER_USERNAME/spamscope-mail-parser;
+          fi
+
+          if [ "$TRAVIS_BRANCH" == "develop" ]; then
+            docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
+            docker push $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH;
+          fi
+      fi
 
 notifications:
     email: false

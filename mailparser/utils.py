@@ -184,3 +184,9 @@ def msgconvert(email):
     else:
         stdoutdata, _ = out.communicate()
         return temp, stdoutdata.decode("utf-8").strip()
+
+
+def markdown2rst(file_path):
+    import pypandoc
+    output = pypandoc.convert_file(file_path, 'rst')
+    return output
