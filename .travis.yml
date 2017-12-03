@@ -1,3 +1,4 @@
+---
 sudo: required
 
 language: python
@@ -14,21 +15,19 @@ before_install:
 
     # Install msgconvert
     - sudo apt-get install -y libemail-outlook-message-perl
-    
-    # Build latest images spamscope-root, spamscope-elasticsearch
 
     # make images
     - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
 
           if [ "$TRAVIS_BRANCH" == "master" ]; then
-            cd docker && 
+            cd docker &&
             docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
             docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser &&
             cd -;
           fi
-          
+
           if [ "$TRAVIS_BRANCH" == "develop" ]; then
-            cd docker && 
+            cd docker &&
             docker build --build-arg BRANCH=$TRAVIS_BRANCH -t $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH . &&
             docker run -i -t --rm $DOCKER_USERNAME/spamscope-mail-parser:$TRAVIS_BRANCH &&
             cd -;
@@ -36,7 +35,7 @@ before_install:
       fi
 
 # command to install dependencies
-install: 
+install:
     # Install msgconvert
     - export PERL_MM_USE_DEFAULT=1
     - sudo cpan -f -i Email::Outlook::Message
@@ -45,20 +44,20 @@ install:
     - pip install coveralls
 
 # command to run tests
-script: 
+script:
     - coverage run --source=mailparser/ --omit=mailparser/__main__.py tests/test_mail_parser.py
     - python tests/test_main.py
     - python -m mailparser -v
     - python -m mailparser -h
     - python -m mailparser -f tests/mails/mail_malformed_3 -j
-    - cat tests/mails/mail_malformed_3 | python -m mailparser -k -j 
+    - cat tests/mails/mail_malformed_3 | python -m mailparser -k -j
     - python -m mailparser -f tests/mails/mail_test_6 -j
 
 after_success:
     - coveralls
 
     - if [ "$TRAVIS_PYTHON_VERSION" == "2.7" ]; then
-      
+
           if [ "$TRAVIS_BRANCH" == "master" ]; then
             docker login -u="$DOCKER_USERNAME" -p="$DOCKER_PASSWORD";
             docker push $DOCKER_USERNAME/spamscope-mail-parser;
@@ -74,4 +73,3 @@ notifications:
     email: false
     slack:
         secure: eawY0ibL+ldzr+lL+QQHicUaoQwom01P7g57avv9ebZ256VMzTuiIYkkNuyetTmjU7oACgrzmIJiuYdeyYYqJDfGBLS/Z6KeIb11iAa9vAmAjmoarP1eyR6XcyIOpAxRXDFDGaqjEqyjikI3P8HQvnv24YFRdpR0jd8kf9rZ9DHVMIOKRi4okBmZvCCgS5YhZJEdOujHwPlF71ZIOk26S7dGRu4gJeLRMPnhwcM2TKqcsU+cZaaRP9n/0sQ/gqDbb+SKtENGLNfTuTuJvhrhsGcbGpFH4M5RDpvJvvlUZQhJBc3ordFXYGT0IQcAn4Os4gOXgcy0JD+74uh/uICohvWKJio5diwH91FVkTF/gODOKSfyEfO2nAKHLF8KRkYoPitecR9KdUbEALeHRxNxWLfumivzJxOK4QLo94qx6LvSIA9j3o137U0POA7gRHYmZCSdDrkxBI5eFqBbivLNGKN6v0a5tZIRSCLfNsr6ZiNcxM5KO9vUIMJ6HdpNTZDqKsd9JFdV2wI/q/yy7vhoocxAtk+H88jdvrqiA9B5jwoHaQ7lGsgmkvPNLeuNsarr3VDGZGzMmqnssx9G4F8jQP52n4t2RfZqe6xE2867J4tt1H/5YkWJiacoxquAe7DcCn1qXko9q9Mbs6lDN9fumb3J5HmG7R/yeX79zAGPE5w=
-
