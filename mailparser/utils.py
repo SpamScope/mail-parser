@@ -23,9 +23,12 @@ from collections import namedtuple
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
+import datetime
+import email
 import hashlib
 import logging
 import os
+import re
 import subprocess
 import tempfile
 
@@ -33,6 +36,13 @@ import six
 
 
 log = logging.getLogger(__name__)
+
+
+RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+                    r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
+                    r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
+JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
 
 
 def sanitize(func):
@@ -190,3 +200,53 @@ def markdown2rst(file_path):
     import pypandoc
     output = pypandoc.convert_file(file_path, 'rst')
     return output
+
+
+def receiveds_parsing(receiveds):
+    """
+    This function parses the receiveds headers
+
+    Args:
+        receiveds (list): list of raw receiveds headers
+
+    Returns:
+        a list of parsed receiveds headers with first hop in first position
+    """
+
+    parsed = []
+
+    try:
+        for i in receiveds:
+            cleaned = re.sub(JUNK_PATTERN, " ", i)
+            for j in RECEIVED_COMPILED.finditer(cleaned):
+                parsed.append(j.groupdict())
+
+    except AttributeError:
+        return receiveds[::-1]
+
+    else:
+        if len(receiveds) == len(parsed):
+            output = []
+
+            for i in parsed:
+                j = {}
+
+                for k, v in i.items():
+                    if v:
+                        j[k] = v.strip()
+
+                    date = i.get("date")
+                    if date:
+                        j["date_utc"] = convert_mail_date(date).isoformat()
+
+                output.append(j)
+
+            return output[::-1]
+        else:
+            return receiveds[::-1]
+
+
+def convert_mail_date(date):
+    d = email.utils.parsedate_tz(date)
+    t = email.utils.mktime_tz(d)
+    return datetime.datetime.utcfromtimestamp(t)

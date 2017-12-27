@@ -39,10 +39,19 @@ mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
-from mailparser.utils import fingerprints, msgconvert, ported_open
+from mailparser.utils import (
+    fingerprints, msgconvert, ported_open, receiveds_parsing)
 
 
 class TestMailParser(unittest.TestCase):
+
+    def test_receiveds_parsing(self):
+        mail = mailparser.parse_from_file(mail_test_2)
+        receiveds = mail.received_raw
+        result = receiveds_parsing(receiveds)
+        self.assertIsInstance(result, list)
+        for i in result:
+            self.assertIsInstance(i, dict)
 
     def test_ipaddress(self):
         mail = mailparser.parse_from_file(mail_test_2)
@@ -97,9 +106,16 @@ class TestMailParser(unittest.TestCase):
     def test_receiveds(self):
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertEqual(len(mail.received), 4)
+
         self.assertIsInstance(mail.received, list)
+        for i in mail.received:
+            self.assertIsInstance(i, dict)
+
+        self.assertIsInstance(mail.received_raw, list)
+        for i in mail.received_raw:
+            self.assertIsInstance(i, six.text_type)
+
         self.assertIsInstance(mail.received_json, six.text_type)
-        self.assertIsInstance(mail.received_raw, six.text_type)
 
     def test_parsing_know_values(self):
         mail = mailparser.parse_from_file(mail_test_2)
