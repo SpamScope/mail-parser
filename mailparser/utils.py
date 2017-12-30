@@ -19,7 +19,7 @@ limitations under the License.
 
 from __future__ import unicode_literals
 
-from collections import namedtuple
+from collections import namedtuple, Counter
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
@@ -221,32 +221,67 @@ def receiveds_parsing(receiveds):
             for j in RECEIVED_COMPILED.finditer(cleaned):
                 parsed.append(j.groupdict())
 
-    except AttributeError:
+        if len(receiveds) != len(parsed):
+            raise ValueError
+
+    except (AttributeError, ValueError):
         return receiveds[::-1]
 
     else:
-        if len(receiveds) == len(parsed):
-            output = []
-
-            for i in parsed:
-                j = {}
-
-                for k, v in i.items():
-                    if v:
-                        j[k] = v.strip()
-
-                    date = i.get("date")
-                    if date:
-                        j["date_utc"] = convert_mail_date(date).isoformat()
-
-                output.append(j)
-
-            return output[::-1]
-        else:
-            return receiveds[::-1]
+        return receiveds_format(parsed)
 
 
 def convert_mail_date(date):
     d = email.utils.parsedate_tz(date)
     t = email.utils.mktime_tz(d)
     return datetime.datetime.utcfromtimestamp(t)
+
+
+def receiveds_format(receiveds):
+    """
+    Given a list of receiveds hop, adds metadata and reformat
+    field values
+
+    Args:
+        receiveds (list): list of receiveds hops already formatted
+
+    Returns:
+        list of receiveds reformated and with new fields
+    """
+
+    output = []
+    counter = Counter()
+
+    for i in receiveds[::-1]:
+        # Clean strings
+        j = {k: v.strip() for k, v in i.items() if v}
+
+        # Add hop
+        j["hop"] = counter["hop"] + 1
+
+        # Add UTC date
+        if i.get("date"):
+            j["date_utc"] = convert_mail_date(i["date"])
+
+        # Add delay
+        size = len(output)
+        now = j.get("date_utc")
+
+        if size and now:
+            before = output[counter["hop"] - 1].get("date_utc")
+            if before:
+                j["delay"] = (now - before).total_seconds()
+        else:
+            j["delay"] = 0
+
+        # append result
+        output.append(j)
+
+        # new hop
+        counter["hop"] += 1
+    else:
+        for i in output:
+            if i.get("date_utc"):
+                i["date_utc"] = i["date_utc"].isoformat()
+        else:
+            return output
