@@ -271,6 +271,8 @@ def receiveds_format(receiveds):
             before = output[counter["hop"] - 1].get("date_utc")
             if before:
                 j["delay"] = (now - before).total_seconds()
+            else:
+                j["delay"] = 0
         else:
             j["delay"] = 0
 
