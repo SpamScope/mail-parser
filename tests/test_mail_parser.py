@@ -29,6 +29,7 @@ root = os.path.join(base_path, '..')
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
+mail_test_4 = os.path.join(base_path, 'mails', 'mail_test_4')
 mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
 mail_test_6 = os.path.join(base_path, 'mails', 'mail_test_6')
 mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
@@ -45,13 +46,29 @@ from mailparser.utils import (
 
 class TestMailParser(unittest.TestCase):
 
+    def setUp(self):
+        self.all_mails = (
+            mail_test_1,
+            mail_test_2,
+            mail_test_3,
+            mail_test_4,
+            mail_test_5,
+            mail_test_6,
+            mail_test_7,
+            mail_malformed_1,
+            mail_malformed_2,
+            mail_malformed_3)
+
     def test_receiveds_parsing(self):
-        mail = mailparser.parse_from_file(mail_test_2)
-        receiveds = mail.received_raw
-        result = receiveds_parsing(receiveds)
-        self.assertIsInstance(result, list)
-        for i in result:
-            self.assertIsInstance(i, dict)
+        for i in self.all_mails:
+            mail = mailparser.parse_from_file(i)
+            receiveds = mail.received_raw
+            result = receiveds_parsing(receiveds)
+            self.assertIsInstance(result, list)
+            for j in result:
+                self.assertIsInstance(j, dict)
+                self.assertIn("hop", j)
+                self.assertIn("delay", j)
 
     def test_ipaddress(self):
         mail = mailparser.parse_from_file(mail_test_2)
