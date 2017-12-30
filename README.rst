@@ -202,6 +202,11 @@ Example:
 
 This example will show you the tokenized mail in a JSON pretty format.
 
+From `raw
+mail <https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e>`__
+to `parsed
+mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`__
+
 .. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
    :target: https://badge.fury.io/py/mail-parser
 .. |Build Status| image:: https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop
