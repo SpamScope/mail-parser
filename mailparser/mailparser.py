@@ -18,7 +18,6 @@ limitations under the License.
 """
 
 from __future__ import unicode_literals
-import datetime
 import email
 import logging
 import os
@@ -29,8 +28,13 @@ import six
 import simplejson as json
 
 from .utils import (
-    ported_string, decode_header_part, ported_open,
-    find_between, msgconvert)
+    convert_mail_date,
+    decode_header_part,
+    find_between,
+    msgconvert,
+    ported_open,
+    ported_string,
+    receiveds_parsing)
 
 
 log = logging.getLogger(__name__)
@@ -424,12 +428,12 @@ class MailParser(object):
     @property
     def received(self):
         """
-        Return a list of all received headers
+        Return a list of all received headers parsed
         """
         output = []
         for i in self.message.get_all("received", []):
             output.append(decode_header_part(i))
-        return output
+        return receiveds_parsing(output)
 
     @property
     def received_json(self):
@@ -437,6 +441,16 @@ class MailParser(object):
         Return a JSON of all received headers
         """
         return json.dumps(self.received, ensure_ascii=False, indent=2)
+
+    @property
+    def received_raw(self):
+        """
+        Return a list of all received headers in raw format
+        """
+        output = []
+        for i in self.message.get_all("received", []):
+            output.append(decode_header_part(i))
+        return output
 
     @property
     def message_id(self):
@@ -483,12 +497,10 @@ class MailParser(object):
         """
         Return the mail date in datetime.datetime format and UTC.
         """
-        date_ = self.message.get('date')
+        date = self.message.get('date')
 
         try:
-            d = email.utils.parsedate_tz(date_)
-            t = email.utils.mktime_tz(d)
-            return datetime.datetime.utcfromtimestamp(t)
+            return convert_mail_date(date)
         except:
             return None
 
