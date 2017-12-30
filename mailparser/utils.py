@@ -19,13 +19,16 @@ limitations under the License.
 
 from __future__ import unicode_literals
 
-from collections import namedtuple
+from collections import namedtuple, Counter
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
+import datetime
+import email
 import hashlib
 import logging
 import os
+import re
 import subprocess
 import tempfile
 
@@ -33,6 +36,13 @@ import six
 
 
 log = logging.getLogger(__name__)
+
+
+RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+                    r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
+                    r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
+JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
 
 
 def sanitize(func):
@@ -190,3 +200,88 @@ def markdown2rst(file_path):
     import pypandoc
     output = pypandoc.convert_file(file_path, 'rst')
     return output
+
+
+def receiveds_parsing(receiveds):
+    """
+    This function parses the receiveds headers
+
+    Args:
+        receiveds (list): list of raw receiveds headers
+
+    Returns:
+        a list of parsed receiveds headers with first hop in first position
+    """
+
+    parsed = []
+
+    try:
+        for i in receiveds:
+            cleaned = re.sub(JUNK_PATTERN, " ", i)
+            for j in RECEIVED_COMPILED.finditer(cleaned):
+                parsed.append(j.groupdict())
+
+        if len(receiveds) != len(parsed):
+            raise ValueError
+
+    except (AttributeError, ValueError):
+        return receiveds[::-1]
+
+    else:
+        return receiveds_format(parsed)
+
+
+def convert_mail_date(date):
+    d = email.utils.parsedate_tz(date)
+    t = email.utils.mktime_tz(d)
+    return datetime.datetime.utcfromtimestamp(t)
+
+
+def receiveds_format(receiveds):
+    """
+    Given a list of receiveds hop, adds metadata and reformat
+    field values
+
+    Args:
+        receiveds (list): list of receiveds hops already formatted
+
+    Returns:
+        list of receiveds reformated and with new fields
+    """
+
+    output = []
+    counter = Counter()
+
+    for i in receiveds[::-1]:
+        # Clean strings
+        j = {k: v.strip() for k, v in i.items() if v}
+
+        # Add hop
+        j["hop"] = counter["hop"] + 1
+
+        # Add UTC date
+        if i.get("date"):
+            j["date_utc"] = convert_mail_date(i["date"])
+
+        # Add delay
+        size = len(output)
+        now = j.get("date_utc")
+
+        if size and now:
+            before = output[counter["hop"] - 1].get("date_utc")
+            if before:
+                j["delay"] = (now - before).total_seconds()
+        else:
+            j["delay"] = 0
+
+        # append result
+        output.append(j)
+
+        # new hop
+        counter["hop"] += 1
+    else:
+        for i in output:
+            if i.get("date_utc"):
+                i["date_utc"] = i["date_utc"].isoformat()
+        else:
+            return output
