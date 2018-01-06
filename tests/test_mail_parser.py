@@ -40,6 +40,7 @@ mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
 
 sys.path.append(root)
 import mailparser
+from mailparser import get_header
 from mailparser.utils import (
     fingerprints, msgconvert, ported_open, receiveds_parsing)
 
@@ -58,6 +59,11 @@ class TestMailParser(unittest.TestCase):
             mail_malformed_1,
             mail_malformed_2,
             mail_malformed_3)
+
+    def test_get_header(self):
+        mail = mailparser.parse_from_file(mail_test_1)
+        h1 = get_header(mail.message, "from")
+        self.assertIsInstance(h1, six.text_type)
 
     def test_receiveds_parsing(self):
         for i in self.all_mails:
