@@ -111,6 +111,24 @@ def parse_from_bytes(bt):
     return MailParser.from_bytes(bt)
 
 
+def get_header(message, name):
+    """
+    Gets an email.message.Message and a header name and returns
+    the mail header decoded with the correct charset.
+
+    Args:
+        message (email.message.Message): message with headers
+        name (string): header to get
+
+    Returns:
+        decoded header
+    """
+    header = message.get(name)
+    if header:
+        return decode_header_part(header)
+    return six.text_type()
+
+
 class MailParser(object):
     """
     MailParser package provides a standard parser that understands
