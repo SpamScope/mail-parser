@@ -448,9 +448,7 @@ class MailParser(object):
         """
         Return a list of all received headers parsed
         """
-        output = []
-        for i in self.message.get_all("received", []):
-            output.append(decode_header_part(i))
+        output = self.received_raw
         return receiveds_parsing(output)
 
     @property
