@@ -225,7 +225,7 @@ def receiveds_parsing(receiveds):
             raise ValueError
 
     except (AttributeError, ValueError):
-        return receiveds[::-1]
+        return receiveds_not_parsed(receiveds)
 
     else:
         return receiveds_format(parsed)
@@ -235,6 +235,31 @@ def convert_mail_date(date):
     d = email.utils.parsedate_tz(date)
     t = email.utils.mktime_tz(d)
     return datetime.datetime.utcfromtimestamp(t)
+
+
+def receiveds_not_parsed(receiveds):
+    """
+    If receiveds are not parsed, makes a new structure with raw
+    field. It's useful to have the same structure of receiveds
+    parsed.
+
+    Args:
+        receiveds (list): list of raw receiveds headers
+
+    Returns:
+        a list of not parsed receiveds headers with first hop in first position
+    """
+
+    output = []
+    counter = Counter()
+
+    for i in receiveds[::-1]:
+        j = {"raw": i.strip()}
+        j["hop"] = counter["hop"] + 1
+        counter["hop"] += 1
+        output.append(j)
+    else:
+        return output
 
 
 def receiveds_format(receiveds):
