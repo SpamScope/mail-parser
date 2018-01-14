@@ -35,6 +35,7 @@ mail_test_6 = os.path.join(base_path, 'mails', 'mail_test_6')
 mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
 mail_test_8 = os.path.join(base_path, 'mails', 'mail_test_8')
 mail_test_9 = os.path.join(base_path, 'mails', 'mail_test_9')
+mail_test_10 = os.path.join(base_path, 'mails', 'mail_test_10')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -74,6 +75,10 @@ class TestMailParser(unittest.TestCase):
         for i in mail.received:
             self.assertIn("date_utc", i)
             self.assertIsNotNone(i["date_utc"])
+
+        mail = mailparser.parse_from_file(mail_test_10)
+        for i in mail.received:
+            self.assertIn("date_utc", i)
 
     def test_get_header(self):
         mail = mailparser.parse_from_file(mail_test_1)
