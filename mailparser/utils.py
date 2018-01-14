@@ -289,7 +289,10 @@ def receiveds_format(receiveds):
             # Modify date to manage strange header like:
             # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
             i["date"] = i["date"].split(";")[-1]
-            j["date_utc"] = convert_mail_date(i["date"])
+            try:
+                j["date_utc"] = convert_mail_date(i["date"])
+            except TypeError:
+                j["date_utc"] = None
 
         # Add delay
         size = len(output)
