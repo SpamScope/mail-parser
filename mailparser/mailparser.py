@@ -134,7 +134,7 @@ class MailParser(object):
     """
     MailParser package provides a standard parser that understands
     most email document structures like official email package.
-    MailParser handles the enconding of email and split the raw email for you.
+    MailParser handles the encoding of email and split the raw email for you.
 
     Headers:
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
