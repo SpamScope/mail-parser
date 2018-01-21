@@ -191,4 +191,4 @@ $ mailparser -f example_mail -j
 This example will show you the tokenized mail in a JSON pretty format.
 
 From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to 
-[parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6)
+[parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).
