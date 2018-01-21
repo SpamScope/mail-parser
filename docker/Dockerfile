@@ -1,4 +1,4 @@
-FROM python
+FROM python:alpine
 ENV MAIL_PARSER_PATH=/tmp/mailparser
 ARG BRANCH=develop
 RUN apt-get -yqq update \

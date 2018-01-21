@@ -1,4 +1,5 @@
 |PyPI version| |Build Status| |Coverage Status| |BCH compliance|
+|image4|
 
 mail-parser
 ===========
@@ -137,8 +138,6 @@ Then you can get all parts
     mail.delivered_to
     mail.from_
     mail.get_server_ipaddress(trust="my_server_mail_trust")
-    mail.has_defects
-    mail.headers
     mail.headers
     mail.mail: tokenized mail in a object
     mail.message: email.message.Message object
@@ -215,5 +214,7 @@ mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`_
    :target: https://coveralls.io/github/SpamScope/mail-parser?branch=develop
 .. |BCH compliance| image:: https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop
    :target: https://bettercodehub.com/
+.. |image4| image:: https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg
+   :target: https://microbadger.com/images/fmantuano/spamscope-mail-parser
 .. |Donate| image:: https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif
    :target: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2

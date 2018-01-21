@@ -34,7 +34,8 @@ from .utils import (
     msgconvert,
     ported_open,
     ported_string,
-    receiveds_parsing)
+    receiveds_parsing,
+)
 
 
 log = logging.getLogger(__name__)
