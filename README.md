@@ -4,6 +4,8 @@
 [![BCH compliance](https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop)](https://bettercodehub.com/)
 [![](https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg)](https://microbadger.com/images/fmantuano/spamscope-mail-parser "Get your own image badge on microbadger.com")
 
+![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
+
 # mail-parser
 
 ## Overview
