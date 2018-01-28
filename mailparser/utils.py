@@ -25,6 +25,7 @@ from email.header import decode_header
 from unicodedata import normalize
 import datetime
 import email
+import functools
 import hashlib
 import logging
 import os
@@ -48,6 +49,7 @@ RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
 def sanitize(func):
     """ NFC is the normalization form recommended by W3C. """
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         return normalize('NFC', func(*args, **kwargs))
     return wrapper
