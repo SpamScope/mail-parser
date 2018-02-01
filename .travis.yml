@@ -59,9 +59,9 @@ deploy:
         secure: "EYCHEuXZPdkxfC6oP2kX811viTBudnDw8DaRooEBvf3he4m/tz7BgkLph48/DF4+Hprr7HmrrMmAI2hLQKr+gSo5QEHpkApyQGagUm/Z4NwQyyiOW+PgphgIWlur7+8SRIdUBMpT9bsMl5SO+P1dy7mxCL2mM+AL8pfZAsEjZN/Ti9XF+dpmo3KLbkBJEnsvJ6CiU+XgivrROl4f6hTqlfkCJPOByyZsZ2rIqeWdpb0Y6WS1bvLyjo1nLPR2HHZR/OQ/Cgsqt1nhum6m5yrq6wz1825Cjd7FqVALQZ3IbeASx+1MVWgb3Avaj9KCBDbhzvzKSSAo1MN79TFx5KPmnHAhhho1LRPP2qkOC9UMquAaAiXY4OhXpCllbg9dEM4Tlmib0szNfCw9ghHGPIYb7jhVlcP3cCIAc5eBZsb8vb1DbhOXJwM3kccWMwbkHYPLiRBxkHNDYdBg3tXX67gC1Xa6jGXOk9xKQ/W2dl/IAdSheZgy/AvmGuuXZ+ctTycWD/ntITiQWuSSgtxmdDYuLZ470Aimo6tF8QNyaZ1rpxGd2cU/tQgMVW66btVTQ4uQKtmfPZ6G4myHFSaBDdpBuFtZJF0PDuQvp/Iyxu79PlshyVSZTYj0Azrv0wUhAYcrdJ+rx4dMWKc2PQHOx1CbgPgW4BL60Fr8bg2tGyFqDyU="
     on:
         tags: true
-        distributions: sdist
         repo: SpamScope/mail-parser
         branch: master
+        condition: "$TRAVIS_PYTHON_VERSION = 2.7"
 
 after_success:
     - coveralls
