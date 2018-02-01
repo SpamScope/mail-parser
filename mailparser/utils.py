@@ -320,3 +320,14 @@ def receiveds_format(receiveds):
                 i["date_utc"] = i["date_utc"].isoformat()
         else:
             return output
+
+
+def get_to_domains(to=[], reply_to=[]):
+    domains = set()
+    for i in to + reply_to:
+        try:
+            domains.add(i[1].split("@")[-1].lower().strip())
+        except KeyError:
+            pass
+    else:
+        return list(domains)

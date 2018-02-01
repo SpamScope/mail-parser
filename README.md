@@ -50,6 +50,7 @@ There are other properties to get:
   - headers
   - attachments
   - sender IP address
+  - to domains
 
 mail-parser can detect defect in mail:
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
@@ -139,6 +140,7 @@ mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
 mail.to
+mail.to_domains
 ```
 
 ## Usage from command-line
