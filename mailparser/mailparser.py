@@ -31,10 +31,12 @@ from .utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
+    get_to_domains,
     msgconvert,
     ported_open,
     ported_string,
-    receiveds_parsing)
+    receiveds_parsing,
+)
 
 
 log = logging.getLogger(__name__)
@@ -133,7 +135,7 @@ class MailParser(object):
     """
     MailParser package provides a standard parser that understands
     most email document structures like official email package.
-    MailParser handles the enconding of email and split the raw email for you.
+    MailParser handles the encoding of email and split the raw email for you.
 
     Headers:
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
@@ -579,3 +581,10 @@ class MailParser(object):
         Return the entire message flattened as a string.
         """
         return self.message.as_string()
+
+    @property
+    def to_domains(self):
+        """
+        Return all domain of 'to' and 'reply-to' email addresses
+        """
+        return get_to_domains(self.to, self.reply_to)

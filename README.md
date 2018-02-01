@@ -2,6 +2,9 @@
 [![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop)](https://travis-ci.org/SpamScope/mail-parser)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
 [![BCH compliance](https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop)](https://bettercodehub.com/)
+[![](https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg)](https://microbadger.com/images/fmantuano/spamscope-mail-parser "Get your own image badge on microbadger.com")
+
+![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
 
@@ -47,6 +50,7 @@ There are other properties to get:
   - headers
   - attachments
   - sender IP address
+  - to domains
 
 mail-parser can detect defect in mail:
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
@@ -127,8 +131,6 @@ mail.defects_categories: only defects categories
 mail.delivered_to
 mail.from_
 mail.get_server_ipaddress(trust="my_server_mail_trust")
-mail.has_defects
-mail.headers
 mail.headers
 mail.mail: tokenized mail in a object
 mail.message: email.message.Message object
@@ -138,6 +140,7 @@ mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
 mail.to
+mail.to_domains
 ```
 
 ## Usage from command-line
@@ -192,4 +195,4 @@ $ mailparser -f example_mail -j
 This example will show you the tokenized mail in a JSON pretty format.
 
 From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to 
-[parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6)
+[parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).

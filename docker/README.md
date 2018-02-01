@@ -1,3 +1,8 @@
+[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop)](https://travis-ci.org/SpamScope/mail-parser)
+[![](https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg)](https://microbadger.com/images/fmantuano/spamscope-mail-parser "Get your own image badge on microbadger.com")
+
+![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
+
 # fmantuano/spamscope-mail-parser
 
 This Dockerfile represents a Docker image that encapsulates mail-parser. The [official image](https://hub.docker.com/r/fmantuano/spamscope-mail-parser/) is on Docker Hub.
