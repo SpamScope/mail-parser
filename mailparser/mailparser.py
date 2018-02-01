@@ -31,6 +31,7 @@ from .utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
+    get_to_domains,
     msgconvert,
     ported_open,
     ported_string,
@@ -580,3 +581,10 @@ class MailParser(object):
         Return the entire message flattened as a string.
         """
         return self.message.as_string()
+
+    @property
+    def to_domains(self):
+        """
+        Return all domain of 'to' and 'reply-to' email addresses
+        """
+        return get_to_domains(self.to, self.reply_to)

@@ -45,7 +45,12 @@ sys.path.append(root)
 import mailparser
 from mailparser import get_header
 from mailparser.utils import (
-    fingerprints, msgconvert, ported_open, receiveds_parsing)
+    fingerprints,
+    get_to_domains,
+    msgconvert,
+    ported_open,
+    receiveds_parsing,
+)
 
 
 class TestMailParser(unittest.TestCase):
@@ -422,6 +427,20 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.defects
         self.assertIsInstance(result, list)
+
+    def test_get_to_domains(self):
+        m = mailparser.parse_from_file(mail_test_6)
+
+        domains_1 = get_to_domains(m.to, m.reply_to)
+        self.assertIsInstance(domains_1, list)
+        self.assertIn("test.it", domains_1)
+
+        domains_2 = m.to_domains
+        self.assertIsInstance(domains_2, list)
+        self.assertIn("test.it", domains_2)
+        self.assertEquals(domains_1, domains_2)
+
+        self.assertIsInstance(m.to_domains_json, six.text_type)
 
 
 if __name__ == '__main__':
