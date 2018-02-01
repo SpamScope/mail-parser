@@ -1,4 +1,10 @@
 |PyPI version| |Build Status| |Coverage Status| |BCH compliance|
+|image4|
+
+.. figure:: https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png
+   :alt: SpamScope
+
+   SpamScope
 
 mail-parser
 ===========
@@ -47,7 +53,7 @@ headers <https://www.iana.org/assignments/message-headers/message-headers.xhtml>
 -  to
 
 There are other properties to get: - body - headers - attachments -
-sender IP address
+sender IP address - to domains
 
 mail-parser can detect defect in mail: -
 `defects <https://docs.python.org/2/library/email.message.html#email.message.Message.defects>`__:
@@ -137,8 +143,6 @@ Then you can get all parts
     mail.delivered_to
     mail.from_
     mail.get_server_ipaddress(trust="my_server_mail_trust")
-    mail.has_defects
-    mail.headers
     mail.headers
     mail.mail: tokenized mail in a object
     mail.message: email.message.Message object
@@ -148,6 +152,7 @@ Then you can get all parts
     mail.subject
     mail.text_plain: only text plain mail parts in a list
     mail.to
+    mail.to_domains
 
 Usage from command-line
 -----------------------
@@ -205,7 +210,7 @@ This example will show you the tokenized mail in a JSON pretty format.
 From `raw
 mail <https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e>`__
 to `parsed
-mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`__
+mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`__.
 
 .. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
    :target: https://badge.fury.io/py/mail-parser
@@ -215,5 +220,7 @@ mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`_
    :target: https://coveralls.io/github/SpamScope/mail-parser?branch=develop
 .. |BCH compliance| image:: https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop
    :target: https://bettercodehub.com/
+.. |image4| image:: https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg
+   :target: https://microbadger.com/images/fmantuano/spamscope-mail-parser
 .. |Donate| image:: https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif
    :target: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2
