@@ -90,6 +90,9 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
 
 
 def decode_header_part(header):
+    if not header:
+        return six.text_type()
+
     output = six.text_type()
 
     try:
