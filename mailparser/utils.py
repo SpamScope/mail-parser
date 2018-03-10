@@ -105,7 +105,7 @@ def decode_header_part(header):
             output += ported_string(d, c, 'ignore')
 
     # Header parsing failed, when header has charset Shift_JIS
-    except HeaderParseError:
+    except (HeaderParseError, UnicodeError):
         log.error("Failed decoding header part: {}".format(header))
         output += header
 
