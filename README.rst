@@ -212,6 +212,21 @@ mail <https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e>`_
 to `parsed
 mail <https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6>`__.
 
+Exceptions
+----------
+
+Exceptions hierarchy of mail-parser:
+
+::
+
+    MailParserError: Base MailParser Exception
+    |
+    ├── MailParserOutlookError: Raised with Outlook integration errors
+    |
+    ├── MailParserEnvironmentError: Raised when the environment is not correct
+    |
+    ├── MailParserOSError: Raised when there is an OS error
+
 .. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
    :target: https://badge.fury.io/py/mail-parser
 .. |Build Status| image:: https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop

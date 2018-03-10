@@ -28,6 +28,10 @@ import simplejson as json
 import mailparser
 from .utils import fingerprints
 
+from .exceptions import (
+    MailParserOutlookError,
+)
+
 current = os.path.realpath(os.path.dirname(__file__))
 
 __version__ = runpy.run_path(
@@ -216,7 +220,8 @@ def main():
         parser = mailparser.parse_from_string(args.string)
     elif args.stdin:
         if args.outlook:
-            raise RuntimeError("You can't use stdin with msg Outlook")
+            raise MailParserOutlookError(
+                "You can't use stdin with msg Outlook")
         parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:

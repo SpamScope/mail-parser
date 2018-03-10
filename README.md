@@ -196,3 +196,19 @@ This example will show you the tokenized mail in a JSON pretty format.
 
 From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to 
 [parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).
+
+
+## Exceptions
+
+Exceptions hierarchy of mail-parser:
+
+```
+MailParserError: Base MailParser Exception
+|
+├── MailParserOutlookError: Raised with Outlook integration errors
+|
+├── MailParserEnvironmentError: Raised when the environment is not correct
+|
+├── MailParserOSError: Raised when there is an OS error
+
+```
