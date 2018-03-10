@@ -35,6 +35,10 @@ import tempfile
 
 import six
 
+from .exceptions import (
+    MailParserOSError
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -194,7 +198,7 @@ def msgconvert(email):
     except OSError:
         message = "To use this function you must install 'msgconvert' tool"
         log.exception(message)
-        raise OSError(message)
+        raise MailParserOSError(message)
 
     else:
         stdoutdata, _ = out.communicate()

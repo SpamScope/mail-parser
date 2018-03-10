@@ -37,6 +37,8 @@ from mailparser.utils import (
     receiveds_parsing,
 )
 
+from mailparser.exceptions import MailParserEnvironmentError
+
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
 mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
@@ -327,7 +329,7 @@ class TestMailParser(unittest.TestCase):
 
     def test_from_bytes(self):
         if six.PY2:
-            with self.assertRaises(EnvironmentError):
+            with self.assertRaises(MailParserEnvironmentError):
                 mailparser.MailParser.from_bytes(b"")
 
     def test_classmethods(self):
