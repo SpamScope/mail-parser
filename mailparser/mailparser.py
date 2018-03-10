@@ -38,6 +38,10 @@ from .utils import (
     receiveds_parsing,
 )
 
+from .exceptions import (
+    MailParserEnvironmentError,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -234,7 +238,7 @@ class MailParser(object):
             Instance of MailParser
         """
         if six.PY2:
-            raise EnvironmentError(
+            raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
 
         message = email.message_from_bytes(bt)
@@ -323,14 +327,14 @@ class MailParser(object):
                 parts.append(p)
             except TypeError:
                 pass
-            except:
+            except Exception:
                 log.error(
                     "Failed to get epilogue part. Should check raw mail.")
 
         # walk all mail parts
         for p in parts:
             if not p.is_multipart():
-                filename = ported_string(p.get_filename())
+                filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
 
                 if filename:
@@ -516,11 +520,12 @@ class MailParser(object):
         Return the mail date in datetime.datetime format and UTC.
         """
         date = self.message.get('date')
+        conv = None
 
         try:
-            return convert_mail_date(date)
-        except:
-            return None
+            conv = convert_mail_date(date)
+        finally:
+            return conv
 
     @property
     def date_json(self):

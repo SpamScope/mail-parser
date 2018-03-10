@@ -25,6 +25,19 @@ import unittest
 
 base_path = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(base_path, '..')
+sys.path.append(root)
+
+import mailparser
+from mailparser import get_header
+from mailparser.utils import (
+    fingerprints,
+    get_to_domains,
+    msgconvert,
+    ported_open,
+    receiveds_parsing,
+)
+
+from mailparser.exceptions import MailParserEnvironmentError
 
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
@@ -36,21 +49,11 @@ mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
 mail_test_8 = os.path.join(base_path, 'mails', 'mail_test_8')
 mail_test_9 = os.path.join(base_path, 'mails', 'mail_test_9')
 mail_test_10 = os.path.join(base_path, 'mails', 'mail_test_10')
+mail_test_11 = os.path.join(base_path, 'mails', 'mail_test_11')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
 mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
-
-sys.path.append(root)
-import mailparser
-from mailparser import get_header
-from mailparser.utils import (
-    fingerprints,
-    get_to_domains,
-    msgconvert,
-    ported_open,
-    receiveds_parsing,
-)
 
 
 class TestMailParser(unittest.TestCase):
@@ -144,6 +147,11 @@ class TestMailParser(unittest.TestCase):
     def test_type_error(self):
         mail = mailparser.parse_from_file(mail_test_5)
         self.assertEqual(len(mail.attachments), 5)
+        for i in mail.attachments:
+            self.assertIsInstance(i["filename"], six.text_type)
+
+    def test_filename_decode(self):
+        mail = mailparser.parse_from_file(mail_test_11)
         for i in mail.attachments:
             self.assertIsInstance(i["filename"], six.text_type)
 
@@ -321,7 +329,7 @@ class TestMailParser(unittest.TestCase):
 
     def test_from_bytes(self):
         if six.PY2:
-            with self.assertRaises(EnvironmentError):
+            with self.assertRaises(MailParserEnvironmentError):
                 mailparser.MailParser.from_bytes(b"")
 
     def test_classmethods(self):

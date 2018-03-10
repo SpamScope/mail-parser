@@ -1,8 +1,9 @@
-*.pyc
 .*.swp
 .coverage
 .env
 .ropeproject
+.vscode
+*.pyc
 build/
 dist/
 mail_parser.egg-info/
