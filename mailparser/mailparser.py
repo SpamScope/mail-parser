@@ -38,6 +38,10 @@ from .utils import (
     receiveds_parsing,
 )
 
+from .exceptions import (
+    MailParserEnvironmentError,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -234,7 +238,7 @@ class MailParser(object):
             Instance of MailParser
         """
         if six.PY2:
-            raise EnvironmentError(
+            raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
 
         message = email.message_from_bytes(bt)
