@@ -402,6 +402,7 @@ class MailParser(object):
         received = self.message.get_all("received", [])
 
         for i in received:
+            i = ported_string(i)
             if trust in i:
                 check = REGXIP.findall(i[0:i.find("by")])
 
