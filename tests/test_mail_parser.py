@@ -50,6 +50,7 @@ mail_test_8 = os.path.join(base_path, 'mails', 'mail_test_8')
 mail_test_9 = os.path.join(base_path, 'mails', 'mail_test_9')
 mail_test_10 = os.path.join(base_path, 'mails', 'mail_test_10')
 mail_test_11 = os.path.join(base_path, 'mails', 'mail_test_11')
+mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -119,6 +120,12 @@ class TestMailParser(unittest.TestCase):
         trust = "   "
         result = mail.get_server_ipaddress(trust)
         self.assertEqual(result, None)
+
+    def test_ipaddress_unicodeerror(self):
+        mail = mailparser.parse_from_file(mail_test_12)
+        trust = "localhost"
+        result = mail.get_server_ipaddress(trust)
+        self.assertEquals(result, "96.202.181.20")
 
     def test_fingerprints_body(self):
         mail = mailparser.parse_from_file(mail_test_1)
