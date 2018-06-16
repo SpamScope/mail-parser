@@ -221,11 +221,11 @@ Exceptions hierarchy of mail-parser:
 
     MailParserError: Base MailParser Exception
     |
-    ├── MailParserOutlookError: Raised with Outlook integration errors
+    \-- MailParserOutlookError: Raised with Outlook integration errors
     |
-    ├── MailParserEnvironmentError: Raised when the environment is not correct
+    \-- MailParserEnvironmentError: Raised when the environment is not correct
     |
-    ├── MailParserOSError: Raised when there is an OS error
+    \-- MailParserOSError: Raised when there is an OS error
 
 .. |PyPI version| image:: https://badge.fury.io/py/mail-parser.svg
    :target: https://badge.fury.io/py/mail-parser
