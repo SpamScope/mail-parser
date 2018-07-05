@@ -28,14 +28,13 @@ root = os.path.join(base_path, '..')
 sys.path.append(root)
 
 import mailparser
-from mailparser import get_header
 from mailparser.utils import (
     fingerprints,
+    get_header,
     get_to_domains,
     msgconvert,
     ported_open,
-    receiveds_parsing,
-)
+    receiveds_parsing)
 
 from mailparser.exceptions import MailParserEnvironmentError
 
