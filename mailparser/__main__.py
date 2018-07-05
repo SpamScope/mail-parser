@@ -24,8 +24,8 @@ import sys
 import simplejson as json
 
 import mailparser
-from exceptions import MailParserOutlookError
-from utils import fingerprints, custom_log
+from .exceptions import MailParserOutlookError
+from .utils import fingerprints, custom_log
 
 
 current = os.path.realpath(os.path.dirname(__file__))
