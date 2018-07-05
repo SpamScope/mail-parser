@@ -26,12 +26,12 @@ import ipaddress
 import six
 import simplejson as json
 
-from const import (
+from .const import (
     ADDRESSES_HEADERS,
     EPILOGUE_DEFECTS,
     REGXIP)
 
-from utils import (
+from .utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
@@ -43,7 +43,7 @@ from utils import (
     ported_string,
     receiveds_parsing)
 
-from exceptions import MailParserEnvironmentError
+from .exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)

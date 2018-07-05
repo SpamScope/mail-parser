@@ -37,8 +37,8 @@ import tempfile
 
 import six
 
-from const import ADDRESSES_HEADERS, OTHERS_PARTS
-from exceptions import MailParserOSError
+from .const import ADDRESSES_HEADERS, OTHERS_PARTS
+from .exceptions import MailParserOSError
 
 
 log = logging.getLogger(__name__)
