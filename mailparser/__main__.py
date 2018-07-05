@@ -18,33 +18,20 @@ limitations under the License.
 """
 
 import argparse
-import logging
 import os
 import runpy
 import sys
-
 import simplejson as json
 
 import mailparser
-from .utils import fingerprints
+from exceptions import MailParserOutlookError
+from utils import fingerprints, custom_log
 
-from .exceptions import (
-    MailParserOutlookError,
-)
 
 current = os.path.realpath(os.path.dirname(__file__))
 
 __version__ = runpy.run_path(
     os.path.join(current, "version.py"))["__version__"]
-
-# Logging
-log = logging.getLogger()
-log.setLevel(logging.WARNING)
-ch = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter(
-    "%(asctime)s | %(name)s | %(levelname)s | %(message)s")
-ch.setFormatter(formatter)
-log.addHandler(ch)
 
 
 def get_args():
@@ -70,6 +57,13 @@ def get_args():
         dest="stdin",
         action="store_true",
         help="Enable parsing from stdin")
+
+    parser.add_argument(
+        "-l",
+        "--log-level",
+        dest="log_level",
+        default="WARNING",
+        help="Set log lovel: CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET")
 
     parser.add_argument(
         "-j",
@@ -210,9 +204,11 @@ def print_attachments(attachments, flag_hash):
 
 def main():
     args = get_args().parse_args()
+    log = custom_log(level=args.log_level)
 
     if args.file:
         if args.outlook:
+            log.debug("Analysis Outlook mail")
             parser = mailparser.parse_from_file_msg(args.file)
         else:
             parser = mailparser.parse_from_file(args.file)
@@ -249,10 +245,12 @@ def main():
         safe_print(parser.received_json)
 
     if args.defects:
+        log.debug("Printing defects")
         for i in parser.defects_categories:
             safe_print(i)
 
     if args.senderip:
+        log.debug("Printing sender IP")
         r = parser.get_server_ipaddress(args.senderip)
         if r:
             safe_print(r)
@@ -260,9 +258,11 @@ def main():
             safe_print("Not Found")
 
     if args.attachments or args.attachments_hash:
+        log.debug("Printing attachments details")
         print_attachments(parser.attachments, args.attachments_hash)
 
     if args.mail_hash:
+        log.debug("Printing also mail fingerprints")
         print_mail_fingerprints(parser.body.encode("utf-8"))
 
 

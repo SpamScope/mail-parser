@@ -126,10 +126,11 @@ Import ``mailparser`` module:
 
     import mailparser
 
+    mail = mailparser.parse_from_bytes(byte_mail)
     mail = mailparser.parse_from_file(f)
+    mail = mailparser.parse_from_file_msg(outlook_mail)
     mail = mailparser.parse_from_file_obj(fp)
     mail = mailparser.parse_from_string(raw_mail)
-    mail = mailparser.parse_from_bytes(byte_mail)
 
 Then you can get all parts
 
