@@ -21,35 +21,32 @@ from __future__ import unicode_literals
 import email
 import logging
 import os
-import re
 
 import ipaddress
 import six
 import simplejson as json
 
-from .utils import (
+from const import (
+    ADDRESSES_HEADERS,
+    EPILOGUE_DEFECTS,
+    REGXIP)
+
+from utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
+    get_header,
+    get_mail_keys,
     get_to_domains,
     msgconvert,
     ported_open,
     ported_string,
-    receiveds_parsing,
-)
+    receiveds_parsing)
 
-from .exceptions import (
-    MailParserEnvironmentError,
-)
+from exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)
-
-REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
-EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
-ADDRESSES_HEADERS = ("bcc", "cc", "delivered_to", "from", "reply_to", "to")
-MAIN_HEADERS = ("attachments", "body", "date", "headers"
-                "message_id", "received", "subject")
 
 
 def parse_from_file_obj(fp):
@@ -117,24 +114,6 @@ def parse_from_bytes(bt):
     return MailParser.from_bytes(bt)
 
 
-def get_header(message, name):
-    """
-    Gets an email.message.Message and a header name and returns
-    the mail header decoded with the correct charset.
-
-    Args:
-        message (email.message.Message): message with headers
-        name (string): header to get
-
-    Returns:
-        decoded header
-    """
-    header = message.get(name)
-    if header:
-        return decode_header_part(header)
-    return six.text_type()
-
-
 class MailParser(object):
     """
     MailParser package provides a standard parser that understands
@@ -150,6 +129,8 @@ class MailParser(object):
         Init a new object from a message object structure.
         """
         self._message = message
+        log.debug(
+            "All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
 
     def __str__(self):
@@ -187,11 +168,13 @@ class MailParser(object):
         Returns:
             Instance of MailParser
         """
+        log.debug("Parsing email from file {!r}".format(fp))
 
         with ported_open(fp) as f:
             message = email.message_from_file(f)
 
         if is_outlook:
+            log.debug("Removing temp converted Outlook email {!r}".format(fp))
             os.remove(fp)
 
         return cls(message)
@@ -248,6 +231,7 @@ class MailParser(object):
         """
         Reset the state of mail object.
         """
+        log.debug("Reset all variables")
 
         self._attachments = []
         self._text_plain = []
@@ -283,13 +267,14 @@ class MailParser(object):
         """
         self._mail = {}
 
-        for i in MAIN_HEADERS + ADDRESSES_HEADERS:
-            if getattr(self, i):
-                self._mail[i] = getattr(self, i)
+        for i in get_mail_keys(self.message):
+            log.debug("Getting header or part {!r}".format(i))
+            value = getattr(self, i)
+            if value:
+                self._mail[i] = value
 
         # add defects
-        self._mail["has_defects"] = self.has_defects
-
+        self.mail["has_defects"] = self.has_defects
         if self.has_defects:
             self._mail["defects"] = self.defects
             self._mail["defects_categories"] = list(self.defects_categories)
@@ -317,6 +302,7 @@ class MailParser(object):
 
         # If defects are in epilogue defects get epilogue
         if self.defects_categories & EPILOGUE_DEFECTS:
+            log.debug("Found defects in emails")
             epilogue = find_between(
                 self.message.epilogue,
                 "{}".format("--" + self.message.get_boundary()),
@@ -326,31 +312,47 @@ class MailParser(object):
                 p = email.message_from_string(epilogue)
                 parts.append(p)
             except TypeError:
-                pass
+                log.debug("Failed to get epilogue part for TypeError")
             except Exception:
-                log.error(
-                    "Failed to get epilogue part. Should check raw mail.")
+                log.error("Failed to get epilogue part. Check raw mail.")
 
         # walk all mail parts
         for p in parts:
+            p_string = ported_string(p.as_string())[:100] + "..."
             if not p.is_multipart():
                 filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
+                log.debug("Charset {!r} for part {!r}".format(
+                    charset, p_string))
 
                 if filename:
+                    log.debug("Email part {!r} is an attachment".format(
+                        p_string))
+                    log.debug("Filename {!r} for part {!r}".format(
+                        filename, p_string))
                     binary = False
                     mail_content_type = ported_string(p.get_content_type())
+                    log.debug("Mail content type {!r} for part {!r}".format(
+                        mail_content_type, p_string))
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
+                    log.debug("Transfer encoding {!r} for part {!r}".format(
+                        transfer_encoding, p_string))
 
                     if transfer_encoding == "base64" or \
                             (transfer_encoding == "quoted-printable" and
                              "application" in mail_content_type):
                         payload = p.get_payload(decode=False)
                         binary = True
+                        log.debug(
+                            "Filename {!r} for part {!r} is binary".format(
+                                filename, p_string))
                     else:
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
+                        log.debug(
+                            "Filename {!r} for part {!r} is not binary".format(
+                                filename, p_string))
 
                     self._attachments.append({
                         "filename": filename,
@@ -359,6 +361,8 @@ class MailParser(object):
                         "mail_content_type": mail_content_type,
                         "content_transfer_encoding": transfer_encoding})
                 else:
+                    log.debug("Email part {!r} is not an attachment".format(
+                        p_string))
                     payload = ported_string(
                         p.get_payload(decode=True), encoding=charset)
                     if payload:
@@ -435,13 +439,9 @@ class MailParser(object):
             raw = self.message.get_all(name)
             return json.dumps(raw, ensure_ascii=False)
 
-    @property
-    def subject(self):
-        """
-        Return subject text
-        """
-        return decode_header_part(self.message.get(
-            'subject', six.text_type()))
+        # others headers
+        else:
+            return get_header(self.message, name)
 
     @property
     def attachments(self):
@@ -474,14 +474,6 @@ class MailParser(object):
         for i in self.message.get_all("received", []):
             output.append(decode_header_part(i))
         return output
-
-    @property
-    def message_id(self):
-        """
-        Return the message id.
-        """
-        message_id = self.message.get('message-id', None)
-        return ported_string(message_id)
 
     @property
     def body(self):
@@ -594,3 +586,11 @@ class MailParser(object):
         Return all domain of 'to' and 'reply-to' email addresses
         """
         return get_to_domains(self.to, self.reply_to)
+
+    @property
+    def message_id(self):
+        """
+        Return the message id.
+        """
+        message_id = self.message.get('message-id', None)
+        return ported_string(message_id)

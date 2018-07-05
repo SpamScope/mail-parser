@@ -23,6 +23,7 @@ from collections import namedtuple, Counter
 from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
+
 import datetime
 import email
 import functools
@@ -31,13 +32,13 @@ import logging
 import os
 import re
 import subprocess
+import sys
 import tempfile
 
 import six
 
-from .exceptions import (
-    MailParserOSError
-)
+from const import ADDRESSES_HEADERS, OTHERS_PARTS
+from exceptions import MailParserOSError
 
 
 log = logging.getLogger(__name__)
@@ -48,6 +49,20 @@ RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
                     r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
 JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
 RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
+
+
+def custom_log(level="WARNING", name=None):
+    if name:
+        log = logging.getLogger(name)
+    else:
+        log = logging.getLogger()
+    log.setLevel(level)
+    ch = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        "%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
+    return log
 
 
 def sanitize(func):
@@ -338,3 +353,29 @@ def get_to_domains(to=[], reply_to=[]):
             pass
     else:
         return list(domains)
+
+
+def get_header(message, name):
+    """
+    Gets an email.message.Message and a header name and returns
+    the mail header decoded with the correct charset.
+
+    Args:
+        message (email.message.Message): message with headers
+        name (string): header to get
+
+    Returns:
+        decoded header
+    """
+    header = message.get(name)
+    log.debug("Getting header {!r}: {!r}".format(name, header))
+    if header:
+        return decode_header_part(header)
+    return six.text_type()
+
+
+def get_mail_keys(message):
+    all_headers_keys = {i.lower() for i in message.keys()}
+    all_parts = ADDRESSES_HEADERS | OTHERS_PARTS | all_headers_keys
+    log.debug("All parts to get: {}".format(", ".join(all_parts)))
+    return all_parts
