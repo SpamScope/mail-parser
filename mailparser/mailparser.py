@@ -338,6 +338,9 @@ class MailParser(object):
                         p.get('content-transfer-encoding', '')).lower()
                     log.debug("Transfer encoding {!r} for part {!r}".format(
                         transfer_encoding, p_string))
+                    content_id = ported_string(p.get('content-id'))
+                    log.debug("content-id {!r} for part {!r}".format(
+                        content_id, p_string))
 
                     if transfer_encoding == "base64" or \
                             (transfer_encoding == "quoted-printable" and
@@ -359,6 +362,7 @@ class MailParser(object):
                         "payload": payload,
                         "binary": binary,
                         "mail_content_type": mail_content_type,
+                        "content-id": content_id,
                         "content_transfer_encoding": transfer_encoding})
                 else:
                     log.debug("Email part {!r} is not an attachment".format(
