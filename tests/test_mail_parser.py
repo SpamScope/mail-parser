@@ -28,14 +28,13 @@ root = os.path.join(base_path, '..')
 sys.path.append(root)
 
 import mailparser
-from mailparser import get_header
 from mailparser.utils import (
     fingerprints,
+    get_header,
     get_to_domains,
     msgconvert,
     ported_open,
-    receiveds_parsing,
-)
+    receiveds_parsing)
 
 from mailparser.exceptions import MailParserEnvironmentError
 
@@ -150,6 +149,15 @@ class TestMailParser(unittest.TestCase):
         defects_categories = mail.defects_categories
         self.assertIn("StartBoundaryNotFoundDefect", defects_categories)
         self.assertIn("MultipartInvariantViolationDefect", defects_categories)
+        self.assertIn("reply-to", mail.mail)
+        self.assertNotIn("reply_to", mail.mail)
+        reply_to = [(u'VICTORIA Souvenirs', u'smgesi4@gmail.com')]
+        self.assertEqual(mail.reply_to, reply_to)
+        self.assertEqual(mail.fake_header, six.text_type())
+
+        # This email has header X-MSMail-Priority
+        msmail_priority = mail.X_MSMail_Priority
+        self.assertEqual(msmail_priority, "High")
 
     def test_type_error(self):
         mail = mailparser.parse_from_file(mail_test_5)
