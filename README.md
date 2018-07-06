@@ -52,6 +52,14 @@ There are other properties to get:
   - sender IP address
   - to domains
 
+To get custom headers you should replace "-" with "\_".
+Example for header `X-MSMail-Priority`:
+
+```
+$ mail.X_MSMail_Priority
+```
+
+
 mail-parser can detect defect in mail:
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
 
@@ -151,9 +159,10 @@ If you installed mailparser with `pip` or `setup.py` you can use it with command
 These are all swithes:
 
 ```
-usage: mailparser.py [-h] (-f FILE | -s STRING | -k) [-j] [-b] [-a] [-r] [-t] [-dt] [-m]
-                   [-u] [-c] [-d] [-n] [-i Trust mail server string] [-p] [-z] 
-                   [-v]
+usage: mailparser [-h] (-f FILE | -s STRING | -k)
+                   [-l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}] [-j] [-b]
+                   [-a] [-r] [-t] [-dt] [-m] [-u] [-c] [-d] [-o]
+                   [-i Trust mail server string] [-p] [-z] [-v]
 
 Wrapper for email Python Standard Library
 
@@ -163,6 +172,8 @@ optional arguments:
   -s STRING, --string STRING
                         Raw email string (default: None)
   -k, --stdin           Enable parsing from stdin (default: False)
+  -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}                                                                                          
+                        Set log level (default: WARNING)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
   -a, --attachments     Print the attachments of mail (default: False)
@@ -173,7 +184,6 @@ optional arguments:
   -u, --subject         Print the subject of mail (default: False)
   -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
-  -n, --anomalies       Print the anomalies of mail (default: False)
   -o, --outlook         Analyze Outlook msg (default: False)
   -i Trust mail server string, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
@@ -206,10 +216,10 @@ Exceptions hierarchy of mail-parser:
 ```
 MailParserError: Base MailParser Exception
 |
-├── MailParserOutlookError: Raised with Outlook integration errors
+\── MailParserOutlookError: Raised with Outlook integration errors
 |
-├── MailParserEnvironmentError: Raised when the environment is not correct
+\── MailParserEnvironmentError: Raised when the environment is not correct
 |
-├── MailParserOSError: Raised when there is an OS error
+\── MailParserOSError: Raised when there is an OS error
 
 ```
