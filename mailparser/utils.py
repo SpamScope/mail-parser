@@ -31,24 +31,23 @@ import hashlib
 import logging
 import os
 import re
+import simplejson as json
 import subprocess
 import sys
 import tempfile
 
 import six
 
-from .const import ADDRESSES_HEADERS, OTHERS_PARTS
+from .const import (
+    ADDRESSES_HEADERS,
+    JUNK_PATTERN,
+    OTHERS_PARTS,
+    RECEIVED_COMPILED)
+
 from .exceptions import MailParserOSError
 
 
 log = logging.getLogger(__name__)
-
-
-RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
-                    r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
-                    r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
-JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
-RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
 
 
 def custom_log(level="WARNING", name=None):
@@ -59,7 +58,12 @@ def custom_log(level="WARNING", name=None):
     log.setLevel(level)
     ch = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter(
-        "%(asctime)s | %(name)s | %(levelname)s | %(message)s")
+        "%(asctime)s | "
+        "%(name)s | "
+        "%(module)s | "
+        "%(funcName)s | "
+        "%(levelname)s | "
+        "%(message)s")
     ch.setFormatter(formatter)
     log.addHandler(ch)
     return log
@@ -76,7 +80,8 @@ def sanitize(func):
 
 @sanitize
 def ported_string(raw_data, encoding='utf-8', errors='ignore'):
-    """ Give as input raw data and output a str in Python 3
+    """
+    Give as input raw data and output a str in Python 3
     and unicode in Python 2.
 
     Args:
@@ -109,6 +114,15 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
 
 
 def decode_header_part(header):
+    """
+    Given an raw header returns an decoded header
+
+    Args:
+        header (string): header to decode
+
+    Returns:
+        str (Python 3) or unicode (Python 2)
+    """
     if not header:
         return six.text_type()
 
@@ -144,7 +158,8 @@ def find_between(text, first_token, last_token):
 
 
 def fingerprints(data):
-    """This function return the fingerprints of data.
+    """
+    This function return the fingerprints of data.
 
     Args:
         data (string): raw data
@@ -186,16 +201,18 @@ def fingerprints(data):
 
 
 def msgconvert(email):
-    """Exec msgconvert tool, to convert msg Outlook
+    """
+    Exec msgconvert tool, to convert msg Outlook
     mail in eml mail format
 
     Args:
         email (string): file path of Outlook msg mail
 
-    Return:
+    Returns:
         tuple with file path of mail converted and
         standard output data (unicode Python 2, str Python 3)
     """
+    log.debug("Started converting Outlook email")
     temp = tempfile.mkstemp(prefix="outlook_")[-1]
     command = ["msgconvert", "--mbox", temp, email]
 
@@ -273,6 +290,7 @@ def receiveds_not_parsed(receiveds):
     Returns:
         a list of not parsed receiveds headers with first hop in first position
     """
+    log.debug("Receiveds for this email are not parsed")
 
     output = []
     counter = Counter()
@@ -297,6 +315,7 @@ def receiveds_format(receiveds):
     Returns:
         list of receiveds reformated and with new fields
     """
+    log.debug("Receiveds for this email are parsed")
 
     output = []
     counter = Counter()
@@ -361,7 +380,7 @@ def get_header(message, name):
     the mail header decoded with the correct charset.
 
     Args:
-        message (email.message.Message): message with headers
+        message (email.message.Message): email message object
         name (string): header to get
 
     Returns:
@@ -375,7 +394,46 @@ def get_header(message, name):
 
 
 def get_mail_keys(message):
+    """
+    Given an email.message.Message, return a set with all email parts to get
+
+    Args:
+        message (email.message.Message): email message object
+
+    Returns:
+        set with all email parts
+    """
     all_headers_keys = {i.lower() for i in message.keys()}
     all_parts = ADDRESSES_HEADERS | OTHERS_PARTS | all_headers_keys
     log.debug("All parts to get: {}".format(", ".join(all_parts)))
     return all_parts
+
+
+def safe_print(data):
+    try:
+        print(data)
+    except UnicodeEncodeError:
+        print(data.encode('utf-8'))
+
+
+def print_mail_fingerprints(data):
+    md5, sha1, sha256, sha512 = fingerprints(data)
+    print("md5:\t{}".format(md5))
+    print("sha1:\t{}".format(sha1))
+    print("sha256:\t{}".format(sha256))
+    print("sha512:\t{}".format(sha512))
+
+
+def print_attachments(attachments, flag_hash):
+    if flag_hash:
+        for i in attachments:
+            if i.get("content_transfer_encoding") == "base64":
+                payload = i["payload"].decode("base64")
+            else:
+                payload = i["payload"]
+
+            i["md5"], i["sha1"], i["sha256"], i["sha512"] = \
+                fingerprints(payload)
+
+    for i in attachments:
+        safe_print(json.dumps(i, ensure_ascii=False, indent=4))

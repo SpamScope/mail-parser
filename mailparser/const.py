@@ -21,15 +21,23 @@ import re
 
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+                    r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
+                    r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
+JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
+
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
 ADDRESSES_HEADERS = set([
     "bcc",
     "cc",
-    "delivered_to",
+    "delivered-to",
     "from",
-    "reply_to",
+    "reply-to",
     "to"])
+
+# These parts have their property in mailparser
 OTHERS_PARTS = set([
     "attachments",
     "body",

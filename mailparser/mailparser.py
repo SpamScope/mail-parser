@@ -151,9 +151,8 @@ class MailParser(object):
         Returns:
             Instance of MailParser
         """
-
+        log.debug("Parsing email from file object")
         message = email.message_from_file(fp)
-
         return cls(message)
 
     @classmethod
@@ -191,6 +190,7 @@ class MailParser(object):
         Returns:
             Instance of MailParser
         """
+        log.debug("Parsing email from file Outlook")
         f, _ = msgconvert(fp)
         return cls.from_file(f, True)
 
@@ -206,6 +206,7 @@ class MailParser(object):
             Instance of MailParser
         """
 
+        log.debug("Parsing email from string")
         message = email.message_from_string(s)
         return cls(message)
 
@@ -220,6 +221,7 @@ class MailParser(object):
         Returns:
             Instance of MailParser
         """
+        log.debug("Parsing email from bytes")
         if six.PY2:
             raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
@@ -245,6 +247,10 @@ class MailParser(object):
 
         The defects are a list of all the problems found
         when parsing this message.
+
+        Args:
+            part (string): mail part
+            part_content_type (string): content type of part
         """
 
         part_defects = {}
@@ -253,6 +259,7 @@ class MailParser(object):
             defects = "{}: {}".format(e.__class__.__name__, e.__doc__)
             self._defects_categories.add(e.__class__.__name__)
             part_defects.setdefault(part_content_type, []).append(defects)
+            log.debug("Added defect {!r}".format(defects))
 
         # Tag mail with defect
         if part_defects:
@@ -264,6 +271,7 @@ class MailParser(object):
     def _make_mail(self):
         """
         This method assigns the right values to all tokens of email.
+        It sets an internal parameter with all tokens.
         """
         self._mail = {}
 
@@ -380,6 +388,7 @@ class MailParser(object):
         """
         Return the ip address of sender
 
+        Overview:
         Extract a reliable sender IP address heuristically for each message.
         Although the message format dictates a chain of relaying IP
         addresses in each message, a malicious relay can easily alter that.
@@ -396,13 +405,13 @@ class MailParser(object):
 
         In our case we trust only our mail server with the trust string.
 
-
         Args:
             trust (string): String that identify our mail server
 
-        Return:
+        Returns:
             string with the ip address
         """
+        log.debug("Trust string is {!r}".format(trust))
 
         if not trust.strip():
             return
@@ -412,28 +421,28 @@ class MailParser(object):
         for i in received:
             i = ported_string(i)
             if trust in i:
+                log.debug("Trust string {!r} is in {!r}".format(trust, i))
                 check = REGXIP.findall(i[0:i.find("by")])
 
                 if check:
                     try:
-                        ip = ipaddress.ip_address(six.text_type(check[-1]))
+                        ip_str = six.text_type(check[-1])
+                        log.debug("Found sender IP {!r} in {!r}".format(
+                            ip_str, i))
+                        ip = ipaddress.ip_address(ip_str)
                     except ValueError:
                         return
-
-                    if not ip.is_private:
-                        return six.text_type(check[-1])
+                    else:
+                        if not ip.is_private:
+                            log.debug("IP {!r} not private".format(ip_str))
+                            return ip_str
 
     def __getattr__(self, name):
         name = name.strip("_").lower()
-
-        # object headers
-        if name in ADDRESSES_HEADERS:
-            h = decode_header_part(
-                self.message.get(name.replace("_", "-"), six.text_type()))
-            return email.utils.getaddresses([h])
+        name_header = name.replace("_", "-")
 
         # json headers
-        elif name.endswith("_json"):
+        if name.endswith("_json"):
             name = name[:-5]
             return json.dumps(getattr(self, name), ensure_ascii=False)
 
@@ -443,9 +452,15 @@ class MailParser(object):
             raw = self.message.get_all(name)
             return json.dumps(raw, ensure_ascii=False)
 
+        # object headers
+        elif name_header in ADDRESSES_HEADERS:
+            h = decode_header_part(self.message.get(
+                name_header, six.text_type()))
+            return email.utils.getaddresses([h])
+
         # others headers
         else:
-            return get_header(self.message, name)
+            return get_header(self.message, name_header)
 
     @property
     def attachments(self):
@@ -590,11 +605,3 @@ class MailParser(object):
         Return all domain of 'to' and 'reply-to' email addresses
         """
         return get_to_domains(self.to, self.reply_to)
-
-    @property
-    def message_id(self):
-        """
-        Return the message id.
-        """
-        message_id = self.message.get('message-id', None)
-        return ported_string(message_id)

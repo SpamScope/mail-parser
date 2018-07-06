@@ -21,11 +21,14 @@ import argparse
 import os
 import runpy
 import sys
-import simplejson as json
 
 import mailparser
 from .exceptions import MailParserOutlookError
-from .utils import fingerprints, custom_log
+from .utils import (
+    custom_log,
+    print_attachments,
+    print_mail_fingerprints,
+    safe_print)
 
 
 current = os.path.realpath(os.path.dirname(__file__))
@@ -63,7 +66,8 @@ def get_args():
         "--log-level",
         dest="log_level",
         default="WARNING",
-        help="Set log lovel: CRITICAL, ERROR, WARNING, INFO, DEBUG, NOTSET")
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"],
+        help="Set log level")
 
     parser.add_argument(
         "-j",
@@ -170,36 +174,6 @@ def get_args():
         version='%(prog)s {}'.format(__version__))
 
     return parser
-
-
-def safe_print(data):
-    try:
-        print(data)
-    except UnicodeEncodeError:
-        print(data.encode('utf-8'))
-
-
-def print_mail_fingerprints(data):
-    md5, sha1, sha256, sha512 = fingerprints(data)
-    print("md5:\t{}".format(md5))
-    print("sha1:\t{}".format(sha1))
-    print("sha256:\t{}".format(sha256))
-    print("sha512:\t{}".format(sha512))
-
-
-def print_attachments(attachments, flag_hash):
-    if flag_hash:
-        for i in attachments:
-            if i.get("content_transfer_encoding") == "base64":
-                payload = i["payload"].decode("base64")
-            else:
-                payload = i["payload"]
-
-            i["md5"], i["sha1"], i["sha256"], i["sha512"] = \
-                fingerprints(payload)
-
-    for i in attachments:
-        safe_print(json.dumps(i, ensure_ascii=False, indent=4))
 
 
 def main():
