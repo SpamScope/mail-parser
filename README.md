@@ -28,6 +28,9 @@ $ apt-cache show libemail-outlook-message-perl
 
 mail-parser supports Python 3.
 
+## mail-parser on Web
+ - [Splunk app](https://splunkbase.splunk.com/app/4129/)
+
 
 ## Description
 
@@ -47,6 +50,8 @@ mail-parser takes as input a raw email and generates a parsed object. The proper
 
 There are other properties to get:
   - body
+  - body html
+  - body plain
   - headers
   - attachments
   - sender IP address
@@ -148,6 +153,7 @@ mail.message_id
 mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
+mail.text_html: only text html mail parts in a list
 mail.to
 mail.to_domains
 ```

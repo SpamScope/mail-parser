@@ -504,7 +504,8 @@ class MailParser(object):
         Return all text plain and text html parts of mail delimited from string
         "--- mail_boundary ---"
         """
-        return "\n--- mail_boundary ---\n".join(self.text_plain + self.text_html)
+        return "\n--- mail_boundary ---\n".join(
+            self.text_plain + self.text_html)
 
     @property
     def headers(self):
