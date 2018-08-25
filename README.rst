@@ -37,6 +37,11 @@ For more details:
 
 mail-parser supports Python 3.
 
+mail-parser on Web
+------------------
+
+-  `Splunk app <https://splunkbase.splunk.com/app/4129/>`__
+
 Description
 -----------
 
@@ -55,8 +60,8 @@ headers <https://www.iana.org/assignments/message-headers/message-headers.xhtml>
 -  subject
 -  to
 
-There are other properties to get: - body - headers - attachments -
-sender IP address - to domains
+There are other properties to get: - body - body html - body plain -
+headers - attachments - sender IP address - to domains
 
 To get custom headers you should replace “-” with “\_”. Example for
 header ``X-MSMail-Priority``:
@@ -163,6 +168,7 @@ Then you can get all parts
    mail.received
    mail.subject
    mail.text_plain: only text plain mail parts in a list
+   mail.text_html: only text html mail parts in a list
    mail.to
    mail.to_domains
 

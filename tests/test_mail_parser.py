@@ -71,6 +71,12 @@ class TestMailParser(unittest.TestCase):
             mail_malformed_2,
             mail_malformed_3)
 
+    def test_html_field(self):
+        mail = mailparser.parse_from_file(mail_malformed_1)
+        self.assertIsInstance(mail.text_html, list)
+        self.assertIsInstance(mail.text_html_json, six.text_type)
+        self.assertEqual(len(mail.text_html), 1)
+
     def test_not_parsed_received(self):
         mail = mailparser.parse_from_file(mail_test_9)
         for i in mail.received:
