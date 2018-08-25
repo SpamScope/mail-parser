@@ -50,7 +50,7 @@ from .exceptions import MailParserOSError
 log = logging.getLogger(__name__)
 
 
-def custom_log(level="WARNING", name=None):
+def custom_log(level="WARNING", name=None):  # pragma: no cover
     if name:
         log = logging.getLogger(name)
     else:
@@ -235,6 +235,7 @@ def msgconvert(email):
     else:
         stdoutdata, _ = out.communicate()
         return temp, stdoutdata.decode("utf-8").strip()
+
 
 def receiveds_parsing(receiveds):
     """
