@@ -283,7 +283,7 @@ class MailParser(object):
                 self._mail[i] = value
 
         # add defects
-        self.mail["has_defects"] = self.has_defects
+        self._mail["has_defects"] = self.has_defects
         if self.has_defects:
             self._mail["defects"] = self.defects
             self._mail["defects_categories"] = list(self.defects_categories)
