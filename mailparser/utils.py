@@ -42,7 +42,7 @@ from .const import (
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
-    RECEIVED_COMPILED)
+    RECEIVED_COMPILED_LIST)
 
 from .exceptions import MailParserOSError
 
@@ -239,7 +239,7 @@ def msgconvert(email):
 
 def receiveds_parsing(receiveds):
     """
-    This function parses the receiveds headers
+    This function parses the receiveds headers.
 
     Args:
         receiveds (list): list of raw receiveds headers
@@ -249,15 +249,30 @@ def receiveds_parsing(receiveds):
     """
 
     parsed = []
+    receiveds = [re.sub(JUNK_PATTERN, " ", i).strip() for i in receiveds]
+    n = len(receiveds)
+    log.debug("Nr. of receiveds. {}".format(n))
 
     try:
-        for i in receiveds:
-            cleaned = re.sub(JUNK_PATTERN, " ", i)
-            for j in RECEIVED_COMPILED.finditer(cleaned):
-                parsed.append(j.groupdict())
-
-        if len(receiveds) != len(parsed):
-            raise ValueError
+        # Loop receiveds
+        for j, i in enumerate(receiveds):
+            log.debug("Parsing received {}/{}".format(j + 1, n))
+            log.debug("Try to parse {!r}".format(i))
+            # Try more patterns
+            for p in RECEIVED_COMPILED_LIST:
+                log.debug("Try to parse with {!r}".format(p.pattern))
+                # Test if all string match
+                t = p.search(i)
+                if t and t.group() == i:
+                    log.debug("Received parsed {!r}".format(i))
+                    parsed.append(t.groupdict())
+                    break
+                else:
+                    log.debug("Received not parsed {!r}".format(i))
+                    continue
+        else:
+            if len(receiveds) != len(parsed):
+                raise ValueError
 
     except (AttributeError, ValueError):
         return receiveds_not_parsed(receiveds)
