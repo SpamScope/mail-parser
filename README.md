@@ -34,7 +34,7 @@ mail-parser supports Python 3.
 
 ## Description
 
-mail-parser takes as input a raw email and generates a parsed object. The properties of this object have the same name of 
+mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of 
 [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml):
 
   - bcc
@@ -64,6 +64,18 @@ Example for header `X-MSMail-Priority`:
 $ mail.X_MSMail_Priority
 ```
 
+The `received` header is parsed and splitted in hop. The fields supported are:
+ - by
+ - date
+ - date_utc
+ - delay (between two hop)
+ - envelope_from
+ - envelope_sender
+ - for
+ - from
+ - hop
+ - with
+
 
 mail-parser can detect defect in mail:
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
@@ -89,6 +101,10 @@ This library can take these epilogues.
 
 ### Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
+
+If you want support the project:
+
+
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
 
