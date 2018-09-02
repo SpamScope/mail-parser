@@ -21,11 +21,46 @@ import re
 
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
-RECEIVED_PATTERN = (r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
-                    r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
-                    r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?')
+
 JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
-RECEIVED_COMPILED = re.compile(RECEIVED_PATTERN, re.I)
+
+# Patterns for receiveds
+RECEIVED_PATTERNS = (
+    (
+        r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+        r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
+        r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?'
+    ),
+    (
+        r'from\s+(?P<from>.*)\s+envelope-sender\s+'
+        r'<(?P<envelope_sender>[^>]+)>\s+by\s+(?P<by>.*)\s+'
+        r'with\s+(?P<with>.*)\s+for\s+<(?P<for>[^>]+)>[,;]\s(?P<date>.*)*'
+    ),
+    (
+        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
+        r'with\s(?P<with>.*)\s+envelope-from\s+<(?P<envelope_from>[^>]+)>\s'
+        r'(?P<others>.*);\s(?P<date>.*)*'
+    ),
+    (
+        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
+        r'envelope-from\s+<(?P<envelope_from>[^>]+)>[,;]\s'
+        r'(?P<others>.*)\s+;\s+(?P<date>.*)*'
+    ),
+    (
+        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
+        r'for\s+<(?P<for>[^>]+)>;\s(?P<date>.*)\s+'
+        r'envelope-from\s+<(?P<envelope_from>[^>]+)>'
+    ),
+    (
+        r'qmail\s+.*\s+from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+        r'(?:\s*;\s*(?P<date>.*))?'
+    ),
+    (
+        r'qmail\s+.*\sby\s+(?P<by>.*)\s*;\s*(?P<date>.*)*'
+    ),
+)
+
+RECEIVED_COMPILED_LIST = [re.compile(i, re.I) for i in RECEIVED_PATTERNS]
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
