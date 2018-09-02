@@ -28,10 +28,13 @@ $ apt-cache show libemail-outlook-message-perl
 
 mail-parser supports Python 3.
 
+## mail-parser on Web
+ - [Splunk app](https://splunkbase.splunk.com/app/4129/)
+
 
 ## Description
 
-mail-parser takes as input a raw email and generates a parsed object. The properties of this object have the same name of 
+mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of 
 [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml):
 
   - bcc
@@ -47,6 +50,8 @@ mail-parser takes as input a raw email and generates a parsed object. The proper
 
 There are other properties to get:
   - body
+  - body html
+  - body plain
   - headers
   - attachments
   - sender IP address
@@ -58,6 +63,18 @@ Example for header `X-MSMail-Priority`:
 ```
 $ mail.X_MSMail_Priority
 ```
+
+The `received` header is parsed and splitted in hop. The fields supported are:
+ - by
+ - date
+ - date_utc
+ - delay (between two hop)
+ - envelope_from
+ - envelope_sender
+ - for
+ - from
+ - hop
+ - with
 
 
 mail-parser can detect defect in mail:
@@ -84,6 +101,10 @@ This library can take these epilogues.
 
 ### Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
+
+If you want support the project:
+
+
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
 
@@ -148,6 +169,7 @@ mail.message_id
 mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
+mail.text_html: only text html mail parts in a list
 mail.to
 mail.to_domains
 ```

@@ -37,11 +37,16 @@ For more details:
 
 mail-parser supports Python 3.
 
+mail-parser on Web
+------------------
+
+-  `Splunk app <https://splunkbase.splunk.com/app/4129/>`__
+
 Description
 -----------
 
 mail-parser takes as input a raw email and generates a parsed object.
-The properties of this object have the same name of `RFC
+The properties of this object are the same name of `RFC
 headers <https://www.iana.org/assignments/message-headers/message-headers.xhtml>`__:
 
 -  bcc
@@ -55,8 +60,8 @@ headers <https://www.iana.org/assignments/message-headers/message-headers.xhtml>
 -  subject
 -  to
 
-There are other properties to get: - body - headers - attachments -
-sender IP address - to domains
+There are other properties to get: - body - body html - body plain -
+headers - attachments - sender IP address - to domains
 
 To get custom headers you should replace “-” with “\_”. Example for
 header ``X-MSMail-Priority``:
@@ -64,6 +69,10 @@ header ``X-MSMail-Priority``:
 ::
 
    $ mail.X_MSMail_Priority
+
+The ``received`` header is parsed and splitted in hop. The fields
+supported are: - by - date - date_utc - delay (between two hop) -
+envelope_from - envelope_sender - for - from - hop - with
 
 mail-parser can detect defect in mail: -
 `defects <https://docs.python.org/2/library/email.message.html#email.message.Message.defects>`__:
@@ -94,6 +103,9 @@ Apache 2 Open Source License
 
 mail-parser can be downloaded, used, and modified free of charge. It is
 available under the Apache 2 license.
+
+If you want support the project:
+
 `Donate <https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2>`__
 
 Authors
@@ -163,6 +175,7 @@ Then you can get all parts
    mail.received
    mail.subject
    mail.text_plain: only text plain mail parts in a list
+   mail.text_html: only text html mail parts in a list
    mail.to
    mail.to_domains
 
