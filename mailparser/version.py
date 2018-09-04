@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "3.5.0"  # pragma: no cover
+__version__ = "3.5.1"  # pragma: no cover
 
 if __name__ == "__main__":  # pragma: no cover
     print(__version__)
