@@ -29,7 +29,8 @@ RECEIVED_PATTERNS = (
     (
         r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
         r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
-        r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?'
+        r'(?:with\s+(?P<with>[^<]+)'
+        r'(?:\sfor\s+<(?P<for>[^>]+)>))?(?:\s*;\s*(?P<date>.*))?'
     ),
     (
         r'from\s+(?P<from>.*)\s+envelope-sender\s+'
@@ -50,6 +51,11 @@ RECEIVED_PATTERNS = (
         r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
         r'for\s+<(?P<for>[^>]+)>;\s(?P<date>.*)\s+'
         r'envelope-from\s+<(?P<envelope_from>[^>]+)>'
+    ),
+    (
+        r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
+        r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
+        r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?'
     ),
     (
         r'qmail\s+.*\s+from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
