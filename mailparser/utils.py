@@ -282,9 +282,14 @@ def receiveds_parsing(receiveds):
 
 
 def convert_mail_date(date):
+    log.debug("Date to parse: {!r}".format(date))
     d = email.utils.parsedate_tz(date)
+    log.debug("Date parsed: {!r}".format(d))
     t = email.utils.mktime_tz(d)
-    return datetime.datetime.utcfromtimestamp(t)
+    log.debug("Date parsed in timestamp: {!r}".format(t))
+    date_utc = datetime.datetime.utcfromtimestamp(t)
+    timezone = d[9] / 3600 if d[9] else 0
+    return date_utc, timezone
 
 
 def receiveds_not_parsed(receiveds):
@@ -342,7 +347,7 @@ def receiveds_format(receiveds):
             # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
             i["date"] = i["date"].split(";")[-1]
             try:
-                j["date_utc"] = convert_mail_date(i["date"])
+                j["date_utc"], _ = convert_mail_date(i["date"])
             except TypeError:
                 j["date_utc"] = None
 
