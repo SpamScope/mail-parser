@@ -467,7 +467,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, list)
 
         result = mail.timezone
-        self.assertEquals(result, 1)
+        self.assertEquals(result, "+1")
 
     def test_get_to_domains(self):
         m = mailparser.parse_from_file(mail_test_6)
