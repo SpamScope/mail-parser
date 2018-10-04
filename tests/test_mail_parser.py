@@ -29,12 +29,15 @@ sys.path.append(root)
 
 import mailparser
 from mailparser.utils import (
+    convert_mail_date,
     fingerprints,
     get_header,
     get_to_domains,
     msgconvert,
     ported_open,
-    receiveds_parsing)
+    ported_string,
+    receiveds_parsing,
+)
 
 from mailparser.exceptions import MailParserEnvironmentError
 
@@ -463,6 +466,9 @@ class TestMailParser(unittest.TestCase):
         result = mail.defects
         self.assertIsInstance(result, list)
 
+        result = mail.timezone
+        self.assertEquals(result, "+1")
+
     def test_get_to_domains(self):
         m = mailparser.parse_from_file(mail_test_6)
 
@@ -476,6 +482,28 @@ class TestMailParser(unittest.TestCase):
         self.assertEquals(domains_1, domains_2)
 
         self.assertIsInstance(m.to_domains_json, six.text_type)
+
+    def test_convert_mail_date(self):
+        s = "Mon, 20 Mar 2017 05:12:54 +0600"
+        d, t = convert_mail_date(s)
+        self.assertEquals(t, "+6")
+        self.assertEquals(str(d), "2017-03-19 23:12:54")
+        s = "Mon, 20 Mar 2017 05:12:54 -0600"
+        d, t = convert_mail_date(s)
+        self.assertEquals(t, "-6")
+
+    def test_ported_string(self):
+        raw_data = ""
+        s = ported_string(raw_data)
+        self.assertEquals(s, six.text_type())
+
+        raw_data = "test "
+        s = ported_string(raw_data)
+        self.assertEquals(s, "test")
+
+        raw_data = u"test "
+        s = ported_string(raw_data)
+        self.assertEquals(s, "test")
 
 
 if __name__ == '__main__':

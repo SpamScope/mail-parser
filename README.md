@@ -56,6 +56,7 @@ There are other properties to get:
   - attachments
   - sender IP address
   - to domains
+  - timezone
 
 To get custom headers you should replace "-" with "\_".
 Example for header `X-MSMail-Priority`:
@@ -172,6 +173,7 @@ mail.text_plain: only text plain mail parts in a list
 mail.text_html: only text html mail parts in a list
 mail.to
 mail.to_domains
+mail.timezone: returns the timezone, offset from UTC
 ```
 
 ## Usage from command-line
