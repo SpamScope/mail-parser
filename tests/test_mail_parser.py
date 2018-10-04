@@ -35,6 +35,7 @@ from mailparser.utils import (
     get_to_domains,
     msgconvert,
     ported_open,
+    ported_string,
     receiveds_parsing,
 )
 
@@ -485,11 +486,24 @@ class TestMailParser(unittest.TestCase):
     def test_convert_mail_date(self):
         s = "Mon, 20 Mar 2017 05:12:54 +0600"
         d, t = convert_mail_date(s)
-        self.assertEquals(t, 6)
+        self.assertEquals(t, "+6")
         self.assertEquals(str(d), "2017-03-19 23:12:54")
         s = "Mon, 20 Mar 2017 05:12:54 -0600"
         d, t = convert_mail_date(s)
-        self.assertEquals(t, -6)
+        self.assertEquals(t, "-6")
+
+    def test_ported_string(self):
+        raw_data = ""
+        s = ported_string(raw_data)
+        self.assertEquals(s, six.text_type())
+
+        raw_data = "test "
+        s = ported_string(raw_data)
+        self.assertEquals(s, "test")
+
+        raw_data = u"test "
+        s = ported_string(raw_data)
+        self.assertEquals(s, "test")
 
 
 if __name__ == '__main__':

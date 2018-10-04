@@ -289,6 +289,7 @@ def convert_mail_date(date):
     log.debug("Date parsed in timestamp: {!r}".format(t))
     date_utc = datetime.datetime.utcfromtimestamp(t)
     timezone = d[9] / 3600 if d[9] else 0
+    timezone = "{:+.0f}".format(timezone)
     return date_utc, timezone
 
 
@@ -430,7 +431,7 @@ def safe_print(data):
         print(data.encode('utf-8'))
 
 
-def print_mail_fingerprints(data):
+def print_mail_fingerprints(data):  # pragma: no cover
     md5, sha1, sha256, sha512 = fingerprints(data)
     print("md5:\t{}".format(md5))
     print("sha1:\t{}".format(sha1))
@@ -438,7 +439,7 @@ def print_mail_fingerprints(data):
     print("sha512:\t{}".format(sha512))
 
 
-def print_attachments(attachments, flag_hash):
+def print_attachments(attachments, flag_hash):  # pragma: no cover
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
