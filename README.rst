@@ -61,7 +61,7 @@ headers <https://www.iana.org/assignments/message-headers/message-headers.xhtml>
 -  to
 
 There are other properties to get: - body - body html - body plain -
-headers - attachments - sender IP address - to domains
+headers - attachments - sender IP address - to domains - timezone
 
 To get custom headers you should replace “-” with “\_”. Example for
 header ``X-MSMail-Priority``:
@@ -178,6 +178,7 @@ Then you can get all parts
    mail.text_html: only text html mail parts in a list
    mail.to
    mail.to_domains
+   mail.timezone: returns the timezone, offset from UTC
 
 Usage from command-line
 -----------------------
