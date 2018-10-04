@@ -424,7 +424,7 @@ def get_mail_keys(message):
     return all_parts
 
 
-def safe_print(data):
+def safe_print(data):  # pragma: no cover
     try:
         print(data)
     except UnicodeEncodeError:
