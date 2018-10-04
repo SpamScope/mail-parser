@@ -84,4 +84,6 @@ OTHERS_PARTS = set([
     "body",
     "date",
     "received",
-    "to_domains"])
+    "timezone",
+    "to_domains",
+])

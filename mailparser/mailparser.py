@@ -547,9 +547,22 @@ class MailParser(object):
         conv = None
 
         try:
-            conv = convert_mail_date(date)
+            conv, _ = convert_mail_date(date)
         finally:
             return conv
+
+    @property
+    def timezone(self):
+        """
+        Return timezone. Offset from UTC.
+        """
+        date = self.message.get('date')
+        timezone = 0
+
+        try:
+            _, timezone = convert_mail_date(date)
+        finally:
+            return timezone
 
     @property
     def date_json(self):
