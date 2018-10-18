@@ -213,8 +213,8 @@ def msgconvert(email):
         standard output data (unicode Python 2, str Python 3)
     """
     log.debug("Started converting Outlook email")
-    temp = tempfile.mkstemp(prefix="outlook_")[-1]
-    command = ["msgconvert", "--mbox", temp, email]
+    temph, temp = tempfile.mkstemp(prefix="outlook_")
+    command = ["msgconvert", "--outfile", temp, email]
 
     try:
         if six.PY2:
@@ -235,6 +235,9 @@ def msgconvert(email):
     else:
         stdoutdata, _ = out.communicate()
         return temp, stdoutdata.decode("utf-8").strip()
+
+    finally:
+        os.close(temph)
 
 
 def receiveds_parsing(receiveds):
