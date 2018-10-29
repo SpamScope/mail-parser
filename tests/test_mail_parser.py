@@ -191,7 +191,7 @@ class TestMailParser(unittest.TestCase):
 
     def test_receiveds(self):
         mail = mailparser.parse_from_file(mail_test_1)
-        self.assertEqual(len(mail.received), 4)
+        self.assertEqual(len(mail.received), 6)
 
         self.assertIsInstance(mail.received, list)
         for i in mail.received:

@@ -22,8 +22,8 @@ import re
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
-#JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
-JUNK_PATTERN = r'[ t\n]+'
+JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+#JUNK_PATTERN = r'[ t\n]+'
 
 # Patterns for receiveds
 RECEIVED_PATTERNS = [

@@ -262,22 +262,38 @@ def receiveds_parsing(receiveds):
             log.debug("Parsing received {}/{}".format(j + 1, n))
             log.debug("Try to parse {!r}".format(i))
             # Try more patterns
-            for p in RECEIVED_COMPILED_LIST:
-                log.debug("Try to parse with {!r}".format(p.pattern))
-                # Test if all string match
-                t = p.search(i)
-                if t and t.group() == i:
-                    log.debug("Received parsed {!r}".format(i))
-                    parsed.append(t.groupdict())
-                    break
-                else:
-                    log.debug("Received not parsed {!r}".format(i))
+            values_by_clause = {}
+            for pattern in RECEIVED_COMPILED_LIST:
+                matches = [match for match in pattern.finditer(received)]
+                if len(matches) == 0:
+                    # no matches for this clause, but it's ok! keep going!
                     continue
+                elif len(matches) > 1:
+                    # uh, can't have more than one of each clause in a received.
+                    # so either there's more than one or the current regex is wrong
+                    raise exceptions.ValueError("More than one match found for %s in %s" % (pattern.pattern, received))
+                else:
+                    # otherwise we have one matching clause!
+                    match = matches[0].groupdict()
+                    values_by_clause[match.keys()[0]] = match.values()[0]
+                    parsed.append(values_by_clause)
+
+#                log.debug("Try to parse with {!r}".format(p.pattern))
+#                # Test if all string match
+#                t = p.search(i)
+#                if t and t.group() == i:
+#                    log.debug("Received parsed {!r}".format(i))
+#                    parsed.append(t.groupdict())
+#                    break
+#                else:
+#                    log.debug("Received not parsed {!r}".format(i))
+#                    continue
         else:
             if len(receiveds) != len(parsed):
                 raise ValueError
 
-    except (AttributeError, ValueError):
+    except (AttributeError, ValueError) as e:
+        log.error(e)
         return receiveds_not_parsed(receiveds)
 
     else:
