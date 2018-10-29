@@ -27,17 +27,19 @@ JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
 
 # Patterns for receiveds
 RECEIVED_PATTERNS = [
+    # need to exclude withs followed by cipher (e.g., google); TODO: ideally would do negative matching for with in parens
+
     # need the beginning or space to differentiate from envelope-from
-    r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+by|\s+with|\s+id|\s+for|\s+via|;))',
+    r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))',
 
     # need to make sure envelope-from comes before from to prevent mismatches
     # envelope-from and -sender seem to optionally have space and/or ( before them
     # other clauses must have whitespace before
-    r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+with|\s+id|\s+for|\s+via|;))',
-    r'(?:with\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))',
-    r'(?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with|\s+for|\s+via|;))',
-    r'(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with|\s+id|\s+via|;))',
-    r'(?:via\s+(?P<via>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+with|;))',
+    r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))',
+    r'(?:with(?! cipher)\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))',
+    r'(?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with(?! cipher)|\s+for|\s+via|;))',
+    r'(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with(?! cipher)|\s+id|\s+via|;))',
+    r'(?:via\s+(?P<via>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))',
 
     # assumes emails are always inside <>
     r'(?:envelope-from\s+<(?P<envelope_from>.+?)>)',
