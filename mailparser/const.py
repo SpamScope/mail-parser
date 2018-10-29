@@ -22,51 +22,32 @@ import re
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
-JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+#JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
+JUNK_PATTERN = r'[ t\n]+'
 
 # Patterns for receiveds
-RECEIVED_PATTERNS = (
-    (
-        r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
-        r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
-        r'(?:with\s+(?P<with>[^<]+)'
-        r'(?:\sfor\s+<(?P<for>[^>]+)>))?(?:\s*;\s*(?P<date>.*))?'
-    ),
-    (
-        r'from\s+(?P<from>.*)\s+envelope-sender\s+'
-        r'<(?P<envelope_sender>[^>]+)>\s+by\s+(?P<by>.*)\s+'
-        r'with\s+(?P<with>.*)\s+for\s+<(?P<for>[^>]+)>[,;]\s(?P<date>.*)*'
-    ),
-    (
-        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
-        r'with\s(?P<with>.*)\s+envelope-from\s+<(?P<envelope_from>[^>]+)>\s'
-        r'(?P<others>.*);\s(?P<date>.*)*'
-    ),
-    (
-        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
-        r'envelope-from\s+<(?P<envelope_from>[^>]+)>[,;]\s'
-        r'(?P<others>.*)\s+;\s+(?P<date>.*)*'
-    ),
-    (
-        r'from\s+(?P<from>.*)\s+by\s+(?P<by>.*)\s+'
-        r'for\s+<(?P<for>[^>]+)>;\s(?P<date>.*)\s+'
-        r'envelope-from\s+<(?P<envelope_from>[^>]+)>'
-    ),
-    (
-        r'from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
-        r'(?:by\s+(?P<by>(?:\b(?!with\b)\S+[ :]*)*))?'
-        r'(?:with\s+(?P<with>[^;]+))?(?:\s*;\s*(?P<date>.*))?'
-    ),
-    (
-        r'qmail\s+.*\s+from\s+(?P<from>(?:\b(?!by\b)\S+[ :]*)*)'
-        r'(?:\s*;\s*(?P<date>.*))?'
-    ),
-    (
-        r'qmail\s+.*\sby\s+(?P<by>.*)\s*;\s*(?P<date>.*)*'
-    ),
-)
+RECEIVED_PATTERNS = [
+    # need the beginning or space to differentiate from envelope-from
+    r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+by|\s+with|\s+id|\s+for|\s+via|;))',
 
-RECEIVED_COMPILED_LIST = [re.compile(i, re.I) for i in RECEIVED_PATTERNS]
+    # need to make sure envelope-from comes before from to prevent mismatches
+    # envelope-from and -sender seem to optionally have space and/or ( before them
+    # other clauses must have whitespace before
+    r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+with|\s+id|\s+for|\s+via|;))',
+    r'(?:with\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))',
+    r'(?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with|\s+for|\s+via|;))',
+    r'(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with|\s+id|\s+via|;))',
+    r'(?:via\s+(?P<via>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+with|;))',
+
+    # assumes emails are always inside <>
+    r'(?:envelope-from\s+<(?P<envelope_from>.+?)>)',
+    r'(?:envelope-sender\s+<(?P<envelope_sender>.+?)>)',
+
+    # datetime comes after ; at the end
+    r';\s*(?P<date>.*)'
+]
+
+RECEIVED_COMPILED_LIST = [re.compile(i, re.I|re.DOTALL) for i in RECEIVED_PATTERNS]
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
