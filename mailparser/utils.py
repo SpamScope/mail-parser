@@ -44,7 +44,7 @@ from .const import (
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST)
 
-from .exceptions import MailParserOSError
+from .exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
@@ -254,7 +254,7 @@ def parse_received(received):
             # so either there's more than one or the current regex is wrong
             msg = "More than one match found for %s in %s" % (pattern.pattern, received)
             log.error(msg)
-            raise ValueError(msg)
+            raise MailParserReceivedParsingError(msg)
         else:
             # otherwise we have one matching clause!
             log.debug("Found one match for %s in %s" % (pattern.pattern, received))
@@ -262,10 +262,9 @@ def parse_received(received):
             values_by_clause[match.keys()[0]] = match.values()[0]
     if len(values_by_clause) == 0:
         # we weren't able to match anything...
-        # TODO: maybe just return an empty dict and not use raw returned for each one if just a single fails to parse
         msg = "Unable to match any clauses in %s" % (received)
         log.error(msg)
-        raise ValueError(msg)
+        raise MailParserReceivedParsingError(msg)
     return values_by_clause
 
 
@@ -285,26 +284,29 @@ def receiveds_parsing(receiveds):
     n = len(receiveds)
     log.debug("Nr. of receiveds. {}".format(n))
 
-    try:
-        # Loop receiveds
-        for idx, received in enumerate(receiveds):
-            print idx, received
-            log.debug("Parsing received {}/{}".format(idx + 1, n))
-            log.debug("Try to parse {!r}".format(received))
+    for idx, received in enumerate(receiveds):
+        print idx, received
+        log.debug("Parsing received {}/{}".format(idx + 1, n))
+        log.debug("Try to parse {!r}".format(received))
+        try:
+            # try to parse the current received header...
             values_by_clause = parse_received(received)
-            parsed.append(values_by_clause)
+        except MailParserReceivedParsingError as e:
+            # if we can't, let's append the raw
+            parsed.append({'raw': received})
         else:
-            print "len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed))
-            if len(receiveds) != len(parsed):
-                msg = "len(receiveds): %s, len(parsed): %s, receiveds: %s, parsed: %s" % (
-                    len(receiveds), len(parsed), receiveds, parsed)
-                raise ValueError
+            # otherwise append the full values_by_clause dict
+            parsed.append(values_by_clause)
 
-    except (AttributeError, ValueError) as e:
-        log.error(e)
+    print "len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed))
+    if len(receiveds) != len(parsed):
+        # something really bad happened, so just return raw receiveds with hop indices
+        log.error("len(receiveds): %s, len(parsed): %s, receiveds: %s, parsed: %s" % (
+            len(receiveds), len(parsed), receiveds, parsed))
         return receiveds_not_parsed(receiveds)
 
     else:
+        # all's good! we have parsed or raw receiveds for each received header
         return receiveds_format(parsed)
 
 
