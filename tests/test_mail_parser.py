@@ -37,6 +37,7 @@ from mailparser.utils import (
     ported_open,
     ported_string,
     receiveds_parsing,
+    parse_received,
 )
 
 from mailparser.exceptions import MailParserEnvironmentError
@@ -58,6 +59,52 @@ mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
 mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
+
+
+class TestParseReceived(unittest.TestCase):
+
+    """
+    Test cases for parsing individual received headers.
+    """
+
+    def test_standard_outlook(self):
+        """ Verify a basic outlook received header works. """
+        received = "from DM3NAM03FT035.eop-NAM03.prod.protection.outlook.com "\
+                    "2a01:111:f400:7e49::205 by CY4PR0601CA0051.outlook.office365.com "\
+                    "2603:10b6:910:89::28 with Microsoft SMTP Server version=TLS1_2, "\
+                    "cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384 id 15.20.1185.23 via Frontend "\
+                    "Transport; Mon, 1 Oct 2018 09:49:21 +0000"
+
+        expected = {
+            'from': 'DM3NAM03FT035.eop-NAM03.prod.protection.outlook.com 2a01:111:f400:7e49::205',
+            'by': 'CY4PR0601CA0051.outlook.office365.com 2603:10b6:910:89::28',
+            'with': 'Microsoft SMTP Server version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384',
+            'id': '15.20.1185.23',
+            'via': 'Frontend Transport',
+            'date': 'Mon, 1 Oct 2018 09:49:21 +0000'
+        }
+        values_by_clause = parse_received(received)
+
+        self.assertEqual(expected, values_by_clause)
+
+    def test_standard_google__with_cipher(self):
+        """ Verify that we don't match 'with cipher' a la google. """
+        received = "from mail-yw1-f65.google.com mail-yw1-f65.google.com 209.85.161.65 using " \
+                "TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 128/128 bits No client certificate " \
+                "requested by subdomain.domain.com Postfix with ESMTPS id abc123 for <user@domain.com>; " \
+                "Tue, 25 Sep 2018 13:09:36 +0000 (UTC)"
+
+        expected = {
+            'from': 'mail-yw1-f65.google.com mail-yw1-f65.google.com 209.85.161.65 using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 128/128 bits No client certificate requested',
+            'by': 'subdomain.domain.com Postfix',
+            'with': 'ESMTPS',
+            'id': 'abc123',
+            'for': '<user@domain.com>',
+            'date': 'Tue, 25 Sep 2018 13:09:36 +0000 (UTC)'
+        }
+        values_by_clause = parse_received(received)
+
+        self.assertEqual(expected, values_by_clause)
 
 
 class TestMailParser(unittest.TestCase):
@@ -98,10 +145,6 @@ class TestMailParser(unittest.TestCase):
         for i in mail.received:
             self.assertIn("date_utc", i)
             self.assertIsNotNone(i["date_utc"])
-
-        mail = mailparser.parse_from_file(mail_test_10)
-        for i in mail.received:
-            self.assertIn("date_utc", i)
 
     def test_get_header(self):
         mail = mailparser.parse_from_file(mail_test_1)
