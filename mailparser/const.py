@@ -23,10 +23,11 @@ import re
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
 JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
-#JUNK_PATTERN = r'[ \t\n]+'
 
 # Patterns for receiveds
 RECEIVED_PATTERNS = [
+    # each pattern handles matching a single clause
+
     # need to exclude withs followed by cipher (e.g., google); (?! cipher)
     # TODO: ideally would do negative matching for with in parens
 
