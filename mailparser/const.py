@@ -27,7 +27,8 @@ JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
 
 # Patterns for receiveds
 RECEIVED_PATTERNS = [
-    # need to exclude withs followed by cipher (e.g., google); TODO: ideally would do negative matching for with in parens
+    # need to exclude withs followed by cipher (e.g., google); (?! cipher)
+    # TODO: ideally would do negative matching for with in parens
 
     # need the beginning or space to differentiate from envelope-from
     r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))',

@@ -285,7 +285,6 @@ def receiveds_parsing(receiveds):
     log.debug("Nr. of receiveds. {}".format(n))
 
     for idx, received in enumerate(receiveds):
-        print idx, received
         log.debug("Parsing received {}/{}".format(idx + 1, n))
         log.debug("Try to parse {!r}".format(received))
         try:
@@ -298,7 +297,7 @@ def receiveds_parsing(receiveds):
             # otherwise append the full values_by_clause dict
             parsed.append(values_by_clause)
 
-    print "len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed))
+    log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
     if len(receiveds) != len(parsed):
         # something really bad happened, so just return raw receiveds with hop indices
         log.error("len(receiveds): %s, len(parsed): %s, receiveds: %s, parsed: %s" % (
