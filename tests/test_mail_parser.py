@@ -551,6 +551,22 @@ class TestMailParser(unittest.TestCase):
         s = ported_string(raw_data)
         self.assertEquals(s, "test")
 
+    def test_email_with_envelope(self):
+        """ Verify we can parse an email that has an envelope. """
+        email_string =  "MAIL FROM:<void-bounce-peter.piper=peter.com@something.com>\n" \
+                        "RCPT TO:<mickey.mouse@something.com>\n" \
+                        "Received: from domain.com (localhost [127.0.0.1]) " \
+                        "by localhost " \
+                        "with SMTP id abc123 " \
+                        "for mickey.mouse@something.com; " \
+                        "Thu, 11 Oct 2018 18:52:29 +0000 (GMT)"
+
+        mail = mailparser.parse_from_string(email_string)
+
+        self.assertTrue(mail.envelope)
+        self.assertEquals(mail.received[0]['id'], 'abc123')
+        self.assertEquals(mail.received[0]['for'], 'mickey.mouse@something.com')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
