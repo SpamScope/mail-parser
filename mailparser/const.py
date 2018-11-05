@@ -22,6 +22,11 @@ import re
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
+# need to strip out the envelope apparently so that python email library can parse it...
+# python [at least 2.7] email library silently skips emails with an envelope
+# https://github.com/python/cpython/blob/2.7/Lib/email/feedparser.py#L226
+EMAIL_ENVELOPE_PATTERN = re.compile(r'(?:MAIL FROM:|RCPT TO:).*\n', re.IGNORECASE)
+
 JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
 
 # Patterns for receiveds
