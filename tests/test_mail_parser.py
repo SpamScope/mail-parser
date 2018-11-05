@@ -512,6 +512,9 @@ class TestMailParser(unittest.TestCase):
         result = mail.timezone
         self.assertEquals(result, "+1")
 
+        result = mail.envelope
+        self.assertEquals(result, False)
+
     def test_get_to_domains(self):
         m = mailparser.parse_from_file(mail_test_6)
 

@@ -126,7 +126,7 @@ class MailParser(object):
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
     """
 
-    def __init__(self, message=None, envelope=None):
+    def __init__(self, message=None, envelope=False):
         """
         Init a new object from a message object structure.
         """
