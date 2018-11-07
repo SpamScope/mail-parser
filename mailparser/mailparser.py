@@ -331,6 +331,7 @@ class MailParser(object):
             if not p.is_multipart():
                 filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
+                charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} for part {!r}".format(
                     charset, p_string))
 
@@ -372,6 +373,7 @@ class MailParser(object):
                         "binary": binary,
                         "mail_content_type": mail_content_type,
                         "content-id": content_id,
+                        "charset": charset_raw,
                         "content_transfer_encoding": transfer_encoding})
                 else:
                     log.debug("Email part {!r} is not an attachment".format(
