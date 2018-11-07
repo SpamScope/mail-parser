@@ -356,6 +356,9 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(
             result["attachments"][0]["content_transfer_encoding"],
             "quoted-printable")
+        self.assertEqual(
+            result["attachments"][0]["charset"],
+            "iso-8859-1")
 
     def test_from_bytes(self):
         if six.PY2:
