@@ -155,8 +155,14 @@ class MailParser(object):
             Instance of MailParser
         """
         log.debug("Parsing email from file object")
-        fp.seek(0)
-        s = fp.read()
+        try:
+            fp.seek(0)
+        except IOError:
+            # When stdout is a TTY it's a character device
+            # and it's not seekable, you cannot seek in a TTY.
+            pass
+        finally:
+            s = fp.read()
 
         return cls.from_string(s)
 
