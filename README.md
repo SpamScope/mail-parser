@@ -245,5 +245,6 @@ MailParserError: Base MailParser Exception
 \── MailParserEnvironmentError: Raised when the environment is not correct
 |
 \── MailParserOSError: Raised when there is an OS error
-
+|
+\── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
