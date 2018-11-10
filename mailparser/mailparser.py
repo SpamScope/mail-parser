@@ -41,7 +41,9 @@ from .utils import (
     msgconvert,
     ported_open,
     ported_string,
-    receiveds_parsing)
+    receiveds_parsing,
+    remove_email_envelope
+)
 
 from .exceptions import MailParserEnvironmentError
 
@@ -124,11 +126,12 @@ class MailParser(object):
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
     """
 
-    def __init__(self, message=None):
+    def __init__(self, message=None, envelope=False):
         """
         Init a new object from a message object structure.
         """
         self._message = message
+        self.envelope = envelope
         log.debug(
             "All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
@@ -152,8 +155,16 @@ class MailParser(object):
             Instance of MailParser
         """
         log.debug("Parsing email from file object")
-        message = email.message_from_file(fp)
-        return cls(message)
+        try:
+            fp.seek(0)
+        except IOError:
+            # When stdout is a TTY it's a character device
+            # and it's not seekable, you cannot seek in a TTY.
+            pass
+        finally:
+            s = fp.read()
+
+        return cls.from_string(s)
 
     @classmethod
     def from_file(cls, fp, is_outlook=False):
@@ -170,13 +181,16 @@ class MailParser(object):
         log.debug("Parsing email from file {!r}".format(fp))
 
         with ported_open(fp) as f:
-            message = email.message_from_file(f)
+            f.seek(0)
+            s = f.read()
+            envelope_present, s = remove_email_envelope(s)
+            message = email.message_from_string(s)
 
         if is_outlook:
             log.debug("Removing temp converted Outlook email {!r}".format(fp))
             os.remove(fp)
 
-        return cls(message)
+        return cls(message, envelope_present)
 
     @classmethod
     def from_file_msg(cls, fp):
@@ -207,8 +221,9 @@ class MailParser(object):
         """
 
         log.debug("Parsing email from string")
+        envelope_present, s = remove_email_envelope(s)
         message = email.message_from_string(s)
-        return cls(message)
+        return cls(message, envelope_present)
 
     @classmethod
     def from_bytes(cls, bt):
@@ -225,9 +240,9 @@ class MailParser(object):
         if six.PY2:
             raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
-
+        envelope_present, bt = remove_email_envelope(bt)
         message = email.message_from_bytes(bt)
-        return cls(message)
+        return cls(message, envelope_present)
 
     def _reset(self):
         """
@@ -331,6 +346,7 @@ class MailParser(object):
             if not p.is_multipart():
                 filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
+                charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} for part {!r}".format(
                     charset, p_string))
 
@@ -372,6 +388,7 @@ class MailParser(object):
                         "binary": binary,
                         "mail_content_type": mail_content_type,
                         "content-id": content_id,
+                        "charset": charset_raw,
                         "content_transfer_encoding": transfer_encoding})
                 else:
                     log.debug("Email part {!r} is not an attachment".format(
