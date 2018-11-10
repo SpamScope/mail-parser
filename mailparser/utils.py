@@ -260,6 +260,7 @@ def parse_received(received):
     values_by_clause = {}
     for pattern in RECEIVED_COMPILED_LIST:
         matches = [match for match in pattern.finditer(received)]
+
         if len(matches) == 0:
             # no matches for this clause, but it's ok! keep going!
             log.debug("No matches found for %s in %s" % (
@@ -277,7 +278,13 @@ def parse_received(received):
             log.debug("Found one match for %s in %s" % (
                 pattern.pattern, received))
             match = matches[0].groupdict()
-            values_by_clause[match.keys()[0]] = match.values()[0]
+            if six.PY2:
+                values_by_clause[match.keys()[0]] = match.values()[0]
+            elif six.PY3:
+                key = list(match.keys())[0]
+                value = list(match.values())[0]
+                values_by_clause[key] = value
+
     if len(values_by_clause) == 0:
         # we weren't able to match anything...
         msg = "Unable to match any clauses in %s" % (received)
