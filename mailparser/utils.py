@@ -40,11 +40,12 @@ import six
 
 from .const import (
     ADDRESSES_HEADERS,
+    EMAIL_ENVELOPE_PATTERN,
     JUNK_PATTERN,
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST)
 
-from .exceptions import MailParserOSError
+from .exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ def decode_header_part(header):
 
 def ported_open(file_):
     if six.PY2:
-        return open(file_)
+        return open(file_, 'rU')
     elif six.PY3:
         return open(file_, encoding="utf-8", errors='ignore')
 
@@ -240,6 +241,34 @@ def msgconvert(email):
         os.close(temph)
 
 
+def parse_received(received):
+    """ Parse a single received header. Return a dictionary of values by clause. """
+    values_by_clause = {}
+    for pattern in RECEIVED_COMPILED_LIST:
+        matches = [match for match in pattern.finditer(received)]
+        if len(matches) == 0:
+            # no matches for this clause, but it's ok! keep going!
+            log.debug("No matches found for %s in %s" % (pattern.pattern, received))
+            continue
+        elif len(matches) > 1:
+            # uh, can't have more than one of each clause in a received.
+            # so either there's more than one or the current regex is wrong
+            msg = "More than one match found for %s in %s" % (pattern.pattern, received)
+            log.error(msg)
+            raise MailParserReceivedParsingError(msg)
+        else:
+            # otherwise we have one matching clause!
+            log.debug("Found one match for %s in %s" % (pattern.pattern, received))
+            match = matches[0].groupdict()
+            values_by_clause[match.keys()[0]] = match.values()[0]
+    if len(values_by_clause) == 0:
+        # we weren't able to match anything...
+        msg = "Unable to match any clauses in %s" % (received)
+        log.error(msg)
+        raise MailParserReceivedParsingError(msg)
+    return values_by_clause
+
+
 def receiveds_parsing(receiveds):
     """
     This function parses the receiveds headers.
@@ -256,31 +285,28 @@ def receiveds_parsing(receiveds):
     n = len(receiveds)
     log.debug("Nr. of receiveds. {}".format(n))
 
-    try:
-        # Loop receiveds
-        for j, i in enumerate(receiveds):
-            log.debug("Parsing received {}/{}".format(j + 1, n))
-            log.debug("Try to parse {!r}".format(i))
-            # Try more patterns
-            for p in RECEIVED_COMPILED_LIST:
-                log.debug("Try to parse with {!r}".format(p.pattern))
-                # Test if all string match
-                t = p.search(i)
-                if t and t.group() == i:
-                    log.debug("Received parsed {!r}".format(i))
-                    parsed.append(t.groupdict())
-                    break
-                else:
-                    log.debug("Received not parsed {!r}".format(i))
-                    continue
+    for idx, received in enumerate(receiveds):
+        log.debug("Parsing received {}/{}".format(idx + 1, n))
+        log.debug("Try to parse {!r}".format(received))
+        try:
+            # try to parse the current received header...
+            values_by_clause = parse_received(received)
+        except MailParserReceivedParsingError as e:
+            # if we can't, let's append the raw
+            parsed.append({'raw': received})
         else:
-            if len(receiveds) != len(parsed):
-                raise ValueError
+            # otherwise append the full values_by_clause dict
+            parsed.append(values_by_clause)
 
-    except (AttributeError, ValueError):
+    log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
+    if len(receiveds) != len(parsed):
+        # something really bad happened, so just return raw receiveds with hop indices
+        log.error("len(receiveds): %s, len(parsed): %s, receiveds: %s, parsed: %s" % (
+            len(receiveds), len(parsed), receiveds, parsed))
         return receiveds_not_parsed(receiveds)
 
     else:
+        # all's good! we have parsed or raw receiveds for each received header
         return receiveds_format(parsed)
 
 
@@ -455,3 +481,11 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
+
+
+def remove_email_envelope(message):
+    """ Remove the email envelope from message. Return boolean if it was present and new message. """
+    envelope_present = True if EMAIL_ENVELOPE_PATTERN.search(message) else False
+    new_message = EMAIL_ENVELOPE_PATTERN.sub('', message)
+
+    return envelope_present, new_message
