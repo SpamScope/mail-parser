@@ -23,6 +23,7 @@ __all__ = (
     "MailParserOutlookError",
     "MailParserEnvironmentError",
     "MailParserOSError",
+    "MailParserReceivedParsingError"
 )
 
 
@@ -50,5 +51,11 @@ class MailParserEnvironmentError(MailParserError):
 class MailParserOSError(MailParserError):
     """
     Raised when there is an OS error
+    """
+    pass
+
+class MailParserReceivedParsingError(MailParserError):
+    """
+    Raised when a receieved header cannot be parsed
     """
     pass
