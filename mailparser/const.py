@@ -22,10 +22,12 @@ import re
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
-# need to strip out the envelope apparently so that python email library can parse it...
+# need to strip out the envelope apparently so
+# that python email library can parse it...
 # python [at least 2.7] email library silently skips emails with an envelope
 # https://github.com/python/cpython/blob/2.7/Lib/email/feedparser.py#L226
-EMAIL_ENVELOPE_PATTERN = re.compile(r'(?:MAIL FROM:|RCPT TO:).*\n', re.IGNORECASE)
+EMAIL_ENVELOPE_PATTERN = re.compile(
+    r'(?:MAIL FROM:|RCPT TO:).*\n', re.IGNORECASE)
 
 JUNK_PATTERN = r'[ \(\)\[\]\t\n]+'
 
@@ -37,16 +39,39 @@ RECEIVED_PATTERNS = [
     # TODO: ideally would do negative matching for with in parens
 
     # need the beginning or space to differentiate from envelope-from
-    r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))',
+    (
+        r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?'
+        r'envelope-from|\s*[(]?envelope-sender|\s+'
+        r'by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))'
+    ),
 
     # need to make sure envelope-from comes before from to prevent mismatches
-    # envelope-from and -sender seem to optionally have space and/or ( before them
-    # other clauses must have whitespace before
-    r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))',
-    r'(?:with(?! cipher)\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))',
-    r'(?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with(?! cipher)|\s+for|\s+via|;))',
-    r'(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+with(?! cipher)|\s+id|\s+via|;))',
-    r'(?:via\s+(?P<via>.+?)(?:\s*[(]?envelope-from|\s*[(]?envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))',
+    # envelope-from and -sender seem to optionally have space and/or
+    # ( before them other clauses must have whitespace before
+    (
+        r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'[(]?envelope-sender|\s+from|\s+with'
+        r'(?! cipher)|\s+id|\s+for|\s+via|;))'
+    ),
+    (
+        r'(?:with(?! cipher)\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?'
+        r'envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))'
+    ),
+    (
+        r'(?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'[(]?envelope-sender|\s+from|\s+by|\s+with'
+        r'(?! cipher)|\s+for|\s+via|;))'
+    ),
+    (
+        r'(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?'
+        r'envelope-sender|\s+from|\s+by|\s+with'
+        r'(?! cipher)|\s+id|\s+via|;))'
+    ),
+    (
+        r'(?:via\s+(?P<via>.+?)(?:\s*[(]?'
+        r'envelope-from|\s*[(]?envelope-sender|\s+'
+        r'from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))'
+    ),
 
     # assumes emails are always inside <>
     r'(?:envelope-from\s+<(?P<envelope_from>.+?)>)',
@@ -56,7 +81,8 @@ RECEIVED_PATTERNS = [
     r';\s*(?P<date>.*)'
 ]
 
-RECEIVED_COMPILED_LIST = [re.compile(i, re.I|re.DOTALL) for i in RECEIVED_PATTERNS]
+RECEIVED_COMPILED_LIST = [
+    re.compile(i, re.I | re.DOTALL) for i in RECEIVED_PATTERNS]
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 

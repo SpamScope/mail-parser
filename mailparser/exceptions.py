@@ -54,8 +54,9 @@ class MailParserOSError(MailParserError):
     """
     pass
 
+
 class MailParserReceivedParsingError(MailParserError):
     """
-    Raised when a receieved header cannot be parsed
+    Raised when a received header cannot be parsed
     """
     pass
