@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import logging
 import os
 import sys
 import unittest
@@ -25,6 +26,7 @@ base_path = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(base_path, '..')
 sys.path.append(root)
 
+logging.getLogger().addHandler(logging.NullHandler())
 
 from mailparser.__main__ import get_args
 
