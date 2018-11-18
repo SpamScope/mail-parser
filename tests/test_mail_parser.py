@@ -18,6 +18,7 @@ limitations under the License.
 """
 
 import datetime
+import logging
 import os
 import six
 import sys
@@ -26,6 +27,8 @@ import unittest
 base_path = os.path.realpath(os.path.dirname(__file__))
 root = os.path.join(base_path, '..')
 sys.path.append(root)
+
+logging.getLogger().addHandler(logging.NullHandler())
 
 import mailparser
 from mailparser.utils import (
@@ -59,52 +62,6 @@ mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
 mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
-
-
-class TestParseReceived(unittest.TestCase):
-
-    """
-    Test cases for parsing individual received headers.
-    """
-
-    def test_standard_outlook(self):
-        """ Verify a basic outlook received header works. """
-        received = "from DM3NAM03FT035.eop-NAM03.prod.protection.outlook.com "\
-                    "2a01:111:f400:7e49::205 by CY4PR0601CA0051.outlook.office365.com "\
-                    "2603:10b6:910:89::28 with Microsoft SMTP Server version=TLS1_2, "\
-                    "cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384 id 15.20.1185.23 via Frontend "\
-                    "Transport; Mon, 1 Oct 2018 09:49:21 +0000"
-
-        expected = {
-            'from': 'DM3NAM03FT035.eop-NAM03.prod.protection.outlook.com 2a01:111:f400:7e49::205',
-            'by': 'CY4PR0601CA0051.outlook.office365.com 2603:10b6:910:89::28',
-            'with': 'Microsoft SMTP Server version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384',
-            'id': '15.20.1185.23',
-            'via': 'Frontend Transport',
-            'date': 'Mon, 1 Oct 2018 09:49:21 +0000'
-        }
-        values_by_clause = parse_received(received)
-
-        self.assertEqual(expected, values_by_clause)
-
-    def test_standard_google__with_cipher(self):
-        """ Verify that we don't match 'with cipher' a la google. """
-        received = "from mail-yw1-f65.google.com mail-yw1-f65.google.com 209.85.161.65 using " \
-                "TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 128/128 bits No client certificate " \
-                "requested by subdomain.domain.com Postfix with ESMTPS id abc123 for <user@domain.com>; " \
-                "Tue, 25 Sep 2018 13:09:36 +0000 (UTC)"
-
-        expected = {
-            'from': 'mail-yw1-f65.google.com mail-yw1-f65.google.com 209.85.161.65 using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 128/128 bits No client certificate requested',
-            'by': 'subdomain.domain.com Postfix',
-            'with': 'ESMTPS',
-            'id': 'abc123',
-            'for': '<user@domain.com>',
-            'date': 'Tue, 25 Sep 2018 13:09:36 +0000 (UTC)'
-        }
-        values_by_clause = parse_received(received)
-
-        self.assertEqual(expected, values_by_clause)
 
 
 class TestMailParser(unittest.TestCase):
@@ -182,7 +139,7 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_12)
         trust = "localhost"
         result = mail.get_server_ipaddress(trust)
-        self.assertEquals(result, "96.202.181.20")
+        self.assertEqual(result, "96.202.181.20")
 
     def test_fingerprints_body(self):
         mail = mailparser.parse_from_file(mail_test_1)
@@ -324,9 +281,9 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.to
         self.assertIsInstance(result, list)
-        self.assertEquals(len(result), 2)
+        self.assertEqual(len(result), 2)
         self.assertIsInstance(result[0], tuple)
-        self.assertEquals(len(result[0]), 2)
+        self.assertEqual(len(result[0]), 2)
 
         result = mail.subject
         self.assertIsInstance(result, six.text_type)
@@ -493,9 +450,9 @@ class TestMailParser(unittest.TestCase):
 
         result = mail.to
         self.assertIsInstance(result, list)
-        self.assertEquals(len(result), 2)
+        self.assertEqual(len(result), 2)
         self.assertIsInstance(result[0], tuple)
-        self.assertEquals(len(result[0]), 2)
+        self.assertEqual(len(result[0]), 2)
 
         result = mail.subject
         self.assertIsInstance(result, six.text_type)
@@ -513,10 +470,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, list)
 
         result = mail.timezone
-        self.assertEquals(result, "+1")
-
-        result = mail.envelope
-        self.assertEquals(result, False)
+        self.assertEqual(result, "+1")
 
     def test_get_to_domains(self):
         m = mailparser.parse_from_file(mail_test_6)
@@ -528,47 +482,120 @@ class TestMailParser(unittest.TestCase):
         domains_2 = m.to_domains
         self.assertIsInstance(domains_2, list)
         self.assertIn("test.it", domains_2)
-        self.assertEquals(domains_1, domains_2)
+        self.assertEqual(domains_1, domains_2)
 
         self.assertIsInstance(m.to_domains_json, six.text_type)
 
     def test_convert_mail_date(self):
         s = "Mon, 20 Mar 2017 05:12:54 +0600"
         d, t = convert_mail_date(s)
-        self.assertEquals(t, "+6")
-        self.assertEquals(str(d), "2017-03-19 23:12:54")
+        self.assertEqual(t, "+6")
+        self.assertEqual(str(d), "2017-03-19 23:12:54")
         s = "Mon, 20 Mar 2017 05:12:54 -0600"
         d, t = convert_mail_date(s)
-        self.assertEquals(t, "-6")
+        self.assertEqual(t, "-6")
 
     def test_ported_string(self):
         raw_data = ""
         s = ported_string(raw_data)
-        self.assertEquals(s, six.text_type())
+        self.assertEqual(s, six.text_type())
 
         raw_data = "test "
         s = ported_string(raw_data)
-        self.assertEquals(s, "test")
+        self.assertEqual(s, "test")
 
         raw_data = u"test "
         s = ported_string(raw_data)
-        self.assertEquals(s, "test")
+        self.assertEqual(s, "test")
 
-    def test_email_with_envelope(self):
-        """ Verify we can parse an email that has an envelope. """
-        email_string =  "MAIL FROM:<void-bounce-peter.piper=peter.com@something.com>\n" \
-                        "RCPT TO:<mickey.mouse@something.com>\n" \
-                        "Received: from domain.com (localhost [127.0.0.1]) " \
-                        "by localhost " \
-                        "with SMTP id abc123 " \
-                        "for mickey.mouse@something.com; " \
-                        "Thu, 11 Oct 2018 18:52:29 +0000 (GMT)"
+    def test_standard_outlook(self):
+        """ Verify a basic outlook received header works. """
+        received = """
+            from DM3NAM03FT035
+            by CY4PR0601CA0051.outlook.office365.com
+            with Microsoft SMTP Server version=TLS1_2, cipher=TLS
+            id 15.20.1185.23
+            via Frontend Transport; Mon, 1 Oct 2018 09:49:21 +0000
+        """.strip()
 
-        mail = mailparser.parse_from_string(email_string)
+        expected = {
+            'from': 'DM3NAM03FT035',
+            'by': 'CY4PR0601CA0051.outlook.office365.com',
+            'with': 'Microsoft SMTP Server version=TLS1_2, cipher=TLS',
+            'id': '15.20.1185.23',
+            'via': 'Frontend Transport',
+            'date': 'Mon, 1 Oct 2018 09:49:21 +0000'
+        }
+        values_by_clause = parse_received(received)
 
-        self.assertTrue(mail.envelope)
-        self.assertEquals(mail.received[0]['id'], 'abc123')
-        self.assertEquals(mail.received[0]['for'], 'mickey.mouse@something.com')
+        self.assertEqual(expected, values_by_clause)
+
+    def test_standard_google__with_cipher(self):
+        """ Verify that we don't match 'with cipher' a la google. """
+        received = """
+            from mail_yw1_f65.google.com
+            by subdomain.domain.com Postfix with ESMTPS
+            id abc123 for <user@domain.com>;
+            Tue, 25 Sep 2018 13:09:36 +0000 (UTC)"""
+
+        expected = {
+            'from': 'mail_yw1_f65.google.com',
+            'by': 'subdomain.domain.com Postfix',
+            'with': 'ESMTPS',
+            'id': 'abc123',
+            'for': '<user@domain.com>',
+            'date': 'Tue, 25 Sep 2018 13:09:36 +0000 (UTC)'
+        }
+        values_by_clause = parse_received(received)
+        self.assertEqual(expected, values_by_clause)
+
+    @unittest.skipIf(sys.version_info[0] < 3, "Must be using Python 3")
+    def test_parse_from_bytes(self):
+        with open(mail_test_2, "rb") as f:
+            mail_bytes = f.read()
+
+        mail = mailparser.parse_from_bytes(mail_bytes)
+        trust = "smtp.customers.net"
+
+        self.assertEqual(False, mail.has_defects)
+
+        raw = "217.76.210.112"
+        result = mail.get_server_ipaddress(trust)
+        self.assertEqual(raw, result)
+
+        raw = "<4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>"
+        result = mail.message_id
+        self.assertEqual(raw, result)
+
+        raw = "echo@tu-berlin.de"
+        result = mail.to
+        self.assertEqual(len(result), 2)
+        self.assertIsInstance(result, list)
+        self.assertIsInstance(result[0], tuple)
+        self.assertIsInstance(mail.to_json, six.text_type)
+        self.assertIsInstance(mail.to_raw, six.text_type)
+        self.assertEqual(raw, result[0][1])
+
+        raw = "meteo@regione.vda.it"
+        result = mail.from_
+        self.assertEqual(raw, result[0][1])
+
+        raw = "Bollettino Meteorologico del 29/11/2015"
+        result = mail.subject
+        self.assertEqual(raw, result)
+
+        result = mail.has_defects
+        self.assertEqual(False, result)
+
+        result = len(mail.attachments)
+        self.assertEqual(3, result)
+
+        # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
+        self.assertIsInstance(mail.date_raw, six.text_type)
+        self.assertIsInstance(mail.date_json, six.text_type)
+        raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
+        result = mail.date.isoformat()
+        self.assertEqual(raw_utc, result)
 
 
 if __name__ == '__main__':
