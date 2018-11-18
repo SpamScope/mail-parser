@@ -42,7 +42,6 @@ from .utils import (
     ported_open,
     ported_string,
     receiveds_parsing,
-    remove_email_envelope
 )
 
 from .exceptions import MailParserEnvironmentError
@@ -126,12 +125,11 @@ class MailParser(object):
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
     """
 
-    def __init__(self, message=None, envelope=False):
+    def __init__(self, message=None):
         """
         Init a new object from a message object structure.
         """
         self._message = message
-        self.envelope = envelope
         log.debug(
             "All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
@@ -181,16 +179,13 @@ class MailParser(object):
         log.debug("Parsing email from file {!r}".format(fp))
 
         with ported_open(fp) as f:
-            f.seek(0)
-            s = f.read()
-            envelope_present, s = remove_email_envelope(s)
-            message = email.message_from_string(s)
+            message = email.message_from_file(f)
 
         if is_outlook:
             log.debug("Removing temp converted Outlook email {!r}".format(fp))
             os.remove(fp)
 
-        return cls(message, envelope_present)
+        return cls(message)
 
     @classmethod
     def from_file_msg(cls, fp):
@@ -221,9 +216,8 @@ class MailParser(object):
         """
 
         log.debug("Parsing email from string")
-        envelope_present, s = remove_email_envelope(s)
         message = email.message_from_string(s)
-        return cls(message, envelope_present)
+        return cls(message)
 
     @classmethod
     def from_bytes(cls, bt):
@@ -240,9 +234,8 @@ class MailParser(object):
         if six.PY2:
             raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
-        envelope_present, bt = remove_email_envelope(bt)
         message = email.message_from_bytes(bt)
-        return cls(message, envelope_present)
+        return cls(message)
 
     def _reset(self):
         """
@@ -367,9 +360,10 @@ class MailParser(object):
                     log.debug("content-id {!r} for part {!r}".format(
                         content_id, p_string))
 
-                    if transfer_encoding == "base64" or \
-                            (transfer_encoding == "quoted-printable" and
-                             "application" in mail_content_type):
+                    if transfer_encoding == "base64" or (
+                       transfer_encoding == "quoted-\
+                       printable" and "application" in mail_content_type):
+
                         payload = p.get_payload(decode=False)
                         binary = True
                         log.debug(

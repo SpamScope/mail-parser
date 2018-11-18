@@ -40,7 +40,6 @@ import six
 
 from .const import (
     ADDRESSES_HEADERS,
-    EMAIL_ENVELOPE_PATTERN,
     JUNK_PATTERN,
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST)
@@ -144,7 +143,7 @@ def decode_header_part(header):
 
 def ported_open(file_):
     if six.PY2:
-        return open(file_, 'rU')
+        return open(file_)
     elif six.PY3:
         return open(file_, encoding="utf-8", errors='ignore')
 
@@ -508,22 +507,3 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
-
-
-def remove_email_envelope(message):
-    """
-    Remove the email envelope from message.
-    Return boolean if it was present and new message.
-
-    Arguments:
-        message {str} -- raw email message
-
-    Returns:
-        tuple -- (bool, new message)
-    """
-
-    envelope_present = \
-        True if EMAIL_ENVELOPE_PATTERN.search(message) else False
-    new_message = EMAIL_ENVELOPE_PATTERN.sub('', message)
-
-    return envelope_present, new_message
