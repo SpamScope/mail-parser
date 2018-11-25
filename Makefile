@@ -56,8 +56,8 @@ lint: ## check style with flake8
 test: ## run tests quickly with the default Python
 	python -m unittest discover -s tests -f -v
 
-# test-all: ## run tests on every Python version with tox
-# 	tox
+test-all: ## run tests on every Python version with tox
+	tox
 
 coverage: ## check code coverage quickly with the default Python
 	coverage run --source mailparser -m pytest
