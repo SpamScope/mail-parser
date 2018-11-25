@@ -11,3 +11,4 @@ dist/
 mail_parser.egg-info/
 venv
 venv3
+report/
