@@ -2,6 +2,7 @@
 .coverage
 .env
 .ropeproject
+.tox/
 .vscode
 *.pyc
 build/
