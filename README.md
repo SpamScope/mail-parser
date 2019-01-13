@@ -216,6 +216,10 @@ optional arguments:
                         False)
   -z, --attachments-hash
                         Print attachments with fingerprints (default: False)
+  -sa, --store-attachments
+                        Store attachments on disk (default: False)
+  -ap ATTACHMENTS_PATH, --attachments-path ATTACHMENTS_PATH
+                        Path where store attachments (default: /tmp)
   -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
