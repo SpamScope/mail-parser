@@ -507,3 +507,37 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
+
+
+def write_attachments(attachments, base_path):  # pragma: no cover
+    for a in attachments:
+        write_sample(
+            binary=a["binary"],
+            payload=a["payload"],
+            path=base_path,
+            filename=a["filename"],
+        )
+
+
+def write_sample(binary, payload, path, filename):  # pragma: no cover
+    """
+    This function writes a sample on file system.
+
+    Args:
+        binary (bool): True if it's a binary file
+        payload: payload of sample, in base64 if it's a binary
+        path (string): path of file
+        filename (string): name of file
+        hash_ (string): file hash
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    sample = os.path.join(path, filename)
+
+    if binary:
+        with open(sample, "wb") as f:
+            f.write(payload.decode("base64"))
+    else:
+        with open(sample, "w") as f:
+            f.write(payload.encode("utf-8"))

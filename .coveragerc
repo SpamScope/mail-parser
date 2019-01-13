@@ -1,8 +1,9 @@
 [run]
-source = src/modules/
+source = mailparser/
 
 [report]
 omit = mailparser/version.py
+    mailparser/__main__.py
 
 exclude_lines =
     pragma: no cover
