@@ -28,7 +28,9 @@ from .utils import (
     custom_log,
     print_attachments,
     print_mail_fingerprints,
-    safe_print)
+    safe_print,
+    write_attachments,
+)
 
 
 current = os.path.realpath(os.path.dirname(__file__))
@@ -168,6 +170,20 @@ def get_args():
         help="Print attachments with fingerprints")
 
     parser.add_argument(
+        "-sa",
+        "--store-attachments",
+        dest="store_attachments",
+        action="store_true",
+        help="Store attachments on disk")
+
+    parser.add_argument(
+        "-ap",
+        "--attachments-path",
+        dest="attachments_path",
+        default="/tmp",
+        help="Path where store attachments")
+
+    parser.add_argument(
         '-v',
         '--version',
         action='version',
@@ -238,6 +254,10 @@ def main():
     if args.mail_hash:
         log.debug("Printing also mail fingerprints")
         print_mail_fingerprints(parser.body.encode("utf-8"))
+
+    if args.store_attachments:
+        log.debug("Store attachments on disk")
+        write_attachments(parser.attachments, args.attachments_path)
 
 
 if __name__ == '__main__':
