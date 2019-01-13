@@ -519,7 +519,7 @@ def write_attachments(attachments, base_path):  # pragma: no cover
         )
 
 
-def write_sample(binary, payload, path, filename):
+def write_sample(binary, payload, path, filename):  # pragma: no cover
     """
     This function writes a sample on file system.
 
