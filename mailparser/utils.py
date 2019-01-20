@@ -24,6 +24,7 @@ from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
 
+import base64
 import datetime
 import email
 import functools
@@ -537,7 +538,7 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
 
     if binary:
         with open(sample, "wb") as f:
-            f.write(payload.decode("base64"))
+            f.write(base64.b64decode(payload))
     else:
         with open(sample, "w") as f:
             f.write(payload.encode("utf-8"))
