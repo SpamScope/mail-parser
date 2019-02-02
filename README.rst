@@ -179,6 +179,7 @@ Then you can get all parts
    mail.to
    mail.to_domains
    mail.timezone: returns the timezone, offset from UTC
+   mail_partial: returns only the mains parts of emails
 
 Usage from command-line
 -----------------------
