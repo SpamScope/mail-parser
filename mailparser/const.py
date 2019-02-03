@@ -87,12 +87,14 @@ ADDRESSES_HEADERS = set([
     "reply-to",
     "to"])
 
-# These parts have their property in mailparser
+# These parts are always returned
 OTHERS_PARTS = set([
     "attachments",
     "body",
     "date",
+    "message-id",
     "received",
     "timezone",
     "to_domains",
+    "x-mailer",
 ])

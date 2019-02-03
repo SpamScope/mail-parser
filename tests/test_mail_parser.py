@@ -35,6 +35,7 @@ from mailparser.utils import (
     convert_mail_date,
     fingerprints,
     get_header,
+    get_mail_keys,
     get_to_domains,
     msgconvert,
     ported_open,
@@ -90,6 +91,24 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.text_html, list)
         self.assertIsInstance(mail.text_html_json, six.text_type)
         self.assertEqual(len(mail.text_html), 1)
+
+    def test_get_mail_keys(self):
+        mail = mailparser.parse_from_file(mail_test_11)
+        all_parts = get_mail_keys(mail.message)
+        mains_parts = get_mail_keys(mail.message, False)
+        self.assertNotEqual(all_parts, mains_parts)
+        self.assertIn("message-id", mains_parts)
+        self.assertIn("x-filterd-recvd-size", all_parts)
+        self.assertNotIn("x-filterd-recvd-size", mains_parts)
+
+    def test_mail_partial(self):
+        mail = mailparser.parse_from_file(mail_test_10)
+        self.assertNotEqual(mail.mail, mail.mail_partial)
+        self.assertIn("message-id", mail.mail_partial)
+        self.assertIn("x-ibm-av-version", mail.mail)
+        self.assertNotIn("x-ibm-av-version", mail.mail_partial)
+        result = mail.mail_partial_json
+        self.assertIsInstance(result, six.text_type)
 
     def test_not_parsed_received(self):
         mail = mailparser.parse_from_file(mail_test_9)

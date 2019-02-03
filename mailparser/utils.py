@@ -464,18 +464,26 @@ def get_header(message, name):
     return six.text_type()
 
 
-def get_mail_keys(message):
+def get_mail_keys(message, complete=True):
     """
     Given an email.message.Message, return a set with all email parts to get
 
     Args:
         message (email.message.Message): email message object
+        complete (bool): if True returns all email headers
 
     Returns:
         set with all email parts
     """
-    all_headers_keys = {i.lower() for i in message.keys()}
-    all_parts = ADDRESSES_HEADERS | OTHERS_PARTS | all_headers_keys
+
+    if complete:
+        log.debug("Get all headers")
+        all_headers_keys = {i.lower() for i in message.keys()}
+        all_parts = ADDRESSES_HEADERS | OTHERS_PARTS | all_headers_keys
+    else:
+        log.debug("Get only mains headers")
+        all_parts = ADDRESSES_HEADERS | OTHERS_PARTS
+
     log.debug("All parts to get: {}".format(", ".join(all_parts)))
     return all_parts
 
