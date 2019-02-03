@@ -94,7 +94,10 @@ OTHERS_PARTS = set([
     "date",
     "message-id",
     "received",
+    "subject",
     "timezone",
     "to_domains",
+    "user-agent",
     "x-mailer",
+    "x-original-to",
 ])
