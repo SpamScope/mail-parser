@@ -277,24 +277,35 @@ class MailParser(object):
             # Save all defects
             self._defects.append(part_defects)
 
-    def _make_mail(self):
+    def _make_mail(self, complete=True):
         """
         This method assigns the right values to all tokens of email.
-        It sets an internal parameter with all tokens.
-        """
-        self._mail = {}
+        Returns a parsed object
 
-        for i in get_mail_keys(self.message):
+        Keyword Arguments:
+            complete {bool} -- If True returns all mails parts
+                                (default: {True})
+
+        Returns:
+            dict -- Parsed email object
+        """
+
+        mail = {}
+        keys = get_mail_keys(self.message, complete)
+
+        for i in keys:
             log.debug("Getting header or part {!r}".format(i))
             value = getattr(self, i)
             if value:
-                self._mail[i] = value
+                mail[i] = value
 
         # add defects
-        self._mail["has_defects"] = self.has_defects
+        mail["has_defects"] = self.has_defects
         if self.has_defects:
-            self._mail["defects"] = self.defects
-            self._mail["defects_categories"] = list(self.defects_categories)
+            mail["defects"] = self.defects
+            mail["defects_categories"] = list(self.defects_categories)
+
+        return mail
 
     def parse(self):
         """
@@ -394,10 +405,12 @@ class MailParser(object):
                             self._text_html.append(payload)
                         else:
                             self._text_plain.append(payload)
+        else:
+            # Parsed object mail with all parts
+            self._mail = self._make_mail()
 
-        # Parsed object mail
-        self._make_mail()
-        return self
+            # Parsed object mail with mains parts
+            self._mail_partial = self._make_mail(complete=False)
 
     def get_server_ipaddress(self, trust):
         """
@@ -598,6 +611,23 @@ class MailParser(object):
         if self.mail.get("date"):
             self._mail["date"] = self.date.isoformat()
         return json.dumps(self.mail, ensure_ascii=False, indent=2)
+
+    @property
+    def mail_partial(self):
+        """
+        Return the Python object of mail parsed
+        with only the mains headers
+        """
+        return self._mail_partial
+
+    @property
+    def mail_partial_json(self):
+        """
+        Return the JSON of mail parsed partial
+        """
+        if self.mail_partial.get("date"):
+            self._mail_partial["date"] = self.date.isoformat()
+        return json.dumps(self.mail_partial, ensure_ascii=False, indent=2)
 
     @property
     def defects(self):

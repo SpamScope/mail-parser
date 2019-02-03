@@ -174,6 +174,7 @@ mail.text_html: only text html mail parts in a list
 mail.to
 mail.to_domains
 mail.timezone: returns the timezone, offset from UTC
+mail_partial: returns only the mains parts of emails
 ```
 
 ## Usage from command-line
