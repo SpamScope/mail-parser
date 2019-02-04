@@ -345,31 +345,27 @@ class MailParser(object):
                 log.error("Failed to get epilogue part. Check raw mail.")
 
         # walk all mail parts
-        for p in parts:
-            p_string = ported_string(p.as_string())[:100] + "..."
+        for i, p in enumerate(parts):
             if not p.is_multipart():
                 filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
-                log.debug("Charset {!r} for part {!r}".format(
-                    charset, p_string))
+                log.debug("Charset {!r} part {!r}".format(charset, i))
 
                 if filename:
-                    log.debug("Email part {!r} is an attachment".format(
-                        p_string))
-                    log.debug("Filename {!r} for part {!r}".format(
-                        filename, p_string))
+                    log.debug("Email part {!r} is an attachment".format(i))
+                    log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
                     mail_content_type = ported_string(p.get_content_type())
-                    log.debug("Mail content type {!r} for part {!r}".format(
-                        mail_content_type, p_string))
+                    log.debug("Mail content type {!r} part {!r}".format(
+                        mail_content_type, i))
                     transfer_encoding = ported_string(
                         p.get('content-transfer-encoding', '')).lower()
-                    log.debug("Transfer encoding {!r} for part {!r}".format(
-                        transfer_encoding, p_string))
+                    log.debug("Transfer encoding {!r} part {!r}".format(
+                        transfer_encoding, i))
                     content_id = ported_string(p.get('content-id'))
-                    log.debug("content-id {!r} for part {!r}".format(
-                        content_id, p_string))
+                    log.debug("content-id {!r} part {!r}".format(
+                        content_id, i))
 
                     if transfer_encoding == "base64" or (
                        transfer_encoding == "quoted-\
@@ -377,15 +373,14 @@ class MailParser(object):
 
                         payload = p.get_payload(decode=False)
                         binary = True
-                        log.debug(
-                            "Filename {!r} for part {!r} is binary".format(
-                                filename, p_string))
+                        log.debug("Filename {!r} part {!r} is binary".format(
+                            filename, i))
                     else:
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
                         log.debug(
-                            "Filename {!r} for part {!r} is not binary".format(
-                                filename, p_string))
+                            "Filename {!r} part {!r} is not binary".format(
+                                filename, i))
 
                     self._attachments.append({
                         "filename": filename,
@@ -396,8 +391,7 @@ class MailParser(object):
                         "charset": charset_raw,
                         "content_transfer_encoding": transfer_encoding})
                 else:
-                    log.debug("Email part {!r} is not an attachment".format(
-                        p_string))
+                    log.debug("Email part {!r} is not an attachment".format(i))
                     payload = ported_string(
                         p.get_payload(decode=True), encoding=charset)
                     if payload:
