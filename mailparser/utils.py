@@ -549,4 +549,4 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
             f.write(base64.b64decode(payload))
     else:
         with open(sample, "w") as f:
-            f.write(payload.encode("utf-8"))
+            f.write(payload)
