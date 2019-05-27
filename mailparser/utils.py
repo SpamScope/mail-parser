@@ -507,7 +507,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
-                payload = i["payload"].decode("base64")
+                payload = base64.b64decode(i["payload"])
             else:
                 payload = i["payload"]
 

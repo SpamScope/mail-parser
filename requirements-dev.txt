@@ -1,6 +1,7 @@
 coverage
 flake8
 ipaddress
-rope
 simplejson
 six
+tox
+twine
