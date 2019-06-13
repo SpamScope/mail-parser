@@ -378,6 +378,12 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(
             result["attachments"][0]["charset"],
             "iso-8859-1")
+        self.assertEqual(
+            result["attachments"][0]["content-disposition"], "inline")
+
+        mail = mailparser.parse_from_file(mail_malformed_1)
+        attachments = mail.mail["attachments"]
+        self.assertEqual(attachments[0]["content-disposition"], "")
 
     def test_from_bytes(self):
         if six.PY2:
