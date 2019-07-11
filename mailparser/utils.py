@@ -539,6 +539,12 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
         filename (string): name of file
         hash_ (string): file hash
     """
+    
+    # filename could contain a directory structure
+    full_path = os.path.join(path, filename)
+    path = os.path.dirname(full_path)
+    filename = os.path.basename(full_path)
+
     if not os.path.exists(path):
         os.makedirs(path)
 
