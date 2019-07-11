@@ -541,9 +541,11 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     """
     
     # filename could contain a directory structure
+    print("before fix: path", path, "filename", filename)
     full_path = os.path.join(path, filename)
     path = os.path.dirname(full_path)
     filename = os.path.basename(full_path)
+    print("after fix: path", path, "filename", filename)
 
     if not os.path.exists(path):
         os.makedirs(path)
