@@ -216,7 +216,7 @@ class MailParser(object):
         """
 
         log.debug("Parsing email from string")
-        message = email.message_from_string(s)
+        message = email.message_from_bytes(s)
         return cls(message)
 
     @classmethod
@@ -350,7 +350,7 @@ class MailParser(object):
                 filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
-                log.debug("Charset {!r} part {!r}".format(charset, i))
+                log.debug("Charset {!r} part {!r} (charset_raw {!r})".format(charset, i, charset_raw))
 
                 if filename:
                     log.debug("Email part {!r} is an attachment".format(i))

@@ -94,24 +94,36 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
     Returns:
         str (Python 3) or unicode (Python 2)
     """
+    log.debug("encoding={!r} errors={!r}".format(encoding, errors))
 
     if not raw_data:
+        log.debug("not raw data, returning {!r}".format(six.text_type()))
         return six.text_type()
 
     if isinstance(raw_data, six.text_type):
+        log.debug("instance of six.text_type, strip")
         return raw_data.strip()
 
     if six.PY2:
+        log.debug("Python2 handler")
         try:
             return six.text_type(raw_data, encoding, errors).strip()
         except LookupError:
             return six.text_type(raw_data, "utf-8", errors).strip()
 
     if six.PY3:
+        log.debug("Python3 handler")
         try:
+            log.debug("try six.text_type to {!r}".format(encoding))
             return six.text_type(raw_data, encoding).strip()
-        except (LookupError, UnicodeDecodeError):
-            return six.text_type(raw_data, "utf-8", errors).strip()
+        except (LookupError, UnicodeDecodeError) as e:
+            try:
+                encoding = "iso-8859-1"
+                log.debug("try six.text_type fallback to {!r}".format(encoding))
+                return six.text_type(raw_data, encoding).strip()
+            except (LookupError, UnicodeDecodeError) as e:
+                log.debug("error {!r}".format(e))
+                return six.text_type(raw_data, "utf-8", errors).strip()
 
 
 def decode_header_part(header):
