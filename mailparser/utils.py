@@ -553,11 +553,22 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     """
     
     # filename could contain a directory structure
-    print("before fix: path", path, "filename", filename)
+    log.debug("before fix: path", path, "filename", filename)
+
+    # if filename has a leading "/", 
+    # os.path.join() would allow directory traversal
+    # we want to prevent this by first using normpath() to remove the 
+    # ..'s and then strip the leading "/"
+    filename = os.normpath("/" + filename).lstrip("/")
+    log.debug("fix filename", filename)
+
+    # join both paths so we actually start in tempdir
     full_path = os.path.join(path, filename)
+    log.debug("full_path", full_path)
+
     path = os.path.dirname(full_path)
     filename = os.path.basename(full_path)
-    print("after fix: path", path, "filename", filename)
+    log.debug("after fix: path", path, "filename", filename)
 
     if not os.path.exists(path):
         os.makedirs(path)
