@@ -559,7 +559,7 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     # os.path.join() would allow directory traversal
     # we want to prevent this by first using normpath() to remove the 
     # ..'s and then strip the leading "/"
-    filename = os.normpath("/" + filename).lstrip("/")
+    filename = os.path.normpath("/" + filename).lstrip("/")
     log.debug("fix filename", filename)
 
     # join both paths so we actually start in tempdir
