@@ -120,7 +120,16 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
             try:
                 encoding = "iso-8859-1"
                 log.debug("try six.text_type fallback to {!r}".format(encoding))
-                return six.text_type(raw_data, encoding).strip()
+                ret = six.text_type(raw_data, encoding)
+                log.debug("ret 1 {!r}", ret)
+                
+                # see https://stackoverflow.com/questions/47685575/python3-unescape-unicode-escapes-surrounded-by-unescaped-characters
+                ret = ret.encode("unicode-escape")
+                ret = ret.replace(b'\\\\u', b'\\u')
+                ret = ret.decode("unicode-escape")
+                log.debug("ret 2 {!r}", ret)
+
+                return ret.strip()
             except (LookupError, UnicodeDecodeError) as e:
                 log.debug("error {!r}".format(e))
                 return six.text_type(raw_data, "utf-8", errors).strip()
