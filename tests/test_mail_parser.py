@@ -378,6 +378,12 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(
             result["attachments"][0]["charset"],
             "iso-8859-1")
+        self.assertEqual(
+            result["attachments"][0]["content-disposition"], "inline")
+
+        mail = mailparser.parse_from_file(mail_malformed_1)
+        attachments = mail.mail["attachments"]
+        self.assertEqual(attachments[0]["content-disposition"], "")
 
     def test_from_bytes(self):
         if six.PY2:
@@ -489,7 +495,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(result, list)
 
         result = mail.timezone
-        self.assertEqual(result, "+1")
+        self.assertEqual(result, "+1.0")
 
     def test_get_to_domains(self):
         m = mailparser.parse_from_file(mail_test_6)
@@ -508,11 +514,14 @@ class TestMailParser(unittest.TestCase):
     def test_convert_mail_date(self):
         s = "Mon, 20 Mar 2017 05:12:54 +0600"
         d, t = convert_mail_date(s)
-        self.assertEqual(t, "+6")
+        self.assertEqual(t, "+6.0")
         self.assertEqual(str(d), "2017-03-19 23:12:54")
         s = "Mon, 20 Mar 2017 05:12:54 -0600"
         d, t = convert_mail_date(s)
-        self.assertEqual(t, "-6")
+        self.assertEqual(t, "-6.0")
+        s = "Mon, 11 Dec 2017 15:27:44 +0530"
+        d, t = convert_mail_date(s)
+        self.assertEqual(t, "+5.5")
 
     def test_ported_string(self):
         raw_data = ""

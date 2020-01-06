@@ -366,6 +366,10 @@ class MailParser(object):
                     content_id = ported_string(p.get('content-id'))
                     log.debug("content-id {!r} part {!r}".format(
                         content_id, i))
+                    content_disposition = ported_string(
+                        p.get('content-disposition'))
+                    log.debug("content-disposition {!r} part {!r}".format(
+                        content_disposition, i))
 
                     if transfer_encoding == "base64" or (
                        transfer_encoding == "quoted-\
@@ -388,6 +392,7 @@ class MailParser(object):
                         "binary": binary,
                         "mail_content_type": mail_content_type,
                         "content-id": content_id,
+                        "content-disposition": content_disposition,
                         "charset": charset_raw,
                         "content_transfer_encoding": transfer_encoding})
                 else:

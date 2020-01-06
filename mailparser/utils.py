@@ -344,8 +344,9 @@ def convert_mail_date(date):
     t = email.utils.mktime_tz(d)
     log.debug("Date parsed in timestamp: {!r}".format(t))
     date_utc = datetime.datetime.utcfromtimestamp(t)
-    timezone = d[9] / 3600 if d[9] else 0
-    timezone = "{:+.0f}".format(timezone)
+    timezone = d[9] / 3600.0 if d[9] else 0
+    timezone = "{:+.1f}".format(timezone)
+    log.debug("Calculated timezone: {!r}".format(timezone))
     return date_utc, timezone
 
 
@@ -507,7 +508,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
-                payload = i["payload"].decode("base64")
+                payload = base64.b64decode(i["payload"])
             else:
                 payload = i["payload"]
 
