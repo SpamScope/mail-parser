@@ -41,6 +41,7 @@ setup(
     license="Apache License, Version 2.0",
     url="https://github.com/SpamScope/mail-parser",
     long_description=long_description,
+    long_description_content_type="text/markdown",
     version=__version__,
     author="Fedele Mantuano",
     author_email="mantuano.fedele@gmail.com",
