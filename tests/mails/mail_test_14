@@ -1,0 +1,31 @@
+From: example@example.com
+Subject: Test
+Date: Wed, 24 Apr 2019 10:05:02 +0200 (CEST)
+Mime-Version: 1.0
+Content-Type: multipart/mixed; boundary="===============8544575414772382491=="
+To: rcpt@example.com
+
+--===============8544575414772382491==
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+<!doctype html>
+<title>Foo</title>
+<meta charset="utf-8">
+
+HTML here
+
+--===============8544575414772382491==
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-Disposition: inline
+
+UE5HIGhlcmU=
+--===============8544575414772382491==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+Plaintext here.
+--===============8544575414772382491==--

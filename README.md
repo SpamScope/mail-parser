@@ -30,6 +30,8 @@ mail-parser supports Python 3.
 
 ## mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
+ - [FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)
+ - [Arch User Repository](https://aur.archlinux.org/packages/mailparser/)
 
 
 ## Description
@@ -57,6 +59,16 @@ There are other properties to get:
   - sender IP address
   - to domains
   - timezone
+
+The `attachments` property is a list of objects. Every object has the following keys:
+  - binary: it's true if the attachment is a binary
+  - charset
+  - content_transfer_encoding
+  - content-disposition
+  - content-id
+  - filename
+  - mail_content_type
+  - payload: attachment payload in base64
 
 To get custom headers you should replace "-" with "\_".
 Example for header `X-MSMail-Priority`:
@@ -171,6 +183,7 @@ mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
 mail.text_html: only text html mail parts in a list
+mail.text_not_managed: all not managed text (check the warning logs to find content subtype)
 mail.to
 mail.to_domains
 mail.timezone: returns the timezone, offset from UTC
