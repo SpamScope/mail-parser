@@ -183,6 +183,7 @@ mail.received
 mail.subject
 mail.text_plain: only text plain mail parts in a list
 mail.text_html: only text html mail parts in a list
+mail.text_not_managed: all not managed text (check the warning logs to find content subtype)
 mail.to
 mail.to_domains
 mail.timezone: returns the timezone, offset from UTC

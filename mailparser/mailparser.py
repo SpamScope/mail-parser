@@ -246,6 +246,7 @@ class MailParser(object):
         self._attachments = []
         self._text_plain = []
         self._text_html = []
+        self._text_not_managed = []
         self._defects = []
         self._defects_categories = set()
         self._has_defects = False
@@ -352,6 +353,7 @@ class MailParser(object):
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
 
+                # this is an attachment
                 if filename:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
@@ -395,6 +397,8 @@ class MailParser(object):
                         "content-disposition": content_disposition,
                         "charset": charset_raw,
                         "content_transfer_encoding": transfer_encoding})
+
+                # this isn't an attachments
                 else:
                     log.debug("Email part {!r} is not an attachment".format(i))
                     payload = ported_string(
@@ -402,8 +406,13 @@ class MailParser(object):
                     if payload:
                         if p.get_content_subtype() == 'html':
                             self._text_html.append(payload)
-                        else:
+                        elif p.get_content_subtype() == 'plain':
                             self._text_plain.append(payload)
+                        else:
+                            log.warning(
+                                'Email content {!r} not handled'.format(
+                                    p.get_content_subtype()))
+                            self._text_not_managed.append(payload)
         else:
             # Parsed object mail with all parts
             self._mail = self._make_mail()
@@ -528,7 +537,7 @@ class MailParser(object):
         "--- mail_boundary ---"
         """
         return "\n--- mail_boundary ---\n".join(
-            self.text_plain + self.text_html)
+            self.text_plain + self.text_html + self.text_not_managed)
 
     @property
     def headers(self):
@@ -560,6 +569,13 @@ class MailParser(object):
         Return a list of all text html parts of email.
         """
         return self._text_html
+
+    @property
+    def text_not_managed(self):
+        """
+        Return a list of all text not managed of email.
+        """
+        return self._text_not_managed
 
     @property
     def date(self):
