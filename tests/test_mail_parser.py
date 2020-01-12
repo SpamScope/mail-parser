@@ -59,6 +59,7 @@ mail_test_10 = os.path.join(base_path, 'mails', 'mail_test_10')
 mail_test_11 = os.path.join(base_path, 'mails', 'mail_test_11')
 mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
 mail_test_13 = os.path.join(base_path, 'mails', 'mail_test_13')
+mail_test_14 = os.path.join(base_path, 'mails', 'mail_test_14')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -91,6 +92,13 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.text_html, list)
         self.assertIsInstance(mail.text_html_json, six.text_type)
         self.assertEqual(len(mail.text_html), 1)
+
+    def test_text_not_managed(self):
+        mail = mailparser.parse_from_file(mail_test_14)
+        self.assertIsInstance(mail.text_not_managed, list)
+        self.assertIsInstance(mail.text_not_managed_json, six.text_type)
+        self.assertEqual(len(mail.text_not_managed), 1)
+        self.assertEqual("PNG here", mail.text_not_managed[0])
 
     def test_get_mail_keys(self):
         mail = mailparser.parse_from_file(mail_test_11)
