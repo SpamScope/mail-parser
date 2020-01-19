@@ -87,6 +87,13 @@ class TestMailParser(unittest.TestCase):
             mail_malformed_2,
             mail_malformed_3)
 
+    def test_issue62(self):
+        mail = mailparser.parse_from_file(mail_test_14)
+        received_spf = mail.Received_SPF
+        self.assertIsInstance(received_spf, list)
+        self.assertIn("custom_header1", received_spf)
+        self.assertIn("custom_header2", received_spf)
+
     def test_html_field(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
         self.assertIsInstance(mail.text_html, list)
