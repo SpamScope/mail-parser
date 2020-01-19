@@ -456,12 +456,19 @@ def get_header(message, name):
         name (string): header to get
 
     Returns:
-        decoded header
+        str if there is an header
+        list if there are more than one
     """
-    header = message.get(name)
-    log.debug("Getting header {!r}: {!r}".format(name, header))
-    if header:
-        return decode_header_part(header)
+
+    headers = message.get_all(name)
+    log.debug("Getting header {!r}: {!r}".format(name, headers))
+    if headers:
+        headers = [decode_header_part(i) for i in headers]
+        if len(headers) == 1:
+            # in this case return a string
+            return headers[0]
+        # in this case return a list
+        return headers
     return six.text_type()
 
 

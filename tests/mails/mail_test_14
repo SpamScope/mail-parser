@@ -4,6 +4,8 @@ Date: Wed, 24 Apr 2019 10:05:02 +0200 (CEST)
 Mime-Version: 1.0
 Content-Type: multipart/mixed; boundary="===============8544575414772382491=="
 To: rcpt@example.com
+Received-SPF: custom_header1
+Received-SPF: custom_header2
 
 --===============8544575414772382491==
 Content-Type: text/html; charset=UTF-8
