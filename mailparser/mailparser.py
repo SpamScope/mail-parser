@@ -352,9 +352,12 @@ class MailParser(object):
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
+                content_id = ported_string(p.get('content-id'))
+                log.debug("content-id {!r} part {!r}".format(
+                    content_id, i))
 
                 # this is an attachment
-                if filename:
+                if filename or content_id:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
@@ -365,9 +368,6 @@ class MailParser(object):
                         p.get('content-transfer-encoding', '')).lower()
                     log.debug("Transfer encoding {!r} part {!r}".format(
                         transfer_encoding, i))
-                    content_id = ported_string(p.get('content-id'))
-                    log.debug("content-id {!r} part {!r}".format(
-                        content_id, i))
                     content_disposition = ported_string(
                         p.get('content-disposition'))
                     log.debug("content-disposition {!r} part {!r}".format(
