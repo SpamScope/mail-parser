@@ -348,16 +348,17 @@ class MailParser(object):
         # walk all mail parts
         for i, p in enumerate(parts):
             if not p.is_multipart():
-                filename = decode_header_part(p.get_filename())
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
                 content_id = ported_string(p.get('content-id'))
                 log.debug("content-id {!r} part {!r}".format(
                     content_id, i))
+                filename = decode_header_part(
+                    p.get_filename("{}".format(content_id)))
 
                 # this is an attachment
-                if filename or content_id:
+                if filename:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
