@@ -31,8 +31,10 @@ import functools
 import hashlib
 import logging
 import os
+import random
 import re
 import simplejson as json
+import string
 import subprocess
 import sys
 import tempfile
@@ -558,3 +560,16 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     else:
         with open(sample, "w") as f:
             f.write(payload)
+
+
+def random_string(string_length=10):
+    """ Generate a random string of fixed length
+
+    Keyword Arguments:
+        string_length {int} -- String length (default: {10})
+
+    Returns:
+        str -- Random string
+    """
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(string_length))

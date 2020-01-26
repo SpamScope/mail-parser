@@ -42,6 +42,7 @@ from .utils import (
     ported_open,
     ported_string,
     receiveds_parsing,
+    write_attachments,
 )
 
 from .exceptions import MailParserEnvironmentError
@@ -473,6 +474,16 @@ class MailParser(object):
                         if not ip.is_private:
                             log.debug("IP {!r} not private".format(ip_str))
                             return ip_str
+
+    def write_attachments(self, base_path):
+        """ This method writes the attachments of mail on disk
+
+        Arguments:
+            base_path {str} -- Base path where write the attachments
+        """
+        write_attachments(
+            attachments=self.attachments,
+            base_path=base_path)
 
     def __getattr__(self, name):
         name = name.strip("_").lower()
