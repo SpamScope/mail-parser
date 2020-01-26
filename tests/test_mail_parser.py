@@ -124,6 +124,8 @@ class TestMailParser(unittest.TestCase):
         self.assertNotIn("x-ibm-av-version", mail.mail_partial)
         result = mail.mail_partial_json
         self.assertIsInstance(result, six.text_type)
+        nr_attachments = len(mail._attachments)
+        self.assertEqual(nr_attachments, 4)
 
     def test_not_parsed_received(self):
         mail = mailparser.parse_from_file(mail_test_9)
