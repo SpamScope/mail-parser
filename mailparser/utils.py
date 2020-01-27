@@ -31,8 +31,10 @@ import functools
 import hashlib
 import logging
 import os
+import random
 import re
 import simplejson as json
+import string
 import subprocess
 import sys
 import tempfile
@@ -456,12 +458,19 @@ def get_header(message, name):
         name (string): header to get
 
     Returns:
-        decoded header
+        str if there is an header
+        list if there are more than one
     """
-    header = message.get(name)
-    log.debug("Getting header {!r}: {!r}".format(name, header))
-    if header:
-        return decode_header_part(header)
+
+    headers = message.get_all(name)
+    log.debug("Getting header {!r}: {!r}".format(name, headers))
+    if headers:
+        headers = [decode_header_part(i) for i in headers]
+        if len(headers) == 1:
+            # in this case return a string
+            return headers[0]
+        # in this case return a list
+        return headers
     return six.text_type()
 
 
@@ -551,3 +560,16 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     else:
         with open(sample, "w") as f:
             f.write(payload)
+
+
+def random_string(string_length=10):
+    """ Generate a random string of fixed length
+
+    Keyword Arguments:
+        string_length {int} -- String length (default: {10})
+
+    Returns:
+        str -- Random string
+    """
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(string_length))

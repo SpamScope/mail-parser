@@ -187,7 +187,13 @@ mail.text_not_managed: all not managed text (check the warning logs to find cont
 mail.to
 mail.to_domains
 mail.timezone: returns the timezone, offset from UTC
-mail_partial: returns only the mains parts of emails
+mail.mail_partial: returns only the mains parts of emails
+```
+
+It's possible to write the attachments on disk with the method:
+
+```
+mail.write_attachments(base_path)
 ```
 
 ## Usage from command-line
