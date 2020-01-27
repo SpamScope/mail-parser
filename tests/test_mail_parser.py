@@ -20,6 +20,7 @@ limitations under the License.
 import datetime
 import logging
 import os
+import shutil
 import six
 import sys
 import unittest
@@ -42,6 +43,7 @@ from mailparser.utils import (
     ported_string,
     receiveds_parsing,
     parse_received,
+    random_string,
 )
 
 from mailparser.exceptions import MailParserEnvironmentError
@@ -87,6 +89,27 @@ class TestMailParser(unittest.TestCase):
             mail_malformed_2,
             mail_malformed_3)
 
+    def test_write_attachments(self):
+        attachments = [
+            "<_1_0B4E44A80B15F6FC005C1243C12580DD>",
+            "<_1_0B4E420C0B4E3DD0005C1243C12580DD>",
+            "<_1_0B4E24640B4E1564005C1243C12580DD>",
+            "Move To Eight ZWEP6227F.pdf"]
+        random_path = os.path.join(root, "tests", random_string())
+        mail = mailparser.parse_from_file(mail_test_10)
+        os.makedirs(random_path)
+        mail.write_attachments(random_path)
+        for i in attachments:
+            self.assertTrue(os.path.exists(os.path.join(random_path, i)))
+        shutil.rmtree(random_path)
+
+    def test_issue62(self):
+        mail = mailparser.parse_from_file(mail_test_14)
+        received_spf = mail.Received_SPF
+        self.assertIsInstance(received_spf, list)
+        self.assertIn("custom_header1", received_spf)
+        self.assertIn("custom_header2", received_spf)
+
     def test_html_field(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
         self.assertIsInstance(mail.text_html, list)
@@ -117,6 +140,8 @@ class TestMailParser(unittest.TestCase):
         self.assertNotIn("x-ibm-av-version", mail.mail_partial)
         result = mail.mail_partial_json
         self.assertIsInstance(result, six.text_type)
+        nr_attachments = len(mail._attachments)
+        self.assertEqual(nr_attachments, 4)
 
     def test_not_parsed_received(self):
         mail = mailparser.parse_from_file(mail_test_9)
