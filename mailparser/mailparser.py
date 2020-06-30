@@ -22,6 +22,7 @@ import email
 import logging
 import os
 
+import uuid
 import ipaddress
 import six
 import simplejson as json
