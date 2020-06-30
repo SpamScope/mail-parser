@@ -434,7 +434,7 @@ class MailParser(object):
                 payload = p.get_payload(decode=False)[0]
                 mail_content_type = ported_string(p.get_content_type())
                 self._attachments.append({
-                    "filename": filename if filename else uuid.uuid4(),
+                    "filename": filename if filename else str(uuid.uuid4()),
                     "payload": payload,
                     "mail_content_type": mail_content_type,
                     "content-id": content_id,
