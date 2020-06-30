@@ -27,6 +27,7 @@ from unicodedata import normalize
 import base64
 import datetime
 import email
+import email.generator
 import functools
 import hashlib
 import logging
@@ -531,14 +532,15 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 def write_attachments(attachments, base_path):  # pragma: no cover
     for a in attachments:
         write_sample(
-            binary=a["binary"],
+            binary=a.get("binary", None),
             payload=a["payload"],
             path=base_path,
             filename=a["filename"],
+            message=a.get("message", False)
         )
 
 
-def write_sample(binary, payload, path, filename):  # pragma: no cover
+def write_sample(binary, payload, path, filename, message):  # pragma: no cover
     """
     This function writes a sample on file system.
 
@@ -554,12 +556,17 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
 
     sample = os.path.join(path, filename)
 
-    if binary:
-        with open(sample, "wb") as f:
-            f.write(base64.b64decode(payload))
-    else:
+    if message:
         with open(sample, "w") as f:
-            f.write(payload)
+            gen = email.generator.Generator(f)
+            gen.flatten(payload)
+    else:
+        if binary:
+            with open(sample, "wb") as f:
+                f.write(base64.b64decode(payload))
+        else:
+            with open(sample, "w") as f:
+                f.write(payload)
 
 
 def random_string(string_length=10):

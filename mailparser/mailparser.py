@@ -308,6 +308,15 @@ class MailParser(object):
             mail["defects_categories"] = list(self.defects_categories)
 
         return mail
+    
+
+    def walk(self, msg, parent=None):
+        if not parent or parent.get_content_type() != "message/rfc822":
+            yield msg
+            if msg.is_multipart():
+                for subpart in msg.get_payload():
+                    yield from self.walk(subpart, parent=msg)        
+
 
     def parse(self):
         """
@@ -325,7 +334,7 @@ class MailParser(object):
         parts = []  # Normal parts plus defects
 
         # walk all mail parts to search defects
-        for p in self.message.walk():
+        for p in self.walk(self.message):
             part_content_type = p.get_content_type()
             self._append_defects(p, part_content_type)
             parts.append(p)
@@ -415,6 +424,23 @@ class MailParser(object):
                                 'Email content {!r} not handled'.format(
                                     p.get_content_subtype()))
                             self._text_not_managed.append(payload)
+            elif p.get_content_type() in ["message/rfc822"]:
+                content_id = ported_string(p.get('content-id'))
+                content_disposition = ported_string(p.get('content-disposition'))
+                charset_raw = p.get_content_charset()
+                filename = decode_header_part(p.get_filename("{}".format(content_id)))
+                transfer_encoding = ported_string(p.get('content-transfer-encoding', '')).lower()
+                payload = p.get_payload(decode=False)[0]
+                mail_content_type = ported_string(p.get_content_type())
+                self._attachments.append({
+                    "filename": filename if filename else uuid.uuid4(),
+                    "payload": payload,
+                    "mail_content_type": mail_content_type,
+                    "content-id": content_id,
+                    "content-disposition": content_disposition,
+                    "charset": charset_raw,
+                    "content_transfer_encoding": transfer_encoding,
+                    "message": True})
         else:
             # Parsed object mail with all parts
             self._mail = self._make_mail()
