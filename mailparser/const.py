@@ -51,7 +51,7 @@ RECEIVED_PATTERNS = [
         r'envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))'
     ),
     (
-        r'[^\w](?:\s+id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'(?:\s+id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+by|\s+with'
         r'(?! cipher)|\s+for|\s+via|;))'
     ),
