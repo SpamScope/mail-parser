@@ -33,7 +33,7 @@ RECEIVED_PATTERNS = [
 
     # need the beginning or space to differentiate from envelope-from
     (
-        r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?'
+        r'(?:(?:^)from\s+(?P<from>.+?)(?:\s*[(]?'
         r'envelope-from|\s*[(]?envelope-sender|\s+'
         r'by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
