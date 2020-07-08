@@ -42,7 +42,7 @@ RECEIVED_PATTERNS = [
     # envelope-from and -sender seem to optionally have space and/or
     # ( before them other clauses must have whitespace before
     (
-        r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'(?:\sby\s(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+with'
         r'(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
