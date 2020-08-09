@@ -71,7 +71,10 @@ RECEIVED_PATTERNS = [
     r'(?:envelope-sender\s+<(?P<envelope_sender>.+?)>)',
 
     # datetime comes after ; at the end
-    r';\s*(?P<date>.*)'
+    r';\s*(?P<date>.*)',
+    
+    # sendgrid datetime
+    r'(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+'
 ]
 
 RECEIVED_COMPILED_LIST = [
