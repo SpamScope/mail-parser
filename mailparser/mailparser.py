@@ -403,8 +403,18 @@ class MailParser(object):
                 # this isn't an attachments
                 else:
                     log.debug("Email part {!r} is not an attachment".format(i))
-                    payload = ported_string(
-                        p.get_payload(decode=True), encoding=charset)
+
+                    # Get the payload using get_payload method with decode=True
+                    # As Python truly decodes only 'base64', 'quoted-printable', 'x-uuencode', 'uuencode', 'uue', 'x-uue'
+                    # And for other encodings it breaks the characters so we need to decode them with encoding python is appying
+                    # To maintain the characters
+                    payload = p.get_payload(decode=True)
+                    cte = p.get_content_type().lower()
+                    if cte in ['base64', 'quoted-printable', 'x-uuencode', 'uuencode', 'uue', 'x-uue']:
+                        payload = ported_string(payload, encoding=charset)
+                    else:
+                        payload = payload.decode('raw-unicode-escape')
+
                     if payload:
                         if p.get_content_subtype() == 'html':
                             self._text_html.append(payload)
