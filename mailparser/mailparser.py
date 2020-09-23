@@ -359,7 +359,7 @@ class MailParser(object):
                 filename = p.get_filename()
 
                 # this is an attachment
-                if filename or content_id:
+                if filename:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
