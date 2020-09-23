@@ -358,8 +358,19 @@ class MailParser(object):
                     content_disposition, i))
                 filename = p.get_filename()
 
-                # this is an attachment
+                # Check if there is a filename present then its an attachment
+                # Check if there is no filename but content id is present then
+                # check again if content sub type is not html or plain to make
+                # sure it can be treated as attachment
+                is_attachment = False
                 if filename:
+                    is_attachment = True
+                else:
+                    if content_id and p.get_content_subtype() not in ['html', 'plain']:
+                        is_attachment = True
+
+                # this is an attachment
+                if is_attachment:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
