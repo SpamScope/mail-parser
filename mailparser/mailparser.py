@@ -359,7 +359,7 @@ class MailParser(object):
                 filename = p.get_filename()
 
                 # this is an attachment
-                if filename:
+                if filename or content_id:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
@@ -410,10 +410,10 @@ class MailParser(object):
                     # To maintain the characters
                     payload = p.get_payload(decode=True)
                     cte = p.get_content_type().lower()
-                    if cte in ['base64', 'quoted-printable', 'x-uuencode', 'uuencode', 'uue', 'x-uue']:
-                        payload = ported_string(payload, encoding=charset)
-                    else:
+                    if cte in ['7bit', '8bit']:
                         payload = payload.decode('raw-unicode-escape')
+                    else:
+                        payload = ported_string(payload, encoding=charset)
 
                     if payload:
                         if p.get_content_subtype() == 'html':
