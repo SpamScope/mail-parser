@@ -12,4 +12,5 @@ mail_parser.egg-info/
 venv
 venv27
 venv3
+venv-mailparser
 report/
