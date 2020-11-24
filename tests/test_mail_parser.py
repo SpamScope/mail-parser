@@ -18,11 +18,13 @@ limitations under the License.
 """
 
 import datetime
+import hashlib
 import logging
 import os
 import shutil
 import six
 import sys
+import tempfile
 import unittest
 
 base_path = os.path.realpath(os.path.dirname(__file__))
@@ -62,6 +64,7 @@ mail_test_11 = os.path.join(base_path, 'mails', 'mail_test_11')
 mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
 mail_test_13 = os.path.join(base_path, 'mails', 'mail_test_13')
 mail_test_14 = os.path.join(base_path, 'mails', 'mail_test_14')
+mail_test_15 = os.path.join(base_path, 'mails', 'mail_test_15')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -658,6 +661,15 @@ class TestMailParser(unittest.TestCase):
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
+    def test_write_uuencode_attachment(self):
+        mail = mailparser.parse_from_file(mail_test_15)
+        temp_dir = tempfile.mkdtemp()
+        mail.write_attachments(temp_dir)
+        md5 = hashlib.md5()
+        with open(os.path.join(temp_dir, 'REQUEST FOR QUOTE.zip'), 'rb') as f:
+            md5.update(f.read())
+        shutil.rmtree(temp_dir)
+        self.assertEqual(md5.hexdigest(), '4f2cf891e7cfb349fca812091f184ecc')
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
