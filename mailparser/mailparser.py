@@ -18,6 +18,7 @@ limitations under the License.
 """
 
 from __future__ import unicode_literals
+import base64
 import email
 import logging
 import os
@@ -383,6 +384,14 @@ class MailParser(object):
                         binary = True
                         log.debug("Filename {!r} part {!r} is binary".format(
                             filename, i))
+                    elif "uuencode" in transfer_encoding:
+                        # Re-encode in base64
+                        payload = base64.b64encode(
+                            p.get_payload(decode=True)).decode('ascii')
+                        binary = True
+                        transfer_encoding = "base64"
+                        log.debug("Filename {!r} part {!r} is binary (uuencode"
+                                  " re-encoded to base64)".format(filename, i))
                     else:
                         payload = ported_string(
                             p.get_payload(decode=True), encoding=charset)
