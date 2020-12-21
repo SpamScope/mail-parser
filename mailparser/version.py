@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "3.12.0"
+__version__ = "3.14.0"
 
 if __name__ == "__main__":
     print(__version__)
