@@ -420,7 +420,9 @@ class MailParser(object):
                     # And for other encodings it breaks the characters so we need to decode them with encoding python is appying
                     # To maintain the characters
                     payload = p.get_payload(decode=True)
-                    cte = p.get_content_type().lower()
+                    cte = p.get('Content-Transfer-Encoding')
+                    if cte:
+                        cte = cte.lower()
                     if cte in ['7bit', '8bit']:
                         payload = payload.decode('raw-unicode-escape')
                     else:
