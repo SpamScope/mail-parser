@@ -290,7 +290,15 @@ def parse_received(received):
     if len(values_by_clause) == 0:
         # we weren't able to match anything...
         msg = "Unable to match any clauses in %s" % (received)
-        log.error(msg)
+
+        # Modification #1: Commenting the following log as this raised exception is caught above and then raw header is updated in response
+        # We dont want to get so many errors in our error logger as we are not even trying to parse the received headers
+        # Wanted to make it configurable via settiings, but this package does not depend on django and making configurable setting
+        # will make it django dependent, so better to keep it working with only python dependent and on any framework of python
+        # commenting it just for our use
+
+        # log.error(msg)
+
         raise MailParserReceivedParsingError(msg)
     return values_by_clause
 

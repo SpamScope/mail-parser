@@ -353,14 +353,25 @@ class MailParser(object):
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
+                content_disposition = ported_string(p.get('content-disposition'))
                 content_id = ported_string(p.get('content-id'))
-                log.debug("content-id {!r} part {!r}".format(
-                    content_id, i))
-                filename = decode_header_part(
-                    p.get_filename("{}".format(content_id)))
+                log.debug("content-disposition {!r} part {!r}".format(
+                    content_disposition, i))
+                filename = p.get_filename()
+
+                # Check if there is a filename present then its an attachment
+                # Check if there is no filename but content id is present then
+                # check again if content sub type is not html or plain to make
+                # sure it can be treated as attachment
+                is_attachment = False
+                if filename:
+                    is_attachment = True
+                else:
+                    if content_id and p.get_content_subtype() not in ['html', 'plain']:
+                        is_attachment = True
 
                 # this is an attachment
-                if filename:
+                if is_attachment:
                     log.debug("Email part {!r} is an attachment".format(i))
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
@@ -412,8 +423,20 @@ class MailParser(object):
                 # this isn't an attachments
                 else:
                     log.debug("Email part {!r} is not an attachment".format(i))
-                    payload = ported_string(
-                        p.get_payload(decode=True), encoding=charset)
+
+                    # Get the payload using get_payload method with decode=True
+                    # As Python truly decodes only 'base64', 'quoted-printable', 'x-uuencode', 'uuencode', 'uue', 'x-uue'
+                    # And for other encodings it breaks the characters so we need to decode them with encoding python is appying
+                    # To maintain the characters
+                    payload = p.get_payload(decode=True)
+                    cte = p.get('Content-Transfer-Encoding')
+                    if cte:
+                        cte = cte.lower()
+                    if not cte or cte in ['7bit', '8bit']:
+                        payload = payload.decode('raw-unicode-escape')
+                    else:
+                        payload = ported_string(payload, encoding=charset)
+
                     if payload:
                         if p.get_content_subtype() == 'html':
                             self._text_html.append(payload)
