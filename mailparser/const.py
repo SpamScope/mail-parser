@@ -33,7 +33,7 @@ RECEIVED_PATTERNS = [
 
     # need the beginning or space to differentiate from envelope-from
     (
-        r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?'
+        r'(?:(?:^)from\s+(?P<from>.+?)(?:\s*[(]?'
         r'envelope-from|\s*[(]?envelope-sender|\s+'
         r'by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
@@ -42,7 +42,7 @@ RECEIVED_PATTERNS = [
     # envelope-from and -sender seem to optionally have space and/or
     # ( before them other clauses must have whitespace before
     (
-        r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'(?:\sby\s(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+with'
         r'(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
@@ -51,7 +51,7 @@ RECEIVED_PATTERNS = [
         r'envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))'
     ),
     (
-        r'[^\w](?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'(?:\s+id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+by|\s+with'
         r'(?! cipher)|\s+for|\s+via|;))'
     ),
