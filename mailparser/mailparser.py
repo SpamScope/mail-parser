@@ -353,7 +353,8 @@ class MailParser(object):
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
-                content_disposition = ported_string(p.get('content-disposition'))
+                content_disposition = ported_string(
+                    p.get('content-disposition'))
                 content_id = ported_string(p.get('content-id'))
                 log.debug("content-disposition {!r} part {!r}".format(
                     content_disposition, i))
@@ -367,8 +368,10 @@ class MailParser(object):
                 if filename:
                     is_attachment = True
                 else:
-                    if content_id and p.get_content_subtype() not in ['html', 'plain']:
+                    if content_id and \
+                            p.get_content_subtype() not in ['html', 'plain']:
                         is_attachment = True
+                        filename = content_id
 
                 # this is an attachment
                 if is_attachment:
@@ -425,8 +428,11 @@ class MailParser(object):
                     log.debug("Email part {!r} is not an attachment".format(i))
 
                     # Get the payload using get_payload method with decode=True
-                    # As Python truly decodes only 'base64', 'quoted-printable', 'x-uuencode', 'uuencode', 'uue', 'x-uue'
-                    # And for other encodings it breaks the characters so we need to decode them with encoding python is appying
+                    # As Python truly decodes only 'base64',
+                    # 'quoted-printable', 'x-uuencode',
+                    # 'uuencode', 'uue', 'x-uue'
+                    # And for other encodings it breaks the characters so
+                    # we need to decode them with encoding python is appying
                     # To maintain the characters
                     payload = p.get_payload(decode=True)
                     cte = p.get('Content-Transfer-Encoding')

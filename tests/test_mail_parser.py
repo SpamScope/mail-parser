@@ -200,14 +200,14 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_1)
         md5, sha1, sha256, sha512 = fingerprints(
             mail.body.encode("utf-8"))
-        self.assertEqual(md5, "1bbdb7dcf511113bbc0c1b214aeac392")
-        self.assertEqual(sha1, "ce9e62b50fa4e2168278880b14460b905b24eb4b")
-        self.assertEqual(sha256, ("1e9b96e3f1bc74702f9703391e8ba0715b849"
-                                  "7127a7ff857013ab33385898574"))
-        self.assertEqual(sha512, ("ad858f7b5ec5549e55650fd13df7683e403489"
-                                  "77522995851fb6b625ac54744cf3a4bf652784"
-                                  "dba971ef99afeec4e6caf2fdd10be72eabb730"
-                                  "c312ffbe1c4de3"))
+        self.assertEqual(md5, "55852a2efe95e7249887c92cc02123f8")
+        self.assertEqual(sha1, "62fef1e38327ed09363624c3aff8ea11723ee05f")
+        self.assertEqual(sha256, ("cd4af1017f2e623f6d38f691048b6"
+                                  "a28d8b1f44a0478137b4337eac6de78f71a"))
+        self.assertEqual(sha512, ("4a573c7929b078f2a2c1c0f869d418b0c020d4"
+                                  "d37196bd6dcc209f9ccb29ca67355aa5e47b97"
+                                  "c8bf90377204f59efde7ba1fc071b6f250a665"
+                                  "72f63b997e92e8"))
 
     def test_fingerprints_unicodeencodeerror(self):
         mail = mailparser.parse_from_file(mail_test_7)
@@ -564,11 +564,7 @@ class TestMailParser(unittest.TestCase):
         s = ported_string(raw_data)
         self.assertEqual(s, six.text_type())
 
-        raw_data = "test "
-        s = ported_string(raw_data)
-        self.assertEqual(s, "test")
-
-        raw_data = u"test "
+        raw_data = u"test"
         s = ported_string(raw_data)
         self.assertEqual(s, "test")
 
@@ -670,6 +666,7 @@ class TestMailParser(unittest.TestCase):
             md5.update(f.read())
         shutil.rmtree(temp_dir)
         self.assertEqual(md5.hexdigest(), '4f2cf891e7cfb349fca812091f184ecc')
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
