@@ -8,8 +8,6 @@
 
 # mail-parser
 
-## Overview
-
 mail-parser is not only a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library.
 It give you an easy way to pass from raw mail to Python object that you can use in your code.
 It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
@@ -28,15 +26,25 @@ $ apt-cache show libemail-outlook-message-perl
 
 mail-parser supports Python 3.
 
-## mail-parser on Web
+
+## Apache 2 Open Source License
+mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
+
+If you want support the project:
+
+
+[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+
+
+# mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
  - [FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)
  - [Arch User Repository](https://aur.archlinux.org/packages/mailparser/)
 
 
-## Description
+# Description
 
-mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of 
+mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of
 [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml):
 
   - bcc
@@ -107,27 +115,18 @@ $ mail.to_raw (raw header)
 
 The command line tool use the JSON format.
 
-### Defects
+## Defects
 These defects can be used to evade the antispam filter. An example are the mails with a malformed boundary that can hide a not legitimate epilogue (often malware).
 This library can take these epilogues.
 
 
-### Apache 2 Open Source License
-mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
+# Authors
 
-If you want support the project:
-
-
-[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
-
-
-## Authors
-
-### Main Author
+## Main Author
 **Fedele Mantuano**: [LinkedIn](https://www.linkedin.com/in/fmantuano/)
 
 
-## Installation
+# Installation
 
 Clone repository
 
@@ -149,7 +148,7 @@ or use `pip`:
 $ pip install mail-parser
 ```
 
-## Usage in a project
+# Usage in a project
 
 Import `mailparser` module:
 
@@ -196,7 +195,7 @@ It's possible to write the attachments on disk with the method:
 mail.write_attachments(base_path)
 ```
 
-## Usage from command-line
+# Usage from command-line
 
 If you installed mailparser with `pip` or `setup.py` you can use it with command-line.
 
@@ -216,7 +215,7 @@ optional arguments:
   -s STRING, --string STRING
                         Raw email string (default: None)
   -k, --stdin           Enable parsing from stdin (default: False)
-  -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}                                                                                          
+  -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Set log level (default: WARNING)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
@@ -253,11 +252,11 @@ $ mailparser -f example_mail -j
 
 This example will show you the tokenized mail in a JSON pretty format.
 
-From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to 
+From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to
 [parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).
 
 
-## Exceptions
+# Exceptions
 
 Exceptions hierarchy of mail-parser:
 
