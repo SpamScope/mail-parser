@@ -35,6 +35,10 @@ If you want support the project:
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
+![Bitcoin Donate](https://i.stack.imgur.com/MnQ6V.png)
+
+![](https://github.com/SpamScope/mail-parser/raw/develop/docs/bitcoin-qrcode.png)
+
 
 # mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
