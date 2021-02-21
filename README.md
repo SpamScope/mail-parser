@@ -27,7 +27,7 @@ $ apt-cache show libemail-outlook-message-perl
 mail-parser supports Python 3.
 
 
-## Apache 2 Open Source License
+# Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
 If you want support the project:
