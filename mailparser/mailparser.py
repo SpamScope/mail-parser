@@ -358,7 +358,7 @@ class MailParser(object):
                 content_id = ported_string(p.get('content-id'))
                 log.debug("content-disposition {!r} part {!r}".format(
                     content_disposition, i))
-                filename = p.get_filename()
+                filename = decode_header_part(p.get_filename())
 
                 # Check if there is a filename present then its an attachment
                 # Check if there is no filename but content id is present then
