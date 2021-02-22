@@ -42,6 +42,7 @@ from .utils import (
     msgconvert,
     ported_open,
     ported_string,
+    random_string,
     receiveds_parsing,
     write_attachments,
 )
@@ -355,23 +356,26 @@ class MailParser(object):
                 log.debug("Charset {!r} part {!r}".format(charset, i))
                 content_disposition = ported_string(
                     p.get('content-disposition'))
-                content_id = ported_string(p.get('content-id'))
                 log.debug("content-disposition {!r} part {!r}".format(
                     content_disposition, i))
+                content_id = ported_string(p.get('content-id'))
+                log.debug("content-id {!r} part {!r}".format(
+                    content_id, i))
+                content_subtype = ported_string(p.get_content_subtype())
+                log.debug("content subtype {!r} part {!r}".format(
+                    content_subtype, i))
                 filename = decode_header_part(p.get_filename())
 
-                # Check if there is a filename present then its an attachment
-                # Check if there is no filename but content id is present then
-                # check again if content sub type is not html or plain to make
-                # sure it can be treated as attachment
                 is_attachment = False
                 if filename:
                     is_attachment = True
                 else:
-                    if content_id and \
-                            p.get_content_subtype() not in ['html', 'plain']:
+                    if content_id and content_subtype not in ('html', 'plain'):
                         is_attachment = True
                         filename = content_id
+                    elif content_subtype in ('rtf'):
+                        is_attachment = True
+                        filename = "{}.rtf".format(random_string())
 
                 # this is an attachment
                 if is_attachment:
