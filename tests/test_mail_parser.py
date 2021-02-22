@@ -456,7 +456,7 @@ class TestMailParser(unittest.TestCase):
         m = mailparser.parse_from_file_msg(mail_outlook_1)
         email = m.mail
         self.assertIn("attachments", email)
-        self.assertEqual(len(email["attachments"]), 5)
+        self.assertEqual(len(email["attachments"]), 6)
         self.assertIn("from", email)
         self.assertEqual(email["from"][0][1], "NueblingV@w-vwa.de")
         self.assertIn("subject", email)
