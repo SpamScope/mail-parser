@@ -65,16 +65,18 @@ RECEIVED_PATTERNS = [
         r'envelope-from|\s*[(]?envelope-sender|\s+'
         r'from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))'
     ),
-
     # assumes emails are always inside <>
     r'(?:envelope-from\s+<(?P<envelope_from>.+?)>)',
     r'(?:envelope-sender\s+<(?P<envelope_sender>.+?)>)',
 
     # datetime comes after ; at the end
     r';\s*(?P<date>.*)',
-    
+
     # sendgrid datetime
-    r'(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+'
+    (
+        r'(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:'
+        r'\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+'
+    )
 ]
 
 RECEIVED_COMPILED_LIST = [
