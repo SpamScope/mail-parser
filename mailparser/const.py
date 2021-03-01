@@ -33,7 +33,7 @@ RECEIVED_PATTERNS = [
 
     # need the beginning or space to differentiate from envelope-from
     (
-        r'(?:(?:^)from\s+(?P<from>.+?)(?:\s*[(]?'
+        r'(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?'
         r'envelope-from|\s*[(]?envelope-sender|\s+'
         r'by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
@@ -42,7 +42,7 @@ RECEIVED_PATTERNS = [
     # envelope-from and -sender seem to optionally have space and/or
     # ( before them other clauses must have whitespace before
     (
-        r'(?:\sby\s(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'(?:by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+with'
         r'(?! cipher)|\s+id|\s+for|\s+via|;))'
     ),
@@ -51,7 +51,7 @@ RECEIVED_PATTERNS = [
         r'envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))'
     ),
     (
-        r'(?:\s+id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
+        r'[^\w](?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*'
         r'[(]?envelope-sender|\s+from|\s+by|\s+with'
         r'(?! cipher)|\s+for|\s+via|;))'
     ),
@@ -65,16 +65,18 @@ RECEIVED_PATTERNS = [
         r'envelope-from|\s*[(]?envelope-sender|\s+'
         r'from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))'
     ),
-
     # assumes emails are always inside <>
     r'(?:envelope-from\s+<(?P<envelope_from>.+?)>)',
     r'(?:envelope-sender\s+<(?P<envelope_sender>.+?)>)',
 
     # datetime comes after ; at the end
     r';\s*(?P<date>.*)',
-    
+
     # sendgrid datetime
-    r'(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+'
+    (
+        r'(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:'
+        r'\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+'
+    )
 ]
 
 RECEIVED_COMPILED_LIST = [

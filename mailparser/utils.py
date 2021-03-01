@@ -102,19 +102,19 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
         return six.text_type()
 
     if isinstance(raw_data, six.text_type):
-        return raw_data.strip()
+        return raw_data
 
     if six.PY2:
         try:
-            return six.text_type(raw_data, encoding, errors).strip()
+            return six.text_type(raw_data, encoding, errors)
         except LookupError:
-            return six.text_type(raw_data, "utf-8", errors).strip()
+            return six.text_type(raw_data, "utf-8", errors)
 
     if six.PY3:
         try:
-            return six.text_type(raw_data, encoding).strip()
+            return six.text_type(raw_data, encoding)
         except (LookupError, UnicodeDecodeError):
-            return six.text_type(raw_data, "utf-8", errors).strip()
+            return six.text_type(raw_data, "utf-8", errors)
 
 
 def decode_header_part(header):
@@ -142,7 +142,7 @@ def decode_header_part(header):
         log.error("Failed decoding header part: {}".format(header))
         output += header
 
-    return output
+    return output.strip()
 
 
 def ported_open(file_):
@@ -292,10 +292,18 @@ def parse_received(received):
         # we weren't able to match anything...
         msg = "Unable to match any clauses in %s" % (received)
 
-        # Modification #1: Commenting the following log as this raised exception is caught above and then raw header is updated in response
-        # We dont want to get so many errors in our error logger as we are not even trying to parse the received headers
-        # Wanted to make it configurable via settiings, but this package does not depend on django and making configurable setting
-        # will make it django dependent, so better to keep it working with only python dependent and on any framework of python
+        # Modification #1: Commenting the following log as
+        # this raised exception is caught above and then
+        # raw header is updated in response
+        # We dont want to get so many errors in our error
+        # logger as we are not even trying to parse the
+        # received headers
+        # Wanted to make it configurable via settiings,
+        # but this package does not depend on django and
+        # making configurable setting
+        # will make it django dependent,
+        # so better to keep it working with only python
+        # dependent and on any framework of python
         # commenting it just for our use
 
         # log.error(msg)
@@ -477,7 +485,7 @@ def get_header(message, name):
         headers = [decode_header_part(i) for i in headers]
         if len(headers) == 1:
             # in this case return a string
-            return headers[0]
+            return headers[0].strip()
         # in this case return a list
         return headers
     return six.text_type()
@@ -561,7 +569,6 @@ def write_sample(binary, payload, path, filename, message):  # pragma: no cover
     """
     if not os.path.exists(path):
         os.makedirs(path)
-
     sample = os.path.join(path, filename)
 
     if message:
