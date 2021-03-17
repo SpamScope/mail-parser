@@ -32,13 +32,9 @@ mail-parser can be downloaded, used, and modified free of charge. It is availabl
 
 If you want support the project:
 
-
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
-![Bitcoin Donate](https://i.stack.imgur.com/MnQ6V.png)
-
-![](https://github.com/SpamScope/mail-parser/raw/develop/docs/bitcoin-qrcode.png)
-
+[![Donate with Bitcoin](https://en.cryptobadges.io/badge/big/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)](https://en.cryptobadges.io/donate/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)
 
 # mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
