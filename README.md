@@ -30,11 +30,13 @@ mail-parser supports Python 3.
 # Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-If you want support the project:
+## Support the project
 
-[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+**Dogecoin**: `DAUbDUttkf8WN1kwP9YYQQKyEJYY2WWtEG`
 
 [![Donate with Bitcoin](https://en.cryptobadges.io/badge/big/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)](https://en.cryptobadges.io/donate/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)
+
+[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
 # mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
