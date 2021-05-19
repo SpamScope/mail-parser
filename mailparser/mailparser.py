@@ -599,8 +599,8 @@ class MailParser(object):
         Return only the headers as Python object
         """
         d = {}
-        for k, v in self.message.items():
-            d[k] = decode_header_part(v)
+        for i in self.message.keys():
+            d[i] = getattr(self, i)
         return d
 
     @property
