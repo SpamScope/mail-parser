@@ -53,69 +53,74 @@ from .exceptions import MailParserEnvironmentError
 log = logging.getLogger(__name__)
 
 
-def parse_from_file_obj(fp):
+def parse_from_file_obj(fp, log_received_parse_errors=True):
     """
     Parsing email from a file-like object.
 
     Args:
         fp (file-like object): file-like object of raw email
+        log_received_parse_errors (bool): if True then only log error
 
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file_obj(fp)
+    return MailParser.from_file_obj(fp, log_received_parse_errors=log_received_parse_errors)
 
 
-def parse_from_file(fp):
+def parse_from_file(fp, log_received_parse_errors=True):
     """
     Parsing email from file.
 
     Args:
         fp (string): file path of raw email
+        log_received_parse_errors (bool): if True then only log error
 
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file(fp)
+    return MailParser.from_file(fp, log_received_parse_errors=log_received_parse_errors)
 
 
-def parse_from_file_msg(fp):
+def parse_from_file_msg(fp, log_received_parse_errors=True):
     """
     Parsing email from file Outlook msg.
 
     Args:
         fp (string): file path of raw Outlook email
+        log_received_parse_errors (bool): if True then only log error
 
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_file_msg(fp)
+    return MailParser.from_file_msg(fp, log_received_parse_errors=log_received_parse_errors)
 
 
-def parse_from_string(s):
+def parse_from_string(s, log_received_parse_errors=True):
     """
     Parsing email from string.
 
     Args:
         s (string): raw email
+        log_received_parse_errors (bool): if True then only log error
 
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_string(s)
+    return MailParser.from_string(s, log_received_parse_errors=log_received_parse_errors)
 
 
-def parse_from_bytes(bt):
+def parse_from_bytes(bt, log_received_parse_errors=True):
     """
     Parsing email from bytes. Only for Python 3
 
     Args:
         bt (bytes-like object): raw email as bytes-like object
+        log_received_parse_errors (bool): if True then only log error
 
     Returns:
         Instance of MailParser with raw email parsed
     """
-    return MailParser.from_bytes(bt)
+    return MailParser.from_bytes(bt, log_received_parse_errors=log_received_parse_errors)
 
 
 class MailParser(object):
@@ -128,11 +133,12 @@ class MailParser(object):
     https://www.iana.org/assignments/message-headers/message-headers.xhtml
     """
 
-    def __init__(self, message=None):
+    def __init__(self, message=None, log_received_parse_errors=True):
         """
         Init a new object from a message object structure.
         """
         self._message = message
+        self._log_received_parse_errors = log_received_parse_errors
         log.debug(
             "All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
@@ -144,13 +150,14 @@ class MailParser(object):
             return six.text_type()
 
     @classmethod
-    def from_file_obj(cls, fp):
+    def from_file_obj(cls, fp, log_received_parse_errors=True):
         """
         Init a new object from a file-like object.
         Not for Outlook msg.
 
         Args:
             fp (file-like object): file-like object of raw email
+            log_received_parse_errors (bool): if True then only log error
 
         Returns:
             Instance of MailParser
@@ -165,16 +172,17 @@ class MailParser(object):
         finally:
             s = fp.read()
 
-        return cls.from_string(s)
+        return cls.from_string(s, log_received_parse_errors=log_received_parse_errors)
 
     @classmethod
-    def from_file(cls, fp, is_outlook=False):
+    def from_file(cls, fp, is_outlook=False, log_received_parse_errors=True):
         """
         Init a new object from a file path.
 
         Args:
             fp (string): file path of raw email
             is_outlook (boolean): if True is an Outlook email
+            log_received_parse_errors (bool): if True then only log error
 
         Returns:
             Instance of MailParser
@@ -188,31 +196,33 @@ class MailParser(object):
             log.debug("Removing temp converted Outlook email {!r}".format(fp))
             os.remove(fp)
 
-        return cls(message)
+        return cls(message, log_received_parse_errors=log_received_parse_errors)
 
     @classmethod
-    def from_file_msg(cls, fp):
+    def from_file_msg(cls, fp, log_received_parse_errors=True):
         """
         Init a new object from a Outlook message file,
         mime type: application/vnd.ms-outlook
 
         Args:
             fp (string): file path of raw Outlook email
+            log_received_parse_errors (bool): if True then only log error
 
         Returns:
             Instance of MailParser
         """
         log.debug("Parsing email from file Outlook")
         f, _ = msgconvert(fp)
-        return cls.from_file(f, True)
+        return cls.from_file(f, True, log_received_parse_errors=log_received_parse_errors)
 
     @classmethod
-    def from_string(cls, s):
+    def from_string(cls, s, log_received_parse_errors=True):
         """
         Init a new object from a string.
 
         Args:
             s (string): raw email
+            log_received_parse_errors (bool): if True then only log error
 
         Returns:
             Instance of MailParser
@@ -220,15 +230,16 @@ class MailParser(object):
 
         log.debug("Parsing email from string")
         message = email.message_from_string(s)
-        return cls(message)
+        return cls(message, log_received_parse_errors=log_received_parse_errors)
 
     @classmethod
-    def from_bytes(cls, bt):
+    def from_bytes(cls, bt, log_received_parse_errors=True):
         """
         Init a new object from bytes.
 
         Args:
             bt (bytes-like object): raw email as bytes-like object
+            log_received_parse_errors (bool): if True then only log error
 
         Returns:
             Instance of MailParser
@@ -238,7 +249,7 @@ class MailParser(object):
             raise MailParserEnvironmentError(
                 "Parsing from bytes is valid only for Python 3.x version")
         message = email.message_from_bytes(bt)
-        return cls(message)
+        return cls(message, log_received_parse_errors=log_received_parse_errors)
 
     def _reset(self):
         """
@@ -565,7 +576,7 @@ class MailParser(object):
         Return a list of all received headers parsed
         """
         output = self.received_raw
-        return receiveds_parsing(output)
+        return receiveds_parsing(output, _log_received_parse_errors=self._log_received_parse_errors)
 
     @property
     def received_json(self):

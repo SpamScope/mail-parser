@@ -243,7 +243,7 @@ def msgconvert(email):
         os.close(temph)
 
 
-def parse_received(received):
+def parse_received(received, _log_received_parse_errors=True):
     """
     Parse a single received header.
     Return a dictionary of values by clause.
@@ -273,7 +273,10 @@ def parse_received(received):
             # so either there's more than one or the current regex is wrong
             msg = "More than one match found for %s in %s" % (
                 pattern.pattern, received)
-            log.error(msg)
+
+            if _log_received_parse_errors:
+                log.error(msg)
+
             raise MailParserReceivedParsingError(msg)
         else:
             # otherwise we have one matching clause!
@@ -311,7 +314,7 @@ def parse_received(received):
     return values_by_clause
 
 
-def receiveds_parsing(receiveds):
+def receiveds_parsing(receiveds, _log_received_parse_errors=True):
     """
     This function parses the receiveds headers.
 
@@ -332,7 +335,7 @@ def receiveds_parsing(receiveds):
         log.debug("Try to parse {!r}".format(received))
         try:
             # try to parse the current received header...
-            values_by_clause = parse_received(received)
+            values_by_clause = parse_received(received, _log_received_parse_errors=_log_received_parse_errors)
         except MailParserReceivedParsingError:
             # if we can't, let's append the raw
             parsed.append({'raw': received})
