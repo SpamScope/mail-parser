@@ -219,15 +219,19 @@ def msgconvert(email):
     temph, temp = tempfile.mkstemp(prefix="outlook_")
     command = ["msgconvert", "--outfile", temp, email]
 
-    if six.PY2:
-        with open(os.devnull, "w") as devnull:
+    try:
+        if six.PY2:
+            with open(os.devnull, "w") as devnull:
+                out = subprocess.Popen(
+                    command, stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE, stderr=devnull)
+        elif six.PY3:
             out = subprocess.Popen(
                 command, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=devnull)
-    elif six.PY3:
-        out = subprocess.Popen(
-            command, stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+
+    except OSError:
+        raise ValueError
 
     else:
         stdoutdata, _ = out.communicate()
