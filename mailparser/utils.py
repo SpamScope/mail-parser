@@ -230,8 +230,8 @@ def msgconvert(email):
                 command, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-    except OSError:
-        raise ValueError
+    except Exception as e:
+        print(e)
 
     else:
         stdoutdata, _ = out.communicate()
