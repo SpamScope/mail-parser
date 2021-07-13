@@ -219,21 +219,15 @@ def msgconvert(email):
     temph, temp = tempfile.mkstemp(prefix="outlook_")
     command = ["msgconvert", "--outfile", temp, email]
 
-    try:
-        if six.PY2:
-            with open(os.devnull, "w") as devnull:
-                out = subprocess.Popen(
-                    command, stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE, stderr=devnull)
-        elif six.PY3:
+    if six.PY2:
+        with open(os.devnull, "w") as devnull:
             out = subprocess.Popen(
                 command, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
-    except OSError:
-        message = "To use this function you must install 'msgconvert' tool"
-        log.exception(message)
-        raise MailParserOSError(message)
+                stdout=subprocess.PIPE, stderr=devnull)
+    elif six.PY3:
+        out = subprocess.Popen(
+            command, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     else:
         stdoutdata, _ = out.communicate()
