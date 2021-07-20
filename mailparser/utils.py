@@ -231,7 +231,7 @@ def msgconvert(email):
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     except OSError as e:
-        message = "Check if 'msgconvert' tool is installed / %s" % e
+        message = "Check if 'msgconvert' tool is installed / {!r}".format(e)
         log.exception(message)
         raise MailParserOSError(message)
 
