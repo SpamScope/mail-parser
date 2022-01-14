@@ -65,6 +65,7 @@ mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
 mail_test_13 = os.path.join(base_path, 'mails', 'mail_test_13')
 mail_test_14 = os.path.join(base_path, 'mails', 'mail_test_14')
 mail_test_15 = os.path.join(base_path, 'mails', 'mail_test_15')
+mail_test_16 = os.path.join(base_path, 'mails', 'mail_test_16')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -105,6 +106,10 @@ class TestMailParser(unittest.TestCase):
         for i in attachments:
             self.assertTrue(os.path.exists(os.path.join(random_path, i)))
         shutil.rmtree(random_path)
+
+    def test_header_rfc2047_decoding(self):
+        mail = mailparser.parse_from_file(mail_test_16)
+        self.assertEqual(mail._from, [('Moore, Keith', 'moore@cs.utk.edu')])
 
     def test_issue62(self):
         mail = mailparser.parse_from_file(mail_test_14)
