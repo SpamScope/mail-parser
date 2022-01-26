@@ -378,7 +378,9 @@ class MailParser(object):
                 filename = decode_header_part(p.get_filename())
 
                 is_attachment = False
-                if filename:
+                if content_disposition:
+                    is_attachment = True
+                elif filename:
                     is_attachment = True
                 else:
                     if content_id and content_subtype not in ('html', 'plain'):
