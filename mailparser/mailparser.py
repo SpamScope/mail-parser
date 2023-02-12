@@ -19,6 +19,7 @@ limitations under the License.
 
 from __future__ import unicode_literals
 import base64
+import uuid
 import email
 import logging
 import os
