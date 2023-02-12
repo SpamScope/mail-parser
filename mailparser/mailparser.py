@@ -350,7 +350,9 @@ class MailParser(object):
 
         # walk all mail parts
         for i, p in enumerate(parts):
-            if not p.is_multipart() or ported_string(p.get_content_disposition()).lower() == 'attachment':
+            if not p.is_multipart() \
+                 or p.get_filename() \
+                 or ported_string(p.get_content_disposition()).lower() == 'attachment':
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))

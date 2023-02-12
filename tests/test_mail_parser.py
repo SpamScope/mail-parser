@@ -65,6 +65,7 @@ mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
 mail_test_13 = os.path.join(base_path, 'mails', 'mail_test_13')
 mail_test_14 = os.path.join(base_path, 'mails', 'mail_test_14')
 mail_test_15 = os.path.join(base_path, 'mails', 'mail_test_15')
+mail_test_16 = os.path.join(base_path, 'mails', 'mail_test_16')
 mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
 mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
 mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
@@ -393,7 +394,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.parsed_mail_json, six.text_type)
 
         result = len(mail.attachments)
-        self.assertEqual(0, result)
+        self.assertEqual(1, result)
 
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
@@ -656,6 +657,12 @@ class TestMailParser(unittest.TestCase):
         raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
+
+    def test_message_attachment(self):
+        # Parse EML attachment
+        mail = mailparser.parse_from_file(mail_test_16)
+        result = len(mail.attachments)
+        self.assertEqual(3, result)
 
     def test_write_uuencode_attachment(self):
         mail = mailparser.parse_from_file(mail_test_15)
