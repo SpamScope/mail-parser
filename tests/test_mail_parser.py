@@ -662,7 +662,7 @@ class TestMailParser(unittest.TestCase):
         # Parse EML attachment
         mail = mailparser.parse_from_file(mail_test_16)
         result = len(mail.attachments)
-        self.assertEqual(3, result)
+        self.assertEqual(4, result)
 
     def test_write_uuencode_attachment(self):
         mail = mailparser.parse_from_file(mail_test_15)
