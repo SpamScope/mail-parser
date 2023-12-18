@@ -456,7 +456,7 @@ class MailParser(object):
                     cte = p.get('Content-Transfer-Encoding')
                     if cte:
                         cte = cte.lower()
-                    if not cte or cte in ['7bit', '8bit']:
+                    if payload and not cte or cte in ['7bit', '8bit']:
                         payload = payload.decode('raw-unicode-escape')
                     else:
                         payload = ported_string(payload, encoding=charset)
