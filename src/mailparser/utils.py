@@ -33,7 +33,7 @@ import logging
 import os
 import random
 import re
-import simplejson as json
+import json
 import string
 import subprocess
 import sys
