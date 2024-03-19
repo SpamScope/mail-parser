@@ -14,49 +14,44 @@ jobs:
         python-version: ['3.7', '3.8', '3.9', '3.10']
 
     steps:
-    - name: Setup Node.js environment
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y libemail-outlook-message-perl
+          pip install ".[dev, test]"
+          export PERL_MM_USE_DEFAULT=1
+          sudo cpan -f -i Email::Outlook::Message
 
-    - name: Install dependencies
-      run: |
-        sudo apt-get -qq update
-        sudo apt-get install -y libemail-outlook-message-perl
-        pip install ".[dev, test]"
-        export PERL_MM_USE_DEFAULT=1
-        sudo cpan -f -i Email::Outlook::Message
+      - name: Run tests
+        run: |
+          pytest
+          python -m mailparser -v
+          python -m mailparser -h
+          mail-parser -f tests/mails/mail_malformed_3 -j
+          cat tests/mails/mail_malformed_3 | mail-parser -k -j
 
-    - name: Run tests
-      run: |
-        pytest
-        python -m mailparser -v
-        python -m mailparser -h
-        mail-parser -f tests/mails/mail_malformed_3 -j
-        cat tests/mails/mail_malformed_3 | mail-parser -k -j
+      - name: Report to Coveralls
+        uses: coverallsapp/github-action@v2.2.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Report to Coveralls
-      uses: coverallsapp/github-action@v2.2.3
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        run: |
+          python -m build
 
-    - name: Build
-      run: |
-        python -m build
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-artifacts
-        path: |
-          dist/mail-parser-*.tar.gz
-          dist/mail_parser-*.whl
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            dist/mail-parser-*.tar.gz
+            dist/mail_parser-*.whl
