@@ -48,6 +48,9 @@ clean-all: clean-tests clean-build  ## remove all tests and build files
 test: clean-tests ## run tests quickly with the default Python
 	pytest
 
+pre-commit:  ## run pre-commit on all files
+	pre-commit run -a
+
 dist: clean-all ## builds source and wheel package
 	python -m build
 

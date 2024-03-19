@@ -31,6 +31,10 @@ jobs:
           export PERL_MM_USE_DEFAULT=1
           sudo cpan -f -i Email::Outlook::Message
 
+      - name: Run pre-commit
+        run: |
+          make pre-commit
+
       - name: Run tests
         run: |
           pytest
