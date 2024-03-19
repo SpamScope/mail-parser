@@ -295,7 +295,8 @@ class MailParser(object):
 
         for i in keys:
             log.debug("Getting header or part {!r}".format(i))
-            if value := getattr(self, i):
+            value = getattr(self, i)
+            if value:
                 mail[i] = value
 
         # add defects
