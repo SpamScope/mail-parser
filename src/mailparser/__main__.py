@@ -184,10 +184,8 @@ def get_args():
         help="Path where store attachments")
 
     parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version='%(prog)s {}'.format(__version__))
+        '-v', '--version', action='version', version=f'%(prog)s {__version__}'
+    )
 
     return parser
 

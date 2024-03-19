@@ -133,15 +133,11 @@ class MailParser(object):
         Init a new object from a message object structure.
         """
         self._message = message
-        log.debug(
-            "All headers of emails: {}".format(", ".join(message.keys())))
+        log.debug(f'All headers of emails: {", ".join(message.keys())}')
         self.parse()
 
     def __str__(self):
-        if self.message:
-            return self.subject
-        else:
-            return six.text_type()
+        return self.subject if self.message else six.text_type()
 
     @classmethod
     def from_file_obj(cls, fp):
@@ -159,7 +155,7 @@ class MailParser(object):
         try:
             fp.seek(0)
         except IOError:
-            # When stdout is a TTY it's a character device
+            # When stdout is a TTY it's a character device,
             # and it's not seekable, you cannot seek in a TTY.
             pass
         finally:
@@ -299,8 +295,7 @@ class MailParser(object):
 
         for i in keys:
             log.debug("Getting header or part {!r}".format(i))
-            value = getattr(self, i)
-            if value:
+            if value := getattr(self, i):
                 mail[i] = value
 
         # add defects
