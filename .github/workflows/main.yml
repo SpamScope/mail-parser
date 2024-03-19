@@ -14,10 +14,17 @@ jobs:
         python-version: ['3.7', '3.8', '3.9', '3.10']
 
     steps:
-    - uses: actions/checkout@v2
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -47,14 +54,9 @@ jobs:
         python -m build
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: build-artifacts
-        path: dist/*
-#
-#    - name: Build and push Docker image
-#      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop'
-#      run: |
-#        docker build --build-arg BRANCH=${{ github.ref }} -t $DOCKER_USERNAME/spamscope-mail-parser .
-#        echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-#        docker push $DOCKER_USERNAME/spamscope-mail-parser
+        path: |
+          dist/mail-parser-*.tar.gz
+          dist/mail_parser-*.whl
