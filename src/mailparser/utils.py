@@ -41,13 +41,13 @@ import tempfile
 
 import six
 
-from .const import (
+from mailparser.const import (
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST)
 
-from .exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
@@ -514,14 +514,14 @@ def get_mail_keys(message, complete=True):
     return all_parts
 
 
-def safe_print(data):  # pragma: no cover
+def safe_print(data):
     try:
         print(data)
     except UnicodeEncodeError:
         print(data.encode('utf-8'))
 
 
-def print_mail_fingerprints(data):  # pragma: no cover
+def print_mail_fingerprints(data):
     md5, sha1, sha256, sha512 = fingerprints(data)
     print("md5:\t{}".format(md5))
     print("sha1:\t{}".format(sha1))
@@ -529,7 +529,7 @@ def print_mail_fingerprints(data):  # pragma: no cover
     print("sha512:\t{}".format(sha512))
 
 
-def print_attachments(attachments, flag_hash):  # pragma: no cover
+def print_attachments(attachments, flag_hash):
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
@@ -544,7 +544,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
 
 
-def write_attachments(attachments, base_path):  # pragma: no cover
+def write_attachments(attachments, base_path):
     for a in attachments:
         write_sample(
             binary=a["binary"],
@@ -554,7 +554,7 @@ def write_attachments(attachments, base_path):  # pragma: no cover
         )
 
 
-def write_sample(binary, payload, path, filename):  # pragma: no cover
+def write_sample(binary, payload, path, filename):
     """
     This function writes a sample on file system.
 

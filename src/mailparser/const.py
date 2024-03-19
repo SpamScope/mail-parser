@@ -17,6 +17,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+
+
 import re
 
 
@@ -84,16 +86,10 @@ RECEIVED_COMPILED_LIST = [
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
-ADDRESSES_HEADERS = set([
-    "bcc",
-    "cc",
-    "delivered-to",
-    "from",
-    "reply-to",
-    "to"])
+ADDRESSES_HEADERS = {"bcc", "cc", "delivered-to", "from", "reply-to", "to"}
 
 # These parts are always returned
-OTHERS_PARTS = set([
+OTHERS_PARTS = {
     "attachments",
     "body",
     "date",
@@ -105,4 +101,4 @@ OTHERS_PARTS = set([
     "user-agent",
     "x-mailer",
     "x-original-to",
-])
+}

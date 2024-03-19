@@ -23,8 +23,8 @@ import runpy
 import sys
 
 import mailparser
-from .exceptions import MailParserOutlookError
-from .utils import (
+from mailparser.exceptions import MailParserOutlookError
+from mailparser.utils import (
     custom_log,
     print_attachments,
     print_mail_fingerprints,

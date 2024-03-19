@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['2.7', '3.7', '3.8', '3.9']
+        python-version: ['3.7', '3.8', '3.9', '3.10']
 
     steps:
     - uses: actions/checkout@v2
@@ -37,11 +37,10 @@ jobs:
         mail-parser -f tests/mails/mail_malformed_3 -j
         cat tests/mails/mail_malformed_3 | mail-parser -k -j
 
-#    - name: Report to Coveralls
-#      uses: AndreMiras/coveralls-python-action@v20201113
-#      with:
-#        github-token: ${{ secrets.GITHUB_TOKEN }}
-#        coveralls-token: ${{ secrets.COVERALLS_TOKEN }}
+    - name: Report to Coveralls
+      uses: coverallsapp/github-action@v2.2.3
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 #
 #    - name: Build and push Docker image
 #      if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop'

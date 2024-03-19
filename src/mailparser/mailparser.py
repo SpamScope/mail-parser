@@ -47,7 +47,7 @@ from .utils import (
     write_attachments,
 )
 
-from .exceptions import MailParserEnvironmentError
+from mailparser.exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)
