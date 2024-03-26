@@ -54,11 +54,16 @@ log = logging.getLogger(__name__)
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
-    if name:
-        log = logging.getLogger(name)
-    else:
-        log = logging.getLogger()
-    log.setLevel(level)
+    """
+    This function returns a custom logger.
+    Args:
+        level (): logging level
+        name (): logger name
+
+    Returns: logger
+    """
+    logger = logging.getLogger(name) if name else logging.getLogger()
+    logger.setLevel(level)
     ch = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter(
         "%(asctime)s | "
@@ -68,8 +73,8 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
         "%(levelname)s | "
         "%(message)s")
     ch.setFormatter(formatter)
-    log.addHandler(ch)
-    return log
+    logger.addHandler(ch)
+    return logger
 
 
 def sanitize(func):
@@ -118,7 +123,7 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
 
 def decode_header_part(header):
     """
-    Given an raw header returns an decoded header
+    Get a header and return a decoded string.
 
     Args:
         header (string): header to decode
@@ -133,7 +138,7 @@ def decode_header_part(header):
 
     try:
         for d, c in decode_header(header):
-            c = c if c else 'utf-8'
+            c = c or 'utf-8'
             output += ported_string(d, c, 'ignore')
 
     # Header parsing failed, when header has charset Shift_JIS
@@ -563,7 +568,6 @@ def write_sample(binary, payload, path, filename):
         payload: payload of sample, in base64 if it's a binary
         path (string): path of file
         filename (string): name of file
-        hash_ (string): file hash
     """
     if not os.path.exists(path):
         os.makedirs(path)

@@ -27,3 +27,5 @@ from mailparser.mailparser import (
     parse_from_string)
 
 from mailparser.utils import get_header
+
+__version__ = "3.15.0"
