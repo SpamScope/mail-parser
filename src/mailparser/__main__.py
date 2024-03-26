@@ -23,23 +23,22 @@ import runpy
 import sys
 
 import mailparser
-from .exceptions import MailParserOutlookError
-from .utils import (
+from mailparser.exceptions import MailParserOutlookError
+from mailparser.utils import (
     custom_log,
     print_attachments,
     print_mail_fingerprints,
     safe_print,
     write_attachments,
 )
-
-
-current = os.path.realpath(os.path.dirname(__file__))
-
-__version__ = runpy.run_path(
-    os.path.join(current, "version.py"))["__version__"]
+from mailparser import __version__
 
 
 def get_args():
+    """
+    Get arguments from command line.
+    Returns: argparse.ArgumentParser
+    """
     parser = argparse.ArgumentParser(
         description="Wrapper for email Python Standard Library",
         epilog="It takes as input a raw mail and generates a parsed object.",
@@ -184,35 +183,42 @@ def get_args():
         help="Path where store attachments")
 
     parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version='%(prog)s {}'.format(__version__))
+        '-v', '--version', action='version', version=f'%(prog)s {__version__}'
+    )
 
     return parser
 
 
-def main():
-    args = get_args().parse_args()
-    log = custom_log(level=args.log_level)
-
+def get_mailparser(args):
+    """
+    Get the correct mailparser instance.
+    Returns: MailParser
+    """
     if args.file:
         if args.outlook:
-            log.debug("Analysis Outlook mail")
-            parser = mailparser.parse_from_file_msg(args.file)
+            return mailparser.parse_from_file_msg(args.file)
         else:
-            parser = mailparser.parse_from_file(args.file)
+            return mailparser.parse_from_file(args.file)
     elif args.string:
-        parser = mailparser.parse_from_string(args.string)
+        return mailparser.parse_from_string(args.string)
     elif args.stdin:
         if args.outlook:
             raise MailParserOutlookError(
                 "You can't use stdin with msg Outlook")
-        parser = mailparser.parse_from_file_obj(sys.stdin)
+        return mailparser.parse_from_file_obj(sys.stdin)
+    else:
+        raise ValueError("No valid input method")
 
-    if args.json:
-        safe_print(parser.mail_json)
 
+def safe_print_mail_parts(parser, args):
+    """
+    Print mail parts in a safe way.
+    Args:
+        parser (): MailParser instance
+        args (): argparse.Namespace
+
+    Returns: None
+    """
     if args.body:
         safe_print(parser.body)
 
@@ -233,6 +239,21 @@ def main():
 
     if args.receiveds:
         safe_print(parser.received_json)
+
+
+def main():  # sourcery skip: use-named-expression
+    """
+    Main function.
+    Returns:
+    """
+    args = get_args().parse_args()
+    log = custom_log(level=args.log_level)
+    parser = get_mailparser(args)
+
+    if args.json:
+        safe_print(parser.mail_json)
+
+    safe_print_mail_parts(parser, args)
 
     if args.defects:
         log.debug("Printing defects")

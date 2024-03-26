@@ -29,54 +29,30 @@ BROWSER := python -c "$$BROWSER_PYSCRIPT"
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-clean: clean-build clean-pyc clean-test ## remove all build, test, coverage and Python artifacts
+clean-build:  ## remove all build files
+	find . -type d -name "build" -exec rm -rf {} +
+	find . -type d -name "dist" -exec rm -rf {} +
 
-clean-build: ## remove build artifacts
-	rm -fr build/
-	rm -fr dist/
-	rm -fr .eggs/
-	find . -name '*.egg-info' -exec rm -fr {} +
-	find . -name '*.egg' -exec rm -f {} +
+clean-tests: ## remove test and coverage artifacts
+	find . -type f -name "*.log" -delete
+	find . -type f -name "coverage.xml" -delete
+	find . -type f -name "junit.xml" -delete
+	find . -type f -name ".coverage" -delete
+	find . -type d -name ".pytest_cache" -exec rm -rf {} +
+	find . -type d -name "htmlcov" -exec rm -rf {} +
+	find . -type d -name ".mypy_cache" -exec rm -rf {} +
+	find . -type d -name "__pycache__" -exec rm -rf {} +
 
-clean-pyc: ## remove Python file artifacts
-	find . -name '*.pyc' -exec rm -f {} +
-	find . -name '*.pyo' -exec rm -f {} +
-	find . -name '*~' -exec rm -f {} +
-	find . -name '__pycache__' -exec rm -fr {} +
+clean-all: clean-tests clean-build  ## remove all tests and build files
 
-clean-test: ## remove test and coverage artifacts
-	rm -fr .tox/
-	rm -f .coverage
-	rm -fr htmlcov/
-	rm -fr .pytest_cache
+test: clean-tests ## run tests quickly with the default Python
+	pytest
 
-lint: ## check style with flake8
-	flake8 mailparser tests
+pre-commit:  ## run pre-commit on all files
+	pre-commit run -a
 
-test: ## run tests quickly with the default Python
-	python -m unittest discover -s tests -f -v
-
-test-all: ## run tests on every Python version with tox
-	tox
-
-# docs: ## generate Sphinx HTML documentation, including API docs
-# 	rm -f docs/mailparser.rst
-# 	rm -f docs/modules.rst
-# 	sphinx-apidoc -o docs/ mailparser
-# 	$(MAKE) -C docs clean
-# 	$(MAKE) -C docs html
-# 	$(BROWSER) docs/_build/html/index.html
-
-# servedocs: docs ## compile the docs watching for changes
-# 	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
+dist: clean-all ## builds source and wheel package
+	python -m build
 
 release: dist ## package and upload a release
 	twine upload dist/*
-
-dist: clean ## builds source and wheel package
-	python setup.py sdist
-	python setup.py bdist_wheel
-	ls -l dist
-
-install: clean ## install the package to the active Python's site-packages
-	python setup.py install

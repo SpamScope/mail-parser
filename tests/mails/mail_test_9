@@ -4,9 +4,9 @@ Received: (qmail 12733 invoked from network); 8 Mar 2017 05:57:05 -0000
 Received: from unknown (HELO sgis.com.cn) (218.15.33.11)
   by smtp.didi.net with SMTP; 8 Mar 2017 05:57:05 -0000
 Received: (qmail 11857 invoked by uid 8061); 26 Dec 2016 05:32:04 -0000
-Received: from 223.152.177.168 by mail.sgis.com.cn (envelope-from <zyb@sgis.com.cn>, uid 0) with qmail-scanner-1.24 
- (4.4.4.56.  
- Clear:RC:0(223.152.177.168):. 
+Received: from 223.152.177.168 by mail.sgis.com.cn (envelope-from <zyb@sgis.com.cn>, uid 0) with qmail-scanner-1.24
+ (4.4.4.56.
+ Clear:RC:0(223.152.177.168):.
  Processed in 2.047196 secs); 26 Dec 2016 05:32:04 -0000
 Received: from unknown (HELO ljhw) (zyb@sgis.com.cn@[223.152.177.168])
           (envelope-sender <zyb@sgis.com.cn>)
@@ -66,5 +66,3 @@ Uk9ORz48Rk9OVCBzdHlsZT0iQkFDS0dST1VORC1DT0xPUjogZGFya2JsdWUiIA0KY29sb3I9eWVs
 bG93PiZuYnNwOyZuYnNwOyZuYnNwO87SsNG+tc23wK29/NCpo6zE48PHv7S/tNXiuPbKx8qyw7SM
 wqOs1eLW1rOhus/X1Mi7ydmyu8HLxNrJ5DwvRk9OVD48L1NUUk9ORz48L1A+PC9CT0RZPjwvSFRN
 TD4NCg==
-
-

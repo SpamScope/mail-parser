@@ -33,7 +33,7 @@ import logging
 import os
 import random
 import re
-import simplejson as json
+import json
 import string
 import subprocess
 import sys
@@ -41,24 +41,29 @@ import tempfile
 
 import six
 
-from .const import (
+from mailparser.const import (
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST)
 
-from .exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
-    if name:
-        log = logging.getLogger(name)
-    else:
-        log = logging.getLogger()
-    log.setLevel(level)
+    """
+    This function returns a custom logger.
+    Args:
+        level (): logging level
+        name (): logger name
+
+    Returns: logger
+    """
+    logger = logging.getLogger(name) if name else logging.getLogger()
+    logger.setLevel(level)
     ch = logging.StreamHandler(sys.stdout)
     formatter = logging.Formatter(
         "%(asctime)s | "
@@ -68,8 +73,8 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
         "%(levelname)s | "
         "%(message)s")
     ch.setFormatter(formatter)
-    log.addHandler(ch)
-    return log
+    logger.addHandler(ch)
+    return logger
 
 
 def sanitize(func):
@@ -118,7 +123,7 @@ def ported_string(raw_data, encoding='utf-8', errors='ignore'):
 
 def decode_header_part(header):
     """
-    Given an raw header returns an decoded header
+    Get a header and return a decoded string.
 
     Args:
         header (string): header to decode
@@ -133,7 +138,7 @@ def decode_header_part(header):
 
     try:
         for d, c in decode_header(header):
-            c = c if c else 'utf-8'
+            c = c or 'utf-8'
             output += ported_string(d, c, 'ignore')
 
     # Header parsing failed, when header has charset Shift_JIS
@@ -514,14 +519,14 @@ def get_mail_keys(message, complete=True):
     return all_parts
 
 
-def safe_print(data):  # pragma: no cover
+def safe_print(data):
     try:
         print(data)
     except UnicodeEncodeError:
         print(data.encode('utf-8'))
 
 
-def print_mail_fingerprints(data):  # pragma: no cover
+def print_mail_fingerprints(data):
     md5, sha1, sha256, sha512 = fingerprints(data)
     print("md5:\t{}".format(md5))
     print("sha1:\t{}".format(sha1))
@@ -529,7 +534,7 @@ def print_mail_fingerprints(data):  # pragma: no cover
     print("sha512:\t{}".format(sha512))
 
 
-def print_attachments(attachments, flag_hash):  # pragma: no cover
+def print_attachments(attachments, flag_hash):
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
@@ -544,7 +549,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
 
 
-def write_attachments(attachments, base_path):  # pragma: no cover
+def write_attachments(attachments, base_path):
     for a in attachments:
         write_sample(
             binary=a["binary"],
@@ -554,7 +559,7 @@ def write_attachments(attachments, base_path):  # pragma: no cover
         )
 
 
-def write_sample(binary, payload, path, filename):  # pragma: no cover
+def write_sample(binary, payload, path, filename):
     """
     This function writes a sample on file system.
 
@@ -563,7 +568,6 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
         payload: payload of sample, in base64 if it's a binary
         path (string): path of file
         filename (string): name of file
-        hash_ (string): file hash
     """
     if not os.path.exists(path):
         os.makedirs(path)
@@ -587,4 +591,4 @@ def random_string(string_length=10):
         str -- Random string
     """
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(string_length))
+    return ''.join(random.choice(letters) for _ in range(string_length))

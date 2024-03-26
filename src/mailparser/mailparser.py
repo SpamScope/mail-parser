@@ -25,7 +25,7 @@ import os
 
 import ipaddress
 import six
-import simplejson as json
+import json
 
 from .const import (
     ADDRESSES_HEADERS,
@@ -47,7 +47,7 @@ from .utils import (
     write_attachments,
 )
 
-from .exceptions import MailParserEnvironmentError
+from mailparser.exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)
@@ -133,15 +133,11 @@ class MailParser(object):
         Init a new object from a message object structure.
         """
         self._message = message
-        log.debug(
-            "All headers of emails: {}".format(", ".join(message.keys())))
+        log.debug(f'All headers of emails: {", ".join(message.keys())}')
         self.parse()
 
     def __str__(self):
-        if self.message:
-            return self.subject
-        else:
-            return six.text_type()
+        return self.subject if self.message else six.text_type()
 
     @classmethod
     def from_file_obj(cls, fp):
@@ -159,7 +155,7 @@ class MailParser(object):
         try:
             fp.seek(0)
         except IOError:
-            # When stdout is a TTY it's a character device
+            # When stdout is a TTY it's a character device,
             # and it's not seekable, you cannot seek in a TTY.
             pass
         finally:

@@ -17,7 +17,7 @@ This command runs mail-parser help as default, but you can use all others option
 
 To share the "mails" directory between your host and the container, create a "mails" directory on your host.
 
-There also is an example of `docker-compose` 
+There also is an example of `docker-compose`
 
 From the `docker-compose.yml` directory, run:
 

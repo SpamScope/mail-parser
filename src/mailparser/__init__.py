@@ -17,7 +17,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "3.15.0"
 
-if __name__ == "__main__":
-    print(__version__)
+from mailparser.mailparser import (
+    MailParser,
+    parse_from_bytes,
+    parse_from_file,
+    parse_from_file_msg,
+    parse_from_file_obj,
+    parse_from_string)
+
+from mailparser.utils import get_header
+
+__version__ = "3.15.0"

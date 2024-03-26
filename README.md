@@ -1,18 +1,15 @@
 [![PyPI version](https://badge.fury.io/py/mail-parser.svg)](https://badge.fury.io/py/mail-parser)
-[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop)](https://travis-ci.org/SpamScope/mail-parser)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
-[![BCH compliance](https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop)](https://bettercodehub.com/)
-[![](https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg)](https://microbadger.com/images/fmantuano/spamscope-mail-parser "Get your own image badge on microbadger.com")
 
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
 
-mail-parser is not only a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library.
+`mail-parser` is not only a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library.
 It give you an easy way to pass from raw mail to Python object that you can use in your code.
 It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
 
-mail-parser can parse Outlook email format (.msg). To use this feature, you need to install `libemail-outlook-message-perl` package. For Debian based systems:
+`mail-parser` can parse Outlook email format (.msg). To use this feature, you need to install `libemail-outlook-message-perl` package. For Debian based systems:
 
 ```
 $ apt-get install libemail-outlook-message-perl
@@ -24,17 +21,15 @@ For more details:
 $ apt-cache show libemail-outlook-message-perl
 ```
 
-mail-parser supports Python 3.
+`mail-parser` supports Python 3.
+
+The support to Python 2 has been dropped from version 4.0.0.
 
 
 # Apache 2 Open Source License
-mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
+`mail-parser` can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
 ## Support the project
-
-**Dogecoin**: `DAUbDUttkf8WN1kwP9YYQQKyEJYY2WWtEG`
-
-[![Donate with Bitcoin](https://en.cryptobadges.io/badge/big/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)](https://en.cryptobadges.io/donate/1BCJ8wok4DNW8KbdL8H3VwZviXAWibhEPe)
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
@@ -46,7 +41,7 @@ mail-parser can be downloaded, used, and modified free of charge. It is availabl
 
 # Description
 
-mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of
+`mail-parser` takes as input a raw email and generates a parsed object. The properties of this object are the same name of
 [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml):
 
   - bcc
@@ -100,7 +95,7 @@ The `received` header is parsed and splitted in hop. The fields supported are:
  - with
 
 
-mail-parser can detect defect in mail:
+`mail-parser` can detect defect in mail:
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
 
 All properties have a JSON and raw property that you can get with:
@@ -136,7 +131,7 @@ Clone repository
 git clone https://github.com/SpamScope/mail-parser.git
 ```
 
-and install mail-parser with `setup.py`:
+and install `mail-parser` with `setup.py`:
 
 ```
 $ cd mail-parser
@@ -260,7 +255,7 @@ From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21
 
 # Exceptions
 
-Exceptions hierarchy of mail-parser:
+Exceptions hierarchy of `mail-parser`:
 
 ```
 MailParserError: Base MailParser Exception

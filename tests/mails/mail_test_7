@@ -7,7 +7,7 @@ Received: from voidstudicom.it (host161-200-static.0-79-b.business.telecomitalia
 	(Authenticated sender: ctrstdicomsmtp)
 	by smtp.s2smtp.com (Postfix) with ESMTPA id 67A957337
 	for <serena.nicolini@fake.it>; Fri,  9 Jun 2017 18:07:16 +0200 (CEST)
-Received: from COMP02.CSC.local by voidstudicom.it with ESMTPA id md50000234499.msg; 
+Received: from COMP02.CSC.local by voidstudicom.it with ESMTPA id md50000234499.msg;
 	Fri, 09 Jun 2017 17:56:17 +0200
 X-Spam-Processed: voidstudicom.it, Fri, 09 Jun 2017 17:56:17 +0200
 	(not processed: spam filter heuristic analysis disabled)
@@ -106,7 +106,7 @@ Ti auguro una buona giornata
 =20
 =20
 Anna Milone
-Export Sales Manager 
+Export Sales Manager
 --400816-6334-1497023776-0
 Content-Type: text/html; charset=utf-8
 Content-Transfer-Encoding: quoted-printable
@@ -1432,4 +1432,3 @@ ace; -webkit-line-break: after-white-space;" class=3D""><div class=3D""><di=
 v class=3D""><div class=3D""></div></div><br class=3D""></div></div></div><=
 /div><br class=3D""></body></html>
 --400816-18467-1497023776-0--
-
