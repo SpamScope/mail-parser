@@ -273,7 +273,7 @@ The first step is to install the development environment:
 ```
 $ python3.10 -m virtualenv venv
 $ source venv/bin/activate
-$ pip install  -e ".[dev, test]"
+$ pip install -e ".[dev, test]"
 ```
 
 The second step is to run the tests:
