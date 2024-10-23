@@ -25,7 +25,7 @@ import os
 
 import ipaddress
 import six
-import simplejson as json
+import json
 
 from .const import (
     ADDRESSES_HEADERS,
