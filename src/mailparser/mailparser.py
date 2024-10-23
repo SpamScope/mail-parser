@@ -25,7 +25,7 @@ import os
 
 import ipaddress
 import six
-import simplejson as json
+import json
 
 from .const import (
     ADDRESSES_HEADERS,
@@ -350,7 +350,7 @@ class MailParser(object):
 
         # walk all mail parts
         for i, p in enumerate(parts):
-            if not p.is_multipart():
+            if not p.is_multipart() or ported_string(p.get_content_disposition()).lower() == 'attachment':
                 charset = p.get_content_charset('utf-8')
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
@@ -394,7 +394,12 @@ class MailParser(object):
                     log.debug("content-disposition {!r} part {!r}".format(
                         content_disposition, i))
 
-                    if transfer_encoding == "base64" or (
+                    if p.is_multipart():
+                        payload = ''.join([m.as_string() for m in p.get_payload(decode=False)])
+                        binary = False
+                        log.debug("Filename {!r} part {!r} is multipart".format(
+                            filename, i))
+                    elif transfer_encoding == "base64" or (
                        transfer_encoding == "quoted-\
                        printable" and "application" in mail_content_type):
 
@@ -599,8 +604,8 @@ class MailParser(object):
         Return only the headers as Python object
         """
         d = {}
-        for k, v in self.message.items():
-            d[k] = decode_header_part(v)
+        for i in self.message.keys():
+            d[i] = getattr(self, i)
         return d
 
     @property
