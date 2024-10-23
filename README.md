@@ -266,3 +266,26 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
+
+# Development
+The first step is to install the development environment:
+
+```
+$ python3.10 -m virtualenv venv
+$ source venv/bin/activate
+$ pip install  -e ".[dev, test]"
+```
+
+The second step is to run the tests:
+
+```
+$ make test
+```
+
+Then you can try to run the command line tool:
+
+```
+$ mail-parser -f tests/mails/mail_malformed_3 -j
+```
+
+If all is ok, you can start to develop.
