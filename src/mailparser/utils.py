@@ -33,7 +33,7 @@ import logging
 import os
 import random
 import re
-import simplejson as json
+import json
 import string
 import subprocess
 import sys
@@ -230,8 +230,8 @@ def msgconvert(email):
                 command, stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
-    except OSError:
-        message = "To use this function you must install 'msgconvert' tool"
+    except OSError as e:
+        message = "Check if 'msgconvert' tool is installed / {!r}".format(e)
         log.exception(message)
         raise MailParserOSError(message)
 

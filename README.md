@@ -1,8 +1,5 @@
 [![PyPI version](https://badge.fury.io/py/mail-parser.svg)](https://badge.fury.io/py/mail-parser)
-[![Build Status](https://travis-ci.org/SpamScope/mail-parser.svg?branch=develop)](https://travis-ci.org/SpamScope/mail-parser)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
-[![BCH compliance](https://bettercodehub.com/edge/badge/SpamScope/mail-parser?branch=develop)](https://bettercodehub.com/)
-[![](https://images.microbadger.com/badges/image/fmantuano/spamscope-mail-parser.svg)](https://microbadger.com/images/fmantuano/spamscope-mail-parser "Get your own image badge on microbadger.com")
 
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
@@ -30,21 +27,15 @@ mail-parser supports Python 3.
 # Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-If you want support the project:
-
+## Support the project
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
-
-![Bitcoin Donate](https://i.stack.imgur.com/MnQ6V.png)
-
-![](https://github.com/SpamScope/mail-parser/raw/develop/docs/bitcoin-qrcode.png)
-
 
 # mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
  - [FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)
  - [Arch User Repository](https://aur.archlinux.org/packages/mailparser/)
-
+ - [REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)
 
 # Description
 
@@ -275,3 +266,26 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
+
+# Development
+The first step is to install the development environment:
+
+```
+$ python3.10 -m virtualenv venv
+$ source venv/bin/activate
+$ pip install -e ".[dev, test]"
+```
+
+The second step is to run the tests:
+
+```
+$ make test
+```
+
+Then you can try to run the command line tool:
+
+```
+$ mail-parser -f tests/mails/mail_malformed_3 -j
+```
+
+If all is ok, you can start to develop.
