@@ -33,7 +33,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --cov=mailparser --cov-report=xml
+          pytest --cov=src/mailparser --cov-report=xml
           python -m mailparser -v
           python -m mailparser -h
           mail-parser -f tests/mails/mail_malformed_3 -j
