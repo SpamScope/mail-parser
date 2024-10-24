@@ -17,14 +17,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-
 from mailparser.mailparser import (
     MailParser,
     parse_from_bytes,
     parse_from_file,
     parse_from_file_msg,
     parse_from_file_obj,
-    parse_from_string)
+    parse_from_string,
+)
 
 from mailparser.utils import get_header
 
@@ -35,5 +35,5 @@ __all__ = [
     "parse_from_file_msg",
     "parse_from_file_obj",
     "parse_from_string",
-    "get_header"
+    "get_header",
 ]

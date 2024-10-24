@@ -35,33 +35,26 @@ from .utils import (
 
 current = os.path.realpath(os.path.dirname(__file__))
 
-__version__ = runpy.run_path(
-    os.path.join(current, "version.py"))["__version__"]
+__version__ = runpy.run_path(os.path.join(current, "version.py"))["__version__"]
 
 
 def get_args():
     parser = argparse.ArgumentParser(
         description="Wrapper for email Python Standard Library",
         epilog="It takes as input a raw mail and generates a parsed object.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     parsing_group = parser.add_mutually_exclusive_group(required=True)
-    parsing_group.add_argument(
-        "-f",
-        "--file",
-        dest="file",
-        help="Raw email file")
-    parsing_group.add_argument(
-        "-s",
-        "--string",
-        dest="string",
-        help="Raw email string")
+    parsing_group.add_argument("-f", "--file", dest="file", help="Raw email file")
+    parsing_group.add_argument("-s", "--string", dest="string", help="Raw email string")
     parsing_group.add_argument(
         "-k",
         "--stdin",
         dest="stdin",
         action="store_true",
-        help="Enable parsing from stdin")
+        help="Enable parsing from stdin",
+    )
 
     parser.add_argument(
         "-l",
@@ -69,125 +62,128 @@ def get_args():
         dest="log_level",
         default="WARNING",
         choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "NOTSET"],
-        help="Set log level")
+        help="Set log level",
+    )
 
     parser.add_argument(
         "-j",
         "--json",
         dest="json",
         action="store_true",
-        help="Show the JSON of parsed mail")
+        help="Show the JSON of parsed mail",
+    )
 
     parser.add_argument(
-        "-b",
-        "--body",
-        dest="body",
-        action="store_true",
-        help="Print the body of mail")
+        "-b", "--body", dest="body", action="store_true", help="Print the body of mail"
+    )
 
     parser.add_argument(
         "-a",
         "--attachments",
         dest="attachments",
         action="store_true",
-        help="Print the attachments of mail")
+        help="Print the attachments of mail",
+    )
 
     parser.add_argument(
         "-r",
         "--headers",
         dest="headers",
         action="store_true",
-        help="Print the headers of mail")
+        help="Print the headers of mail",
+    )
 
     parser.add_argument(
-        "-t",
-        "--to",
-        dest="to",
-        action="store_true",
-        help="Print the to of mail")
+        "-t", "--to", dest="to", action="store_true", help="Print the to of mail"
+    )
 
     parser.add_argument(
         "-dt",
         "--delivered-to",
         dest="delivered_to",
         action="store_true",
-        help="Print the delivered-to of mail")
+        help="Print the delivered-to of mail",
+    )
 
     parser.add_argument(
-        "-m",
-        "--from",
-        dest="from_",
-        action="store_true",
-        help="Print the from of mail")
+        "-m", "--from", dest="from_", action="store_true", help="Print the from of mail"
+    )
 
     parser.add_argument(
         "-u",
         "--subject",
         dest="subject",
         action="store_true",
-        help="Print the subject of mail")
+        help="Print the subject of mail",
+    )
 
     parser.add_argument(
         "-c",
         "--receiveds",
         dest="receiveds",
         action="store_true",
-        help="Print all receiveds of mail")
+        help="Print all receiveds of mail",
+    )
 
     parser.add_argument(
         "-d",
         "--defects",
         dest="defects",
         action="store_true",
-        help="Print the defects of mail")
+        help="Print the defects of mail",
+    )
 
     parser.add_argument(
         "-o",
         "--outlook",
         dest="outlook",
         action="store_true",
-        help="Analyze Outlook msg")
+        help="Analyze Outlook msg",
+    )
 
     parser.add_argument(
         "-i",
         "--senderip",
         dest="senderip",
         metavar="Trust mail server string",
-        help="Extract a reliable sender IP address heuristically")
+        help="Extract a reliable sender IP address heuristically",
+    )
 
     parser.add_argument(
         "-p",
         "--mail-hash",
         dest="mail_hash",
         action="store_true",
-        help="Print mail fingerprints without headers")
+        help="Print mail fingerprints without headers",
+    )
 
     parser.add_argument(
         "-z",
         "--attachments-hash",
         dest="attachments_hash",
         action="store_true",
-        help="Print attachments with fingerprints")
+        help="Print attachments with fingerprints",
+    )
 
     parser.add_argument(
         "-sa",
         "--store-attachments",
         dest="store_attachments",
         action="store_true",
-        help="Store attachments on disk")
+        help="Store attachments on disk",
+    )
 
     parser.add_argument(
         "-ap",
         "--attachments-path",
         dest="attachments_path",
         default="/tmp",
-        help="Path where store attachments")
+        help="Path where store attachments",
+    )
 
     parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version='%(prog)s {}'.format(__version__))
+        "-v", "--version", action="version", version="%(prog)s {}".format(__version__)
+    )
 
     return parser
 
@@ -206,8 +202,7 @@ def main():
         parser = mailparser.parse_from_string(args.string)
     elif args.stdin:
         if args.outlook:
-            raise MailParserOutlookError(
-                "You can't use stdin with msg Outlook")
+            raise MailParserOutlookError("You can't use stdin with msg Outlook")
         parser = mailparser.parse_from_file_obj(sys.stdin)
 
     if args.json:
@@ -260,5 +255,5 @@ def main():
         write_attachments(parser.attachments, args.attachments_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

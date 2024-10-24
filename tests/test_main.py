@@ -17,7 +17,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-
 import unittest
 
 
@@ -25,7 +24,6 @@ from mailparser.__main__ import get_args
 
 
 class TestMain(unittest.TestCase):
-
     def setUp(self):
         self.parser = get_args()
 
@@ -73,15 +71,13 @@ class TestMain(unittest.TestCase):
         parsed = self.parser.parse_args(["--file", "mail.eml", "-d"])
         self.assertTrue(parsed.defects)
 
-        parsed = self.parser.parse_args([
-            "--file", "mail.eml", "--senderip", "trust"])
+        parsed = self.parser.parse_args(["--file", "mail.eml", "--senderip", "trust"])
         self.assertTrue(parsed.senderip)
 
         parsed = self.parser.parse_args(["--file", "mail.eml", "-p"])
         self.assertTrue(parsed.mail_hash)
 
-        parsed = self.parser.parse_args([
-            "--file", "mail.eml", "--attachments-hash"])
+        parsed = self.parser.parse_args(["--file", "mail.eml", "--attachments-hash"])
         self.assertTrue(parsed.attachments_hash)
 
         parsed = self.parser.parse_args(["--file", "mail.eml", "-c"])
