@@ -19,7 +19,6 @@ limitations under the License.
 
 import datetime
 import hashlib
-import logging
 import os
 import shutil
 import six
@@ -27,11 +26,6 @@ import sys
 import tempfile
 import unittest
 
-base_path = os.path.realpath(os.path.dirname(__file__))
-root = os.path.join(base_path, '..')
-sys.path.append(root)
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 import mailparser
 from mailparser.utils import (
@@ -48,31 +42,33 @@ from mailparser.utils import (
     random_string,
 )
 
-from mailparser.exceptions import MailParserEnvironmentError
+# base paths
+base_path = os.path.realpath(os.path.dirname(__file__))
+root = os.path.join(base_path, "..")
 
-mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
-mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
-mail_test_3 = os.path.join(base_path, 'mails', 'mail_test_3')
-mail_test_4 = os.path.join(base_path, 'mails', 'mail_test_4')
-mail_test_5 = os.path.join(base_path, 'mails', 'mail_test_5')
-mail_test_6 = os.path.join(base_path, 'mails', 'mail_test_6')
-mail_test_7 = os.path.join(base_path, 'mails', 'mail_test_7')
-mail_test_8 = os.path.join(base_path, 'mails', 'mail_test_8')
-mail_test_9 = os.path.join(base_path, 'mails', 'mail_test_9')
-mail_test_10 = os.path.join(base_path, 'mails', 'mail_test_10')
-mail_test_11 = os.path.join(base_path, 'mails', 'mail_test_11')
-mail_test_12 = os.path.join(base_path, 'mails', 'mail_test_12')
-mail_test_13 = os.path.join(base_path, 'mails', 'mail_test_13')
-mail_test_14 = os.path.join(base_path, 'mails', 'mail_test_14')
-mail_test_15 = os.path.join(base_path, 'mails', 'mail_test_15')
-mail_malformed_1 = os.path.join(base_path, 'mails', 'mail_malformed_1')
-mail_malformed_2 = os.path.join(base_path, 'mails', 'mail_malformed_2')
-mail_malformed_3 = os.path.join(base_path, 'mails', 'mail_malformed_3')
-mail_outlook_1 = os.path.join(base_path, 'mails', 'mail_outlook_1')
+# raw mails to test
+mail_test_1 = os.path.join(base_path, "mails", "mail_test_1")
+mail_test_2 = os.path.join(base_path, "mails", "mail_test_2")
+mail_test_3 = os.path.join(base_path, "mails", "mail_test_3")
+mail_test_4 = os.path.join(base_path, "mails", "mail_test_4")
+mail_test_5 = os.path.join(base_path, "mails", "mail_test_5")
+mail_test_6 = os.path.join(base_path, "mails", "mail_test_6")
+mail_test_7 = os.path.join(base_path, "mails", "mail_test_7")
+mail_test_8 = os.path.join(base_path, "mails", "mail_test_8")
+mail_test_9 = os.path.join(base_path, "mails", "mail_test_9")
+mail_test_10 = os.path.join(base_path, "mails", "mail_test_10")
+mail_test_11 = os.path.join(base_path, "mails", "mail_test_11")
+mail_test_12 = os.path.join(base_path, "mails", "mail_test_12")
+mail_test_13 = os.path.join(base_path, "mails", "mail_test_13")
+mail_test_14 = os.path.join(base_path, "mails", "mail_test_14")
+mail_test_15 = os.path.join(base_path, "mails", "mail_test_15")
+mail_malformed_1 = os.path.join(base_path, "mails", "mail_malformed_1")
+mail_malformed_2 = os.path.join(base_path, "mails", "mail_malformed_2")
+mail_malformed_3 = os.path.join(base_path, "mails", "mail_malformed_3")
+mail_outlook_1 = os.path.join(base_path, "mails", "mail_outlook_1")
 
 
 class TestMailParser(unittest.TestCase):
-
     def setUp(self):
         self.all_mails = (
             mail_test_1,
@@ -90,14 +86,16 @@ class TestMailParser(unittest.TestCase):
             mail_test_13,
             mail_malformed_1,
             mail_malformed_2,
-            mail_malformed_3)
+            mail_malformed_3,
+        )
 
     def test_write_attachments(self):
         attachments = [
             "<_1_0B4E44A80B15F6FC005C1243C12580DD>",
             "<_1_0B4E420C0B4E3DD0005C1243C12580DD>",
             "<_1_0B4E24640B4E1564005C1243C12580DD>",
-            "Move To Eight ZWEP6227F.pdf"]
+            "Move To Eight ZWEP6227F.pdf",
+        ]
         random_path = os.path.join(root, "tests", random_string())
         mail = mailparser.parse_from_file(mail_test_10)
         os.makedirs(random_path)
@@ -198,16 +196,22 @@ class TestMailParser(unittest.TestCase):
 
     def test_fingerprints_body(self):
         mail = mailparser.parse_from_file(mail_test_1)
-        md5, sha1, sha256, sha512 = fingerprints(
-            mail.body.encode("utf-8"))
+        md5, sha1, sha256, sha512 = fingerprints(mail.body.encode("utf-8"))
         self.assertEqual(md5, "55852a2efe95e7249887c92cc02123f8")
         self.assertEqual(sha1, "62fef1e38327ed09363624c3aff8ea11723ee05f")
-        self.assertEqual(sha256, ("cd4af1017f2e623f6d38f691048b6"
-                                  "a28d8b1f44a0478137b4337eac6de78f71a"))
-        self.assertEqual(sha512, ("4a573c7929b078f2a2c1c0f869d418b0c020d4"
-                                  "d37196bd6dcc209f9ccb29ca67355aa5e47b97"
-                                  "c8bf90377204f59efde7ba1fc071b6f250a665"
-                                  "72f63b997e92e8"))
+        self.assertEqual(
+            sha256,
+            ("cd4af1017f2e623f6d38f691048b6a28d8b1f44a0478137b4337eac6de78f71a"),
+        )
+        self.assertEqual(
+            sha512,
+            (
+                "4a573c7929b078f2a2c1c0f869d418b0c020d4"
+                "d37196bd6dcc209f9ccb29ca67355aa5e47b97"
+                "c8bf90377204f59efde7ba1fc071b6f250a665"
+                "72f63b997e92e8"
+            ),
+        )
 
     def test_fingerprints_unicodeencodeerror(self):
         mail = mailparser.parse_from_file(mail_test_7)
@@ -221,7 +225,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("MultipartInvariantViolationDefect", defects_categories)
         self.assertIn("reply-to", mail.mail)
         self.assertNotIn("reply_to", mail.mail)
-        reply_to = [(u'VICTORIA Souvenirs', u'smgesi4@gmail.com')]
+        reply_to = [("VICTORIA Souvenirs", "smgesi4@gmail.com")]
         self.assertEqual(mail.reply_to, reply_to)
         self.assertEqual(mail.fake_header, six.text_type())
 
@@ -363,8 +367,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(mail.defects))
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
-        self.assertIn("StartBoundaryNotFoundDefect",
-                      mail.defects_categories)
+        self.assertIn("StartBoundaryNotFoundDefect", mail.defects_categories)
         self.assertIsInstance(mail.mail_json, six.text_type)
 
         result = len(mail.attachments)
@@ -379,8 +382,7 @@ class TestMailParser(unittest.TestCase):
             self.assertEqual(1, len(mail.defects))
             self.assertEqual(1, len(mail.defects_categories))
             self.assertIn("defects", mail.mail)
-            self.assertIn(
-                "CloseBoundaryNotFoundDefect", mail.defects_categories)
+            self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
 
     @unittest.skip("Skipping this test for now")
     def test_defects_bug(self):
@@ -390,8 +392,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(mail.defects))
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
-        self.assertIn("StartBoundaryNotFoundDefect",
-                      mail.defects_categories)
+        self.assertIn("StartBoundaryNotFoundDefect", mail.defects_categories)
         self.assertIsInstance(mail.parsed_mail_json, six.text_type)
 
         result = len(mail.attachments)
@@ -406,27 +407,19 @@ class TestMailParser(unittest.TestCase):
 
         self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(
-            result["attachments"][0]["mail_content_type"], six.text_type)
+            result["attachments"][0]["mail_content_type"], six.text_type
+        )
         self.assertFalse(result["attachments"][0]["binary"])
-        self.assertIsInstance(
-            result["attachments"][0]["payload"], six.text_type)
+        self.assertIsInstance(result["attachments"][0]["payload"], six.text_type)
         self.assertEqual(
-            result["attachments"][0]["content_transfer_encoding"],
-            "quoted-printable")
-        self.assertEqual(
-            result["attachments"][0]["charset"],
-            "iso-8859-1")
-        self.assertEqual(
-            result["attachments"][0]["content-disposition"], "inline")
+            result["attachments"][0]["content_transfer_encoding"], "quoted-printable"
+        )
+        self.assertEqual(result["attachments"][0]["charset"], "iso-8859-1")
+        self.assertEqual(result["attachments"][0]["content-disposition"], "inline")
 
         mail = mailparser.parse_from_file(mail_malformed_1)
         attachments = mail.mail["attachments"]
         self.assertEqual(attachments[0]["content-disposition"], "")
-
-    def test_from_bytes(self):
-        if six.PY2:
-            with self.assertRaises(MailParserEnvironmentError):
-                mailparser.MailParser.from_bytes(b"")
 
     def test_classmethods(self):
         # MailParser.from_file
@@ -568,12 +561,12 @@ class TestMailParser(unittest.TestCase):
         s = ported_string(raw_data)
         self.assertEqual(s, six.text_type())
 
-        raw_data = u"test"
+        raw_data = "test"
         s = ported_string(raw_data)
         self.assertEqual(s, "test")
 
     def test_standard_outlook(self):
-        """ Verify a basic outlook received header works. """
+        """Verify a basic outlook received header works."""
         received = """
             from DM3NAM03FT035
             by CY4PR0601CA0051.outlook.office365.com
@@ -583,19 +576,19 @@ class TestMailParser(unittest.TestCase):
         """.strip()
 
         expected = {
-            'from': 'DM3NAM03FT035',
-            'by': 'CY4PR0601CA0051.outlook.office365.com',
-            'with': 'Microsoft SMTP Server version=TLS1_2, cipher=TLS',
-            'id': '15.20.1185.23',
-            'via': 'Frontend Transport',
-            'date': 'Mon, 1 Oct 2018 09:49:21 +0000'
+            "from": "DM3NAM03FT035",
+            "by": "CY4PR0601CA0051.outlook.office365.com",
+            "with": "Microsoft SMTP Server version=TLS1_2, cipher=TLS",
+            "id": "15.20.1185.23",
+            "via": "Frontend Transport",
+            "date": "Mon, 1 Oct 2018 09:49:21 +0000",
         }
         values_by_clause = parse_received(received)
 
         self.assertEqual(expected, values_by_clause)
 
     def test_standard_google__with_cipher(self):
-        """ Verify that we don't match 'with cipher' a la google. """
+        """Verify that we don't match 'with cipher' a la google."""
         received = """
             from mail_yw1_f65.google.com
             by subdomain.domain.com Postfix with ESMTPS
@@ -603,12 +596,12 @@ class TestMailParser(unittest.TestCase):
             Tue, 25 Sep 2018 13:09:36 +0000 (UTC)"""
 
         expected = {
-            'from': 'mail_yw1_f65.google.com',
-            'by': 'subdomain.domain.com Postfix',
-            'with': 'ESMTPS',
-            'id': 'abc123',
-            'for': '<user@domain.com>',
-            'date': 'Tue, 25 Sep 2018 13:09:36 +0000 (UTC)'
+            "from": "mail_yw1_f65.google.com",
+            "by": "subdomain.domain.com Postfix",
+            "with": "ESMTPS",
+            "id": "abc123",
+            "for": "<user@domain.com>",
+            "date": "Tue, 25 Sep 2018 13:09:36 +0000 (UTC)",
         }
         values_by_clause = parse_received(received)
         self.assertEqual(expected, values_by_clause)
@@ -666,11 +659,7 @@ class TestMailParser(unittest.TestCase):
         temp_dir = tempfile.mkdtemp()
         mail.write_attachments(temp_dir)
         md5 = hashlib.md5()
-        with open(os.path.join(temp_dir, 'REQUEST FOR QUOTE.zip'), 'rb') as f:
+        with open(os.path.join(temp_dir, "REQUEST FOR QUOTE.zip"), "rb") as f:
             md5.update(f.read())
         shutil.rmtree(temp_dir)
-        self.assertEqual(md5.hexdigest(), '4f2cf891e7cfb349fca812091f184ecc')
-
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
+        self.assertEqual(md5.hexdigest(), "4f2cf891e7cfb349fca812091f184ecc")

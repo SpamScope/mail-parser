@@ -27,10 +27,7 @@ import ipaddress
 import six
 import json
 
-from .const import (
-    ADDRESSES_HEADERS,
-    EPILOGUE_DEFECTS,
-    REGXIP)
+from .const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
 
 from .utils import (
     convert_mail_date,
@@ -133,8 +130,7 @@ class MailParser(object):
         Init a new object from a message object structure.
         """
         self._message = message
-        log.debug(
-            "All headers of emails: {}".format(", ".join(message.keys())))
+        log.debug("All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
 
     def __str__(self):
@@ -236,7 +232,8 @@ class MailParser(object):
         log.debug("Parsing email from bytes")
         if six.PY2:
             raise MailParserEnvironmentError(
-                "Parsing from bytes is valid only for Python 3.x version")
+                "Parsing from bytes is valid only for Python 3.x version"
+            )
         message = email.message_from_bytes(bt)
         return cls(message)
 
@@ -338,7 +335,8 @@ class MailParser(object):
             epilogue = find_between(
                 self.message.epilogue,
                 "{}".format("--" + self.message.get_boundary()),
-                "{}".format("--" + self.message.get_boundary() + "--"))
+                "{}".format("--" + self.message.get_boundary() + "--"),
+            )
 
             try:
                 p = email.message_from_string(epilogue)
@@ -350,30 +348,31 @@ class MailParser(object):
 
         # walk all mail parts
         for i, p in enumerate(parts):
-            if not p.is_multipart() or ported_string(p.get_content_disposition()).lower() == 'attachment':
-                charset = p.get_content_charset('utf-8')
+            if (
+                not p.is_multipart()
+                or ported_string(p.get_content_disposition()).lower() == "attachment"
+            ):
+                charset = p.get_content_charset("utf-8")
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
-                content_disposition = ported_string(
-                    p.get('content-disposition'))
-                log.debug("content-disposition {!r} part {!r}".format(
-                    content_disposition, i))
-                content_id = ported_string(p.get('content-id'))
-                log.debug("content-id {!r} part {!r}".format(
-                    content_id, i))
+                content_disposition = ported_string(p.get("content-disposition"))
+                log.debug(
+                    "content-disposition {!r} part {!r}".format(content_disposition, i)
+                )
+                content_id = ported_string(p.get("content-id"))
+                log.debug("content-id {!r} part {!r}".format(content_id, i))
                 content_subtype = ported_string(p.get_content_subtype())
-                log.debug("content subtype {!r} part {!r}".format(
-                    content_subtype, i))
+                log.debug("content subtype {!r} part {!r}".format(content_subtype, i))
                 filename = decode_header_part(p.get_filename())
 
                 is_attachment = False
                 if filename:
                     is_attachment = True
                 else:
-                    if content_id and content_subtype not in ('html', 'plain'):
+                    if content_id and content_subtype not in ("html", "plain"):
                         is_attachment = True
                         filename = content_id
-                    elif content_subtype in ('rtf'):
+                    elif content_subtype in ("rtf"):
                         is_attachment = True
                         filename = "{}.rtf".format(random_string())
 
@@ -383,54 +382,72 @@ class MailParser(object):
                     log.debug("Filename {!r} part {!r}".format(filename, i))
                     binary = False
                     mail_content_type = ported_string(p.get_content_type())
-                    log.debug("Mail content type {!r} part {!r}".format(
-                        mail_content_type, i))
+                    log.debug(
+                        "Mail content type {!r} part {!r}".format(mail_content_type, i)
+                    )
                     transfer_encoding = ported_string(
-                        p.get('content-transfer-encoding', '')).lower()
-                    log.debug("Transfer encoding {!r} part {!r}".format(
-                        transfer_encoding, i))
-                    content_disposition = ported_string(
-                        p.get('content-disposition'))
-                    log.debug("content-disposition {!r} part {!r}".format(
-                        content_disposition, i))
+                        p.get("content-transfer-encoding", "")
+                    ).lower()
+                    log.debug(
+                        "Transfer encoding {!r} part {!r}".format(transfer_encoding, i)
+                    )
+                    content_disposition = ported_string(p.get("content-disposition"))
+                    log.debug(
+                        "content-disposition {!r} part {!r}".format(
+                            content_disposition, i
+                        )
+                    )
 
                     if p.is_multipart():
-                        payload = ''.join([m.as_string() for m in p.get_payload(decode=False)])
+                        payload = "".join(
+                            [m.as_string() for m in p.get_payload(decode=False)]
+                        )
                         binary = False
-                        log.debug("Filename {!r} part {!r} is multipart".format(
-                            filename, i))
+                        log.debug(
+                            "Filename {!r} part {!r} is multipart".format(filename, i)
+                        )
                     elif transfer_encoding == "base64" or (
-                       transfer_encoding == "quoted-\
-                       printable" and "application" in mail_content_type):
-
+                        transfer_encoding
+                        == "quoted-\
+                       printable"
+                        and "application" in mail_content_type
+                    ):
                         payload = p.get_payload(decode=False)
                         binary = True
-                        log.debug("Filename {!r} part {!r} is binary".format(
-                            filename, i))
+                        log.debug(
+                            "Filename {!r} part {!r} is binary".format(filename, i)
+                        )
                     elif "uuencode" in transfer_encoding:
                         # Re-encode in base64
-                        payload = base64.b64encode(
-                            p.get_payload(decode=True)).decode('ascii')
+                        payload = base64.b64encode(p.get_payload(decode=True)).decode(
+                            "ascii"
+                        )
                         binary = True
                         transfer_encoding = "base64"
-                        log.debug("Filename {!r} part {!r} is binary (uuencode"
-                                  " re-encoded to base64)".format(filename, i))
+                        log.debug(
+                            "Filename {!r} part {!r} is binary (uuencode"
+                            " re-encoded to base64)".format(filename, i)
+                        )
                     else:
                         payload = ported_string(
-                            p.get_payload(decode=True), encoding=charset)
+                            p.get_payload(decode=True), encoding=charset
+                        )
                         log.debug(
-                            "Filename {!r} part {!r} is not binary".format(
-                                filename, i))
+                            "Filename {!r} part {!r} is not binary".format(filename, i)
+                        )
 
-                    self._attachments.append({
-                        "filename": filename,
-                        "payload": payload,
-                        "binary": binary,
-                        "mail_content_type": mail_content_type,
-                        "content-id": content_id,
-                        "content-disposition": content_disposition,
-                        "charset": charset_raw,
-                        "content_transfer_encoding": transfer_encoding})
+                    self._attachments.append(
+                        {
+                            "filename": filename,
+                            "payload": payload,
+                            "binary": binary,
+                            "mail_content_type": mail_content_type,
+                            "content-id": content_id,
+                            "content-disposition": content_disposition,
+                            "charset": charset_raw,
+                            "content_transfer_encoding": transfer_encoding,
+                        }
+                    )
 
                 # this isn't an attachments
                 else:
@@ -444,23 +461,25 @@ class MailParser(object):
                     # we need to decode them with encoding python is appying
                     # To maintain the characters
                     payload = p.get_payload(decode=True)
-                    cte = p.get('Content-Transfer-Encoding')
+                    cte = p.get("Content-Transfer-Encoding")
                     if cte:
                         cte = cte.lower()
-                    if not cte or cte in ['7bit', '8bit']:
-                        payload = payload.decode('raw-unicode-escape')
+                    if not cte or cte in ["7bit", "8bit"]:
+                        payload = payload.decode("raw-unicode-escape")
                     else:
                         payload = ported_string(payload, encoding=charset)
 
                     if payload:
-                        if p.get_content_subtype() == 'html':
+                        if p.get_content_subtype() == "html":
                             self._text_html.append(payload)
-                        elif p.get_content_subtype() == 'plain':
+                        elif p.get_content_subtype() == "plain":
                             self._text_plain.append(payload)
                         else:
                             log.warning(
-                                'Email content {!r} not handled'.format(
-                                    p.get_content_subtype()))
+                                "Email content {!r} not handled".format(
+                                    p.get_content_subtype()
+                                )
+                            )
                             self._text_not_managed.append(payload)
         else:
             # Parsed object mail with all parts
@@ -507,13 +526,12 @@ class MailParser(object):
             i = ported_string(i)
             if trust in i:
                 log.debug("Trust string {!r} is in {!r}".format(trust, i))
-                check = REGXIP.findall(i[0:i.find("by")])
+                check = REGXIP.findall(i[0 : i.find("by")])
 
                 if check:
                     try:
                         ip_str = six.text_type(check[-1])
-                        log.debug("Found sender IP {!r} in {!r}".format(
-                            ip_str, i))
+                        log.debug("Found sender IP {!r} in {!r}".format(ip_str, i))
                         ip = ipaddress.ip_address(ip_str)
                     except ValueError:
                         return
@@ -523,14 +541,12 @@ class MailParser(object):
                             return ip_str
 
     def write_attachments(self, base_path):
-        """ This method writes the attachments of mail on disk
+        """This method writes the attachments of mail on disk
 
         Arguments:
             base_path {str} -- Base path where write the attachments
         """
-        write_attachments(
-            attachments=self.attachments,
-            base_path=base_path)
+        write_attachments(attachments=self.attachments, base_path=base_path)
 
     def __getattr__(self, name):
         name = name.strip("_").lower()
@@ -549,8 +565,7 @@ class MailParser(object):
 
         # object headers
         elif name_header in ADDRESSES_HEADERS:
-            h = decode_header_part(self.message.get(
-                name_header, six.text_type()))
+            h = decode_header_part(self.message.get(name_header, six.text_type()))
             return email.utils.getaddresses([h])
 
         # others headers
@@ -596,7 +611,8 @@ class MailParser(object):
         "--- mail_boundary ---"
         """
         return "\n--- mail_boundary ---\n".join(
-            self.text_plain + self.text_html + self.text_not_managed)
+            self.text_plain + self.text_html + self.text_not_managed
+        )
 
     @property
     def headers(self):
@@ -641,7 +657,7 @@ class MailParser(object):
         """
         Return the mail date in datetime.datetime format and UTC.
         """
-        date = self.message.get('date')
+        date = self.message.get("date")
         conv = None
 
         try:
@@ -654,7 +670,7 @@ class MailParser(object):
         """
         Return timezone. Offset from UTC.
         """
-        date = self.message.get('date')
+        date = self.message.get("date")
         timezone = 0
 
         try:

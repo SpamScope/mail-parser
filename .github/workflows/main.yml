@@ -32,12 +32,19 @@ jobs:
           sudo cpan -f -i Email::Outlook::Message
 
       - name: Run tests
+        env:
+          PYTHONPATH: src
         run: |
-          pytest
+          pytest --cov=mailparser --cov-report=xml
           python -m mailparser -v
           python -m mailparser -h
           mail-parser -f tests/mails/mail_malformed_3 -j
           cat tests/mails/mail_malformed_3 | mail-parser -k -j
+
+      - name: Run pre-commit
+        if: matrix.python-version == '3.10'
+        run: |
+          make pre-commit
 
       - name: Report to Coveralls
         if: matrix.python-version == '3.10'
