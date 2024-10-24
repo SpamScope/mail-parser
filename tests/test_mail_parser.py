@@ -422,11 +422,6 @@ class TestMailParser(unittest.TestCase):
         attachments = mail.mail["attachments"]
         self.assertEqual(attachments[0]["content-disposition"], "")
 
-    def test_from_bytes(self):
-        if six.PY2:
-            with self.assertRaises(MailParserEnvironmentError):
-                mailparser.MailParser.from_bytes(b"")
-
     def test_classmethods(self):
         # MailParser.from_file
         m = mailparser.MailParser.from_file(mail_test_3)
@@ -669,7 +664,3 @@ class TestMailParser(unittest.TestCase):
             md5.update(f.read())
         shutil.rmtree(temp_dir)
         self.assertEqual(md5.hexdigest(), '4f2cf891e7cfb349fca812091f184ecc')
-
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)

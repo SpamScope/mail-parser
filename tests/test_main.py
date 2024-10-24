@@ -86,7 +86,3 @@ class TestMain(unittest.TestCase):
 
         parsed = self.parser.parse_args(["--file", "mail.eml", "-c"])
         self.assertTrue(parsed.receiveds)
-
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)

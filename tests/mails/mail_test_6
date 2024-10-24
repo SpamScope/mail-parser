@@ -24,9 +24,9 @@ DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=ggg.com;
 	 YkAQVr7zVMpbpZml/aYp38SQcR/X+eYPSMFAe5+E=
 X-Mailru-Msgtype: 770 capital
 List-Id: <770 capital.ggg.com>
-List-Unsubscribe: 
+List-Unsubscribe:
  <https://ggg.com/subs/unsubs_user.html?subs=13&hash=fa7e6cf41a395a891e8454dec8bd0744&uid=2505549&hash_user=bd381bed262dce057e5eabee76ca805b&id_rm=6229&id_v=1011>
-Subject: 
+Subject:
  =?UTF-8?B?0JHRi9GB0YLRgNC10LUg0LLQutC70LDQtNGL0LLQsNC50YLQtSDQsiDQt9C+?=
  =?UTF-8?B?0LvQvtGC0L4h?=
 From: =?UTF-8?B?0JLRgNC10LzRjyDQv9GA0LjRiNC70L4=?= <noreply@ggg.com>
