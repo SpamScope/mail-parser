@@ -201,7 +201,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(sha1, "62fef1e38327ed09363624c3aff8ea11723ee05f")
         self.assertEqual(
             sha256,
-            ("cd4af1017f2e623f6d38f691048b6" "a28d8b1f44a0478137b4337eac6de78f71a"),
+            ("cd4af1017f2e623f6d38f691048b6a28d8b1f44a0478137b4337eac6de78f71a"),
         )
         self.assertEqual(
             sha512,
