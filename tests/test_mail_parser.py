@@ -19,7 +19,6 @@ limitations under the License.
 
 import datetime
 import hashlib
-import logging
 import os
 import shutil
 import six
@@ -27,11 +26,6 @@ import sys
 import tempfile
 import unittest
 
-base_path = os.path.realpath(os.path.dirname(__file__))
-root = os.path.join(base_path, '..')
-sys.path.append(root)
-
-logging.getLogger().addHandler(logging.NullHandler())
 
 import mailparser
 from mailparser.utils import (
@@ -47,8 +41,13 @@ from mailparser.utils import (
     parse_received,
     random_string,
 )
-
 from mailparser.exceptions import MailParserEnvironmentError
+
+
+base_path = os.path.realpath(os.path.dirname(__file__))
+root = os.path.join(base_path, '..')
+
+
 
 mail_test_1 = os.path.join(base_path, 'mails', 'mail_test_1')
 mail_test_2 = os.path.join(base_path, 'mails', 'mail_test_2')
