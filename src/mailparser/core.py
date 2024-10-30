@@ -27,9 +27,9 @@ import ipaddress
 import six
 import json
 
-from .const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
+from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
 
-from .utils import (
+from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
@@ -44,7 +44,7 @@ from .utils import (
     write_attachments,
 )
 
-from .exceptions import MailParserEnvironmentError
+from mailparser.exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)
