@@ -529,19 +529,35 @@ class MailParser(object):
             i = ported_string(i)
             if trust in i:
                 log.debug("Trust string {!r} is in {!r}".format(trust, i))
-                check = REGXIP.findall(i[0 : i.find("by")])
+                ip_str = self._extract_ip(i)
+                if ip_str:
+                    return ip_str
 
-                if check:
-                    try:
-                        ip_str = six.text_type(check[-1])
-                        log.debug("Found sender IP {!r} in {!r}".format(ip_str, i))
-                        ip = ipaddress.ip_address(ip_str)
-                    except ValueError:
-                        return
-                    else:
-                        if not ip.is_private:
-                            log.debug("IP {!r} not private".format(ip_str))
-                            return ip_str
+    def _extract_ip(self, received_header):
+        """
+        Extract the IP address from the received header if it is not private.
+
+        Args:
+            received_header (string): The received header string
+
+        Returns:
+            string with the ip address or None
+        """
+        check = REGXIP.findall(received_header[0 : received_header.find("by")])
+        if check:
+            try:
+                ip_str = six.text_type(check[-1])
+                log.debug(
+                    "Found sender IP {!r} in {!r}".format(ip_str, received_header)
+                )
+                ip = ipaddress.ip_address(ip_str)
+            except ValueError:
+                return None
+            else:
+                if not ip.is_private:
+                    log.debug("IP {!r} not private".format(ip_str))
+                    return ip_str
+        return None
 
     def write_attachments(self, base_path):
         """This method writes the attachments of mail on disk
