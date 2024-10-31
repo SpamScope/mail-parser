@@ -375,6 +375,9 @@ class MailParser(object):
                     elif content_subtype in ("rtf"):
                         is_attachment = True
                         filename = "{}.rtf".format(random_string())
+                    elif content_disposition == "attachment":
+                        is_attachment = True
+                        filename = "{}.txt".format(random_string())
 
                 # this is an attachment
                 if is_attachment:
@@ -662,8 +665,9 @@ class MailParser(object):
 
         try:
             conv, _ = convert_mail_date(date)
-        finally:
-            return conv
+        except Exception:
+            pass
+        return conv
 
     @property
     def timezone(self):
@@ -675,8 +679,9 @@ class MailParser(object):
 
         try:
             _, timezone = convert_mail_date(date)
-        finally:
-            return timezone
+        except Exception:
+            pass
+        return timezone
 
     @property
     def date_json(self):
