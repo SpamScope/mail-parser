@@ -467,8 +467,12 @@ class MailParser(object):
                     cte = p.get("Content-Transfer-Encoding")
                     if cte:
                         cte = cte.lower()
+
                     if not cte or cte in ["7bit", "8bit"]:
-                        payload = payload.decode("raw-unicode-escape")
+                        try:
+                            payload = payload.decode("raw-unicode-escape")
+                        except UnicodeDecodeError:
+                            payload = ported_string(payload, encoding=charset)
                     else:
                         payload = ported_string(payload, encoding=charset)
 
@@ -484,12 +488,12 @@ class MailParser(object):
                                 )
                             )
                             self._text_not_managed.append(payload)
-        else:
-            # Parsed object mail with all parts
-            self._mail = self._make_mail()
 
-            # Parsed object mail with mains parts
-            self._mail_partial = self._make_mail(complete=False)
+        # Parsed object mail with all parts
+        self._mail = self._make_mail()
+
+        # Parsed object mail with mains parts
+        self._mail_partial = self._make_mail(complete=False)
 
     def get_server_ipaddress(self, trust):
         """
