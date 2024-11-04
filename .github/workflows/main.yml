@@ -65,3 +65,39 @@ jobs:
           path: |
             dist/mail-parser-*.tar.gz
             dist/mail_parser-*.whl
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract branch name
+        id: extract_branch
+        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+
+      - name: Build and push Docker image
+        run: |
+          IMAGE_NAME=ghcr.io/${{ github.repository }}/mailparser
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          else
+            TAG=develop
+          fi
+          docker build \
+            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+            --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
+            --label "org.opencontainers.image.licenses=Apache-2.0" \
+            --build-arg BRANCH=$TAG
+            -t $IMAGE_NAME:$TAG .
+          docker push $IMAGE_NAME:$TAG
