@@ -85,13 +85,10 @@ jobs:
       - name: Extract branch or tag name
         id: extract_ref
         run: |
-          echo "GITHUB_REF=${GITHUB_REF}"
-          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            REF_NAME=${GITHUB_REF#refs/heads/}
-          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            REF_NAME=${GITHUB_REF#refs/tags/}
+          if [ -n "${GITHUB_HEAD_REF}" ]; then
+            REF_NAME=${GITHUB_HEAD_REF}
           else
-            REF_NAME=develop
+            REF_NAME=$(git describe --tags --exact-match 2>/dev/null || git rev-parse --abbrev-ref HEAD)
           fi
           echo "REF_NAME=${REF_NAME,,}" >> $GITHUB_ENV
 
@@ -100,6 +97,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
+          cd docker
           IMAGE_NAME=ghcr.io/ghcr.io/spamscope/mail-parser/mailparser
           docker build \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
