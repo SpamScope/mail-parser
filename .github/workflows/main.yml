@@ -1,4 +1,4 @@
-name: Python application
+name: Python application and Docker image CI
 
 on:
   push:
@@ -73,14 +73,21 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Extract branch or tag name
         id: extract_ref
@@ -95,7 +102,7 @@ jobs:
       - name: Debug REF_NAME
         run: echo "REF_NAME=${{ env.REF_NAME }}"
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image on GitHub Container Registry
         run: |
           cd docker
           IMAGE_NAME=ghcr.io/ghcr.io/spamscope/mail-parser/mailparser
@@ -106,3 +113,26 @@ jobs:
             --build-arg BRANCH=${{ env.REF_NAME }} \
             -t $IMAGE_NAME:${{ env.REF_NAME }} .
           docker push $IMAGE_NAME:${{ env.REF_NAME }}
+
+      - name: Build and push Docker image on Docker Hub
+        run: |
+          IMAGE_NAME=docker.io/${{ secrets.DOCKER_USERNAME }}/spamscope-mail-parser
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            docker build \
+              --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+              --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
+              --label "org.opencontainers.image.licenses=Apache-2.0" \
+              --build-arg BRANCH=$TAG \
+              -t $IMAGE_NAME:$TAG \
+              -t $IMAGE_NAME:latest .
+            docker push $IMAGE_NAME:$TAG
+            docker push $IMAGE_NAME:latest
+          else
+            docker build \
+              --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+              --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
+              --label "org.opencontainers.image.licenses=Apache-2.0" \
+              --build-arg BRANCH=develop \
+              -t $IMAGE_NAME:develop .
+            docker push $IMAGE_NAME:develop
