@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from mailparser.mailparser import (
+from mailparser.core import (
     MailParser,
     parse_from_bytes,
     parse_from_file,

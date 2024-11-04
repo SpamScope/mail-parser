@@ -359,12 +359,15 @@ def receiveds_parsing(receiveds):
 
 
 def convert_mail_date(date):
+    """
+    Convert a mail date in a datetime object.
+    """
     log.debug("Date to parse: {!r}".format(date))
     d = email.utils.parsedate_tz(date)
     log.debug("Date parsed: {!r}".format(d))
     t = email.utils.mktime_tz(d)
     log.debug("Date parsed in timestamp: {!r}".format(t))
-    date_utc = datetime.datetime.utcfromtimestamp(t)
+    date_utc = datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
     timezone = d[9] / 3600.0 if d[9] else 0
     timezone = "{:+.1f}".format(timezone)
     log.debug("Calculated timezone: {!r}".format(timezone))
