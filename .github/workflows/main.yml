@@ -82,22 +82,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract branch name
-        id: extract_branch
-        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+      - name: Extract branch or tag name
+        id: extract_ref
+        run: |
+          if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
+            echo "REF_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "REF_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "REF_NAME=unknown" >> $GITHUB_ENV
+          fi
 
       - name: Build and push Docker image
         run: |
           IMAGE_NAME=ghcr.io/${{ github.repository }}/mailparser
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            TAG=${GITHUB_REF#refs/tags/}
-          else
-            TAG=develop
-          fi
           docker build \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
             --label "org.opencontainers.image.licenses=Apache-2.0" \
-            --build-arg BRANCH=$TAG
-            -t $IMAGE_NAME:$TAG .
-          docker push $IMAGE_NAME:$TAG
+            --build-arg BRANCH=${{ env.REF_NAME }} \
+            -t $IMAGE_NAME:${{ env.REF_NAME }} .
+          docker push $IMAGE_NAME:${{ env.REF_NAME }}
