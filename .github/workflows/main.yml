@@ -116,6 +116,7 @@ jobs:
 
       - name: Build and push Docker image on Docker Hub
         run: |
+          cd docker
           IMAGE_NAME=docker.io/${{ secrets.DOCKER_USERNAME }}/spamscope-mail-parser
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             TAG=${GITHUB_REF#refs/tags/}
