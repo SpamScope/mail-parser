@@ -135,4 +135,5 @@ jobs:
               --label "org.opencontainers.image.licenses=Apache-2.0" \
               --build-arg BRANCH=${{ env.REF_NAME }} \
               -t $IMAGE_NAME:develop .
-            docker push $IMAGE_NAME:develop
+            # docker push $IMAGE_NAME:develop
+            docker images
