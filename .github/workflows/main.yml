@@ -133,6 +133,6 @@ jobs:
               --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
               --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
               --label "org.opencontainers.image.licenses=Apache-2.0" \
-              --build-arg BRANCH=develop \
+              --build-arg BRANCH=${{ env.REF_NAME }} \
               -t $IMAGE_NAME:develop .
             docker push $IMAGE_NAME:develop
