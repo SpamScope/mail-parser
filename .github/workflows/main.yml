@@ -91,7 +91,7 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             REF_NAME=${GITHUB_REF#refs/tags/}
           else
-            REF_NAME=unknown
+            REF_NAME=develop
           fi
           echo "REF_NAME=${REF_NAME,,}" >> $GITHUB_ENV
 
@@ -100,7 +100,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository }}/mailparser
+          IMAGE_NAME=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/mailparser
           docker build \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
