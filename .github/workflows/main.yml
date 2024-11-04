@@ -100,7 +100,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          IMAGE_NAME=ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')/mailparser
+          IMAGE_NAME=ghcr.io/ghcr.io/spamscope/mail-parser/mailparser
           docker build \
             --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
             --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
