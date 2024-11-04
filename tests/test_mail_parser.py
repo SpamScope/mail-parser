@@ -302,7 +302,7 @@ class TestMailParser(unittest.TestCase):
         # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
         self.assertIsInstance(mail.date_raw, six.text_type)
         self.assertIsInstance(mail.date_json, six.text_type)
-        raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
+        raw_utc = "2015-11-29T08:45:18+00:00"
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
@@ -548,7 +548,7 @@ class TestMailParser(unittest.TestCase):
         s = "Mon, 20 Mar 2017 05:12:54 +0600"
         d, t = convert_mail_date(s)
         self.assertEqual(t, "+6.0")
-        self.assertEqual(str(d), "2017-03-19 23:12:54")
+        self.assertEqual(str(d), "2017-03-19 23:12:54+00:00")
         s = "Mon, 20 Mar 2017 05:12:54 -0600"
         d, t = convert_mail_date(s)
         self.assertEqual(t, "-6.0")
@@ -650,7 +650,7 @@ class TestMailParser(unittest.TestCase):
         # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
         self.assertIsInstance(mail.date_raw, six.text_type)
         self.assertIsInstance(mail.date_json, six.text_type)
-        raw_utc = datetime.datetime(2015, 11, 29, 8, 45, 18, 0).isoformat()
+        raw_utc = "2015-11-29T08:45:18+00:00"
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 

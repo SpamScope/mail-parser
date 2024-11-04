@@ -27,9 +27,9 @@ import ipaddress
 import six
 import json
 
-from .const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
+from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
 
-from .utils import (
+from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
@@ -44,7 +44,7 @@ from .utils import (
     write_attachments,
 )
 
-from .exceptions import MailParserEnvironmentError
+from mailparser.exceptions import MailParserEnvironmentError
 
 
 log = logging.getLogger(__name__)
@@ -375,6 +375,9 @@ class MailParser(object):
                     elif content_subtype in ("rtf"):
                         is_attachment = True
                         filename = "{}.rtf".format(random_string())
+                    elif content_disposition == "attachment":
+                        is_attachment = True
+                        filename = "{}.txt".format(random_string())
 
                 # this is an attachment
                 if is_attachment:
@@ -464,8 +467,12 @@ class MailParser(object):
                     cte = p.get("Content-Transfer-Encoding")
                     if cte:
                         cte = cte.lower()
+
                     if not cte or cte in ["7bit", "8bit"]:
-                        payload = payload.decode("raw-unicode-escape")
+                        try:
+                            payload = payload.decode("raw-unicode-escape")
+                        except UnicodeDecodeError:
+                            payload = ported_string(payload, encoding=charset)
                     else:
                         payload = ported_string(payload, encoding=charset)
 
@@ -481,12 +488,12 @@ class MailParser(object):
                                 )
                             )
                             self._text_not_managed.append(payload)
-        else:
-            # Parsed object mail with all parts
-            self._mail = self._make_mail()
 
-            # Parsed object mail with mains parts
-            self._mail_partial = self._make_mail(complete=False)
+        # Parsed object mail with all parts
+        self._mail = self._make_mail()
+
+        # Parsed object mail with mains parts
+        self._mail_partial = self._make_mail(complete=False)
 
     def get_server_ipaddress(self, trust):
         """
@@ -526,19 +533,35 @@ class MailParser(object):
             i = ported_string(i)
             if trust in i:
                 log.debug("Trust string {!r} is in {!r}".format(trust, i))
-                check = REGXIP.findall(i[0 : i.find("by")])
+                ip_str = self._extract_ip(i)
+                if ip_str:
+                    return ip_str
 
-                if check:
-                    try:
-                        ip_str = six.text_type(check[-1])
-                        log.debug("Found sender IP {!r} in {!r}".format(ip_str, i))
-                        ip = ipaddress.ip_address(ip_str)
-                    except ValueError:
-                        return
-                    else:
-                        if not ip.is_private:
-                            log.debug("IP {!r} not private".format(ip_str))
-                            return ip_str
+    def _extract_ip(self, received_header):
+        """
+        Extract the IP address from the received header if it is not private.
+
+        Args:
+            received_header (string): The received header string
+
+        Returns:
+            string with the ip address or None
+        """
+        check = REGXIP.findall(received_header[0 : received_header.find("by")])
+        if check:
+            try:
+                ip_str = six.text_type(check[-1])
+                log.debug(
+                    "Found sender IP {!r} in {!r}".format(ip_str, received_header)
+                )
+                ip = ipaddress.ip_address(ip_str)
+            except ValueError:
+                return None
+            else:
+                if not ip.is_private:
+                    log.debug("IP {!r} not private".format(ip_str))
+                    return ip_str
+        return None
 
     def write_attachments(self, base_path):
         """This method writes the attachments of mail on disk
@@ -662,8 +685,9 @@ class MailParser(object):
 
         try:
             conv, _ = convert_mail_date(date)
-        finally:
-            return conv
+        except Exception:
+            pass
+        return conv
 
     @property
     def timezone(self):
@@ -675,8 +699,9 @@ class MailParser(object):
 
         try:
             _, timezone = convert_mail_date(date)
-        finally:
-            return timezone
+        except Exception:
+            pass
+        return timezone
 
     @property
     def date_json(self):
