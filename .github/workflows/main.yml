@@ -85,13 +85,18 @@ jobs:
       - name: Extract branch or tag name
         id: extract_ref
         run: |
+          echo "GITHUB_REF=${GITHUB_REF}"
           if [[ "${GITHUB_REF}" == refs/heads/* ]]; then
-            echo "REF_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+            REF_NAME=${GITHUB_REF#refs/heads/}
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "REF_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            REF_NAME=${GITHUB_REF#refs/tags/}
           else
-            echo "REF_NAME=unknown" >> $GITHUB_ENV
+            REF_NAME=unknown
           fi
+          echo "REF_NAME=${REF_NAME,,}" >> $GITHUB_ENV
+
+      - name: Debug REF_NAME
+        run: echo "REF_NAME=${{ env.REF_NAME }}"
 
       - name: Build and push Docker image
         run: |
