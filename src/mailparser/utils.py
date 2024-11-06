@@ -41,15 +41,28 @@ import tempfile
 
 import six
 
-from .const import ADDRESSES_HEADERS, JUNK_PATTERN, OTHERS_PARTS, RECEIVED_COMPILED_LIST
+from mailparser.const import (
+    ADDRESSES_HEADERS,
+    JUNK_PATTERN,
+    OTHERS_PARTS,
+    RECEIVED_COMPILED_LIST,
+)
 
-from .exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
+    """
+    This function returns a custom logger.
+    :param level: logging level
+    :type level: str
+    :param name: logger name
+    :type name: str
+    :return: logger
+    """
     if name:
         log = logging.getLogger(name)
     else:
@@ -61,6 +74,7 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
         "%(name)s | "
         "%(module)s | "
         "%(funcName)s | "
+        "%(lineno)d | "
         "%(levelname)s | "
         "%(message)s"
     )
@@ -169,7 +183,7 @@ def fingerprints(data):
         namedtuple: fingerprints md5, sha1, sha256, sha512
     """
 
-    Hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
+    hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
 
     if six.PY2:
         if not isinstance(data, str):
@@ -198,7 +212,7 @@ def fingerprints(data):
     sha512.update(data)
     sha512 = sha512.hexdigest()
 
-    return Hashes(md5, sha1, sha256, sha512)
+    return hashes(md5, sha1, sha256, sha512)
 
 
 def msgconvert(email):
