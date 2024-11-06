@@ -106,13 +106,26 @@ jobs:
         run: |
           cd docker
           IMAGE_NAME=ghcr.io/ghcr.io/spamscope/mail-parser/mailparser
-          docker build \
-            --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
-            --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
-            --label "org.opencontainers.image.licenses=Apache-2.0" \
-            --build-arg BRANCH=${{ env.REF_NAME }} \
-            -t $IMAGE_NAME:${{ env.REF_NAME }} .
-          docker push $IMAGE_NAME:${{ env.REF_NAME }}
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            docker build \
+              --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+              --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
+              --label "org.opencontainers.image.licenses=Apache-2.0" \
+              --build-arg BRANCH=$TAG \
+              -t $IMAGE_NAME:$TAG \
+              -t $IMAGE_NAME:latest .
+            docker push $IMAGE_NAME:$TAG
+            docker push $IMAGE_NAME:latest
+          else
+            docker build \
+              --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
+              --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
+              --label "org.opencontainers.image.licenses=Apache-2.0" \
+              --build-arg BRANCH=${{ env.REF_NAME }} \
+              -t $IMAGE_NAME:develop .
+            docker push $IMAGE_NAME:develop
+          fi
 
       - name: Build and push Docker image on Docker Hub
         run: |
