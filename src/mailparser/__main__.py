@@ -19,8 +19,6 @@ limitations under the License.
 
 import argparse
 import logging
-import os
-import runpy
 import sys
 
 import mailparser
@@ -32,11 +30,7 @@ from mailparser.utils import (
     safe_print,
     write_attachments,
 )
-
-
-current = os.path.realpath(os.path.dirname(__file__))
-
-__version__ = runpy.run_path(os.path.join(current, "version.py"))["__version__"]
+from mailparser.version import __version__
 
 
 log = logging.getLogger("mailparser")
