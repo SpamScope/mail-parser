@@ -18,8 +18,7 @@ limitations under the License.
 """
 
 import argparse
-import os
-import runpy
+import logging
 import sys
 
 import mailparser
@@ -31,14 +30,18 @@ from mailparser.utils import (
     safe_print,
     write_attachments,
 )
+from mailparser.version import __version__
 
 
-current = os.path.realpath(os.path.dirname(__file__))
-
-__version__ = runpy.run_path(os.path.join(current, "version.py"))["__version__"]
+log = logging.getLogger("mailparser")
 
 
 def get_args():
+    """
+    Get arguments from command line.
+    :return: argparse.ArgumentParser
+    :rtype: argparse.ArgumentParser
+    """
     parser = argparse.ArgumentParser(
         description="Wrapper for email Python Standard Library",
         epilog="It takes as input a raw mail and generates a parsed object.",
@@ -189,22 +192,80 @@ def get_args():
 
 
 def main():
+    """
+    Main function.
+    """
     args = get_args().parse_args()
-    log = custom_log(level=args.log_level)
+    log = custom_log(level=args.log_level, name="mailparser")
 
+    try:
+        parser = get_parser(args)
+        process_output(args, parser)
+    except Exception as e:
+        log.error(f"An error occurred: {e}")
+        sys.exit(1)
+
+
+def get_parser(args):
+    """
+    Get the correct parser based on the input source.
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    :return: MailParser
+    :rtype: mailparser.core.MailParser
+    """
     if args.file:
-        if args.outlook:
-            log.debug("Analysis Outlook mail")
-            parser = mailparser.parse_from_file_msg(args.file)
-        else:
-            parser = mailparser.parse_from_file(args.file)
+        return parse_file(args)
     elif args.string:
-        parser = mailparser.parse_from_string(args.string)
+        log.debug("Start analysis by string mail")
+        return mailparser.parse_from_string(args.string)
     elif args.stdin:
-        if args.outlook:
-            raise MailParserOutlookError("You can't use stdin with msg Outlook")
-        parser = mailparser.parse_from_file_obj(sys.stdin)
+        return parse_stdin(args)
+    else:
+        raise ValueError("No input source provided")
 
+
+def parse_file(args):
+    """
+    Parse the file based on the arguments provided.
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    :return: MailParser
+    :rtype: mailparser.core.MailParser
+    """
+    log.debug("Start analysis by file mail")
+    if args.outlook:
+        log.debug("Start analysis by Outlook msg")
+        return mailparser.parse_from_file_msg(args.file)
+    else:
+        log.debug("Start analysis by raw mail")
+        return mailparser.parse_from_file(args.file)
+
+
+def parse_stdin(args):
+    """
+    Parse the stdin based on the arguments provided.
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    :return: MailParser
+    :rtype: mailparser.core.MailParser
+    """
+    log.debug("Start analysis by stdin mail")
+    if args.outlook:
+        raise MailParserOutlookError("You can't use stdin with msg Outlook")
+    return mailparser.parse_from_file_obj(sys.stdin)
+
+
+def process_output(args, parser):
+    """
+    Process the output based on the arguments provided.
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    :param log: logger
+    :type log: logging.Logger
+    """
     if args.json:
         safe_print(parser.mail_json)
 
@@ -230,21 +291,13 @@ def main():
         safe_print(parser.received_json)
 
     if args.defects:
-        log.debug("Printing defects")
-        for i in parser.defects_categories:
-            safe_print(i)
+        print_defects(parser)
 
     if args.senderip:
-        log.debug("Printing sender IP")
-        r = parser.get_server_ipaddress(args.senderip)
-        if r:
-            safe_print(r)
-        else:
-            safe_print("Not Found")
+        print_sender_ip(parser, args)
 
     if args.attachments or args.attachments_hash:
-        log.debug("Printing attachments details")
-        print_attachments(parser.attachments, args.attachments_hash)
+        print_attachments_details(parser, args)
 
     if args.mail_hash:
         log.debug("Printing also mail fingerprints")
@@ -255,5 +308,41 @@ def main():
         write_attachments(parser.attachments, args.attachments_path)
 
 
-if __name__ == "__main__":
+def print_defects(parser):
+    """
+    Print email defects.
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    """
+    log.debug("Printing defects")
+    for defect in parser.defects_categories:
+        safe_print(defect)
+
+
+def print_sender_ip(parser, args):
+    """
+    Print sender IP address.
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    """
+    log.debug("Printing sender IP")
+    sender_ip = parser.get_server_ipaddress(args.senderip)
+    safe_print(sender_ip if sender_ip else "Not Found")
+
+
+def print_attachments_details(parser, args):
+    """
+    Print attachments details.
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    :param args: argparse.Namespace
+    :type args: argparse.Namespace
+    """
+    log.debug("Printing attachments details")
+    print_attachments(parser.attachments, args.attachments_hash)
+
+
+if __name__ == "__main__":  # pragma: no cover
     main()

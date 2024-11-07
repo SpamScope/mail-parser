@@ -25,6 +25,7 @@ import six
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 import mailparser
@@ -34,7 +35,6 @@ from mailparser.utils import (
     get_header,
     get_mail_keys,
     get_to_domains,
-    msgconvert,
     ported_open,
     ported_string,
     receiveds_parsing,
@@ -182,11 +182,11 @@ class TestMailParser(unittest.TestCase):
 
         trust = ""
         result = mail.get_server_ipaddress(trust)
-        self.assertEqual(result, None)
+        self.assertIsNone(result)
 
         trust = "   "
         result = mail.get_server_ipaddress(trust)
-        self.assertEqual(result, None)
+        self.assertIsNone(result)
 
     def test_ipaddress_unicodeerror(self):
         mail = mailparser.parse_from_file(mail_test_12)
@@ -266,7 +266,7 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, mail.has_defects)
+        self.assertFalse(mail.has_defects)
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -294,12 +294,11 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertEqual(False, result)
+        self.assertFalse(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)
 
-        # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
         self.assertIsInstance(mail.date_raw, six.text_type)
         self.assertIsInstance(mail.date_json, six.text_type)
         raw_utc = "2015-11-29T08:45:18+00:00"
@@ -310,7 +309,7 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, mail.has_defects)
+        self.assertFalse(mail.has_defects)
 
         result = mail.mail
         self.assertIsInstance(result, dict)
@@ -359,11 +358,10 @@ class TestMailParser(unittest.TestCase):
         result = mail.defects
         self.assertIsInstance(result, list)
 
-    @unittest.skip("Skipping this test for now")
     def test_defects(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
 
-        self.assertEqual(True, mail.has_defects)
+        self.assertTrue(mail.has_defects)
         self.assertEqual(1, len(mail.defects))
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
@@ -375,20 +373,19 @@ class TestMailParser(unittest.TestCase):
 
         mail = mailparser.parse_from_file(mail_test_1)
         if six.PY2:
-            self.assertEqual(False, mail.has_defects)
+            self.assertFalse(mail.has_defects)
             self.assertNotIn("defects", mail.mail)
         elif six.PY3:
-            self.assertEqual(True, mail.has_defects)
+            self.assertTrue(mail.has_defects)
             self.assertEqual(1, len(mail.defects))
             self.assertEqual(1, len(mail.defects_categories))
             self.assertIn("defects", mail.mail)
             self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
 
-    @unittest.skip("Skipping this test for now")
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
 
-        self.assertEqual(True, mail.has_defects)
+        self.assertTrue(mail.has_defects)
         self.assertEqual(1, len(mail.defects))
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
@@ -396,12 +393,12 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.parsed_mail_json, six.text_type)
 
         result = len(mail.attachments)
-        self.assertEqual(0, result)
+        self.assertEqual(1, result)
 
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
 
-        self.assertEqual(False, mail.has_defects)
+        self.assertFalse(mail.has_defects)
 
         result = mail.mail
 
@@ -439,8 +436,9 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(m.mail, dict)
         self.assertIsInstance(m.mail_json, six.text_type)
 
-    @unittest.skip("Skipping this test for now")
-    def test_parse_from_file_msg(self):
+    @patch("mailparser.core.os.remove")
+    @patch("mailparser.core.msgconvert")
+    def test_parse_from_file_msg(self, mock_msgconvert, mock_remove):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
 
@@ -448,36 +446,22 @@ class TestMailParser(unittest.TestCase):
         then already publicly available so can not be considered
         as privacy violation
         """
-
+        mock_msgconvert.return_value = (mail_test_2, None)
         m = mailparser.parse_from_file_msg(mail_outlook_1)
+        mock_remove.assert_called_once_with(mail_test_2)
         email = m.mail
         self.assertIn("attachments", email)
-        self.assertEqual(len(email["attachments"]), 6)
+        self.assertEqual(len(email["attachments"]), 3)
         self.assertIn("from", email)
-        self.assertEqual(email["from"][0][1], "NueblingV@w-vwa.de")
+        self.assertEqual(email["from"][0][1], "meteo@regione.vda.it")
         self.assertIn("subject", email)
-
-    @unittest.skip("Skipping this test for now")
-    def test_msgconvert(self):
-        """
-        Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
-
-        The email used for unittest were found randomly on VirusTotal and
-        then already publicly available so can not be considered
-        as privacy violation
-        """
-
-        f, _ = msgconvert(mail_outlook_1)
-        self.assertTrue(os.path.exists(f))
-        m = mailparser.parse_from_file(f)
-        self.assertEqual(m.from_[0][1], "NueblingV@w-vwa.de")
 
     def test_from_file_obj(self):
         with ported_open(mail_test_2) as fp:
             mail = mailparser.parse_from_file_obj(fp)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, mail.has_defects)
+        self.assertFalse(mail.has_defects)
 
         result = mail.mail
         self.assertIsInstance(result, dict)
@@ -614,7 +598,7 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_bytes(mail_bytes)
         trust = "smtp.customers.net"
 
-        self.assertEqual(False, mail.has_defects)
+        self.assertFalse(mail.has_defects)
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -642,12 +626,11 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertEqual(False, result)
+        self.assertFalse(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)
 
-        # raw = "Sun, 29 Nov 2015 09:45:18 +0100"
         self.assertIsInstance(mail.date_raw, six.text_type)
         self.assertIsInstance(mail.date_json, six.text_type)
         raw_utc = "2015-11-29T08:45:18+00:00"

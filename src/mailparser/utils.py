@@ -41,15 +41,28 @@ import tempfile
 
 import six
 
-from .const import ADDRESSES_HEADERS, JUNK_PATTERN, OTHERS_PARTS, RECEIVED_COMPILED_LIST
+from mailparser.const import (
+    ADDRESSES_HEADERS,
+    JUNK_PATTERN,
+    OTHERS_PARTS,
+    RECEIVED_COMPILED_LIST,
+)
 
-from .exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
+    """
+    This function returns a custom logger.
+    :param level: logging level
+    :type level: str
+    :param name: logger name
+    :type name: str
+    :return: logger
+    """
     if name:
         log = logging.getLogger(name)
     else:
@@ -61,6 +74,7 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
         "%(name)s | "
         "%(module)s | "
         "%(funcName)s | "
+        "%(lineno)d | "
         "%(levelname)s | "
         "%(message)s"
     )
@@ -169,14 +183,10 @@ def fingerprints(data):
         namedtuple: fingerprints md5, sha1, sha256, sha512
     """
 
-    Hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
+    hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
 
-    if six.PY2:
-        if not isinstance(data, str):
-            data = data.encode("utf-8")
-    elif six.PY3:
-        if not isinstance(data, bytes):
-            data = data.encode("utf-8")
+    if not isinstance(data, six.binary_type):
+        data = data.encode("utf-8")
 
     # md5
     md5 = hashlib.md5()
@@ -198,7 +208,7 @@ def fingerprints(data):
     sha512.update(data)
     sha512 = sha512.hexdigest()
 
-    return Hashes(md5, sha1, sha256, sha512)
+    return hashes(md5, sha1, sha256, sha512)
 
 
 def msgconvert(email):
@@ -270,7 +280,6 @@ def parse_received(received):
         if len(matches) == 0:
             # no matches for this clause, but it's ok! keep going!
             log.debug("No matches found for %s in %s" % (pattern.pattern, received))
-            continue
         elif len(matches) > 1:
             # uh, can't have more than one of each clause in a received.
             # so either there's more than one or the current regex is wrong
@@ -396,8 +405,8 @@ def receiveds_not_parsed(receiveds):
         j["hop"] = counter["hop"] + 1
         counter["hop"] += 1
         output.append(j)
-    else:
-        return output
+
+    return output
 
 
 def receiveds_format(receiveds):
@@ -451,12 +460,11 @@ def receiveds_format(receiveds):
 
         # new hop
         counter["hop"] += 1
-    else:
-        for i in output:
-            if i.get("date_utc"):
-                i["date_utc"] = i["date_utc"].isoformat()
-        else:
-            return output
+
+    for i in output:
+        if i.get("date_utc"):
+            i["date_utc"] = i["date_utc"].isoformat()
+    return output
 
 
 def get_to_domains(to=[], reply_to=[]):
@@ -466,8 +474,8 @@ def get_to_domains(to=[], reply_to=[]):
             domains.add(i[1].split("@")[-1].lower().strip())
         except KeyError:
             pass
-    else:
-        return list(domains)
+
+    return list(domains)
 
 
 def get_header(message, name):
@@ -592,4 +600,4 @@ def random_string(string_length=10):
         str -- Random string
     """
     letters = string.ascii_lowercase
-    return "".join(random.choice(letters) for i in range(string_length))
+    return "".join(random.choice(letters) for _ in range(string_length))
