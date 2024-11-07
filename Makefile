@@ -45,7 +45,7 @@ clean-tests: ## remove test and coverage artifacts
 
 clean-all: clean-tests clean-build  ## remove all tests and build files
 
-test: clean-tests ## run tests quickly with the default Python
+unittest: clean-tests ## run tests quickly with the default Python
 	pytest
 
 pre-commit:  ## run pre-commit on all files
