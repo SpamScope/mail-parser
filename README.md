@@ -281,7 +281,7 @@ $ pip install -e ".[dev, test]"
 The second step is to run the tests:
 
 ```
-$ make test
+$ make unittest
 ```
 
 Then you can try to run the command line tool:
