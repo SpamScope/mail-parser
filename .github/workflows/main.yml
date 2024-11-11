@@ -3,6 +3,7 @@ name: Python application and Docker image CI
 on:
   push:
     branches: [ master, develop ]
+    tags: [ 'v*.*.*' ]  # Enable pipeline on tag pushes
   pull_request:
     branches: [ master, develop ]
 
