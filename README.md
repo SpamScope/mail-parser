@@ -30,8 +30,15 @@ mail-parser supports Python 3.
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
 ## Support the project
+If you find this project useful, you can support it by donating any amount you want. All donations are greatly appreciated and help maintain and develop the project.
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+
+<a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
+  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true" alt="Bitcoin" width="200">
+</a>
+
+Bitcoin Address: `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
 
 # mail-parser on Web
  - [Splunk app](https://splunkbase.splunk.com/app/4129/)
