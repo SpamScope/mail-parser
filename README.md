@@ -35,7 +35,7 @@ If you find this project useful, you can support it by donating any amount you w
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
 <a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
-  <img src="https://github.com/SpamScope/mail-parser/blob/bitcoin/docs/images/Bitcoin%20SpamScope.jpg?raw=true" alt="Bitcoin" width="200">
+  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true" alt="Bitcoin" width="200">
 </a>
 
 Bitcoin Address: `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
