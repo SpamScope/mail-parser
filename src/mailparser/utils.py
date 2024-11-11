@@ -41,19 +41,28 @@ import tempfile
 
 import six
 
-from .const import (
+from mailparser.const import (
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
-    RECEIVED_COMPILED_LIST)
+    RECEIVED_COMPILED_LIST,
+)
 
-from .exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 
 log = logging.getLogger(__name__)
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
+    """
+    This function returns a custom logger.
+    :param level: logging level
+    :type level: str
+    :param name: logger name
+    :type name: str
+    :return: logger
+    """
     if name:
         log = logging.getLogger(name)
     else:
@@ -65,24 +74,27 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
         "%(name)s | "
         "%(module)s | "
         "%(funcName)s | "
+        "%(lineno)d | "
         "%(levelname)s | "
-        "%(message)s")
+        "%(message)s"
+    )
     ch.setFormatter(formatter)
     log.addHandler(ch)
     return log
 
 
 def sanitize(func):
-    """ NFC is the normalization form recommended by W3C. """
+    """NFC is the normalization form recommended by W3C."""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        return normalize('NFC', func(*args, **kwargs))
+        return normalize("NFC", func(*args, **kwargs))
+
     return wrapper
 
 
 @sanitize
-def ported_string(raw_data, encoding='utf-8', errors='ignore'):
+def ported_string(raw_data, encoding="utf-8", errors="ignore"):
     """
     Give as input raw data and output a str in Python 3
     and unicode in Python 2.
@@ -133,8 +145,8 @@ def decode_header_part(header):
 
     try:
         for d, c in decode_header(header):
-            c = c if c else 'utf-8'
-            output += ported_string(d, c, 'ignore')
+            c = c if c else "utf-8"
+            output += ported_string(d, c, "ignore")
 
     # Header parsing failed, when header has charset Shift_JIS
     except (HeaderParseError, UnicodeError):
@@ -148,7 +160,7 @@ def ported_open(file_):
     if six.PY2:
         return open(file_)
     elif six.PY3:
-        return open(file_, encoding="utf-8", errors='ignore')
+        return open(file_, encoding="utf-8", errors="ignore")
 
 
 def find_between(text, first_token, last_token):
@@ -171,14 +183,10 @@ def fingerprints(data):
         namedtuple: fingerprints md5, sha1, sha256, sha512
     """
 
-    Hashes = namedtuple('Hashes', "md5 sha1 sha256 sha512")
+    hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
 
-    if six.PY2:
-        if not isinstance(data, str):
-            data = data.encode("utf-8")
-    elif six.PY3:
-        if not isinstance(data, bytes):
-            data = data.encode("utf-8")
+    if not isinstance(data, six.binary_type):
+        data = data.encode("utf-8")
 
     # md5
     md5 = hashlib.md5()
@@ -200,7 +208,7 @@ def fingerprints(data):
     sha512.update(data)
     sha512 = sha512.hexdigest()
 
-    return Hashes(md5, sha1, sha256, sha512)
+    return hashes(md5, sha1, sha256, sha512)
 
 
 def msgconvert(email):
@@ -223,12 +231,18 @@ def msgconvert(email):
         if six.PY2:
             with open(os.devnull, "w") as devnull:
                 out = subprocess.Popen(
-                    command, stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE, stderr=devnull)
+                    command,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=devnull,
+                )
         elif six.PY3:
             out = subprocess.Popen(
-                command, stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
 
     except OSError as e:
         message = "Check if 'msgconvert' tool is installed / {!r}".format(e)
@@ -265,20 +279,16 @@ def parse_received(received):
 
         if len(matches) == 0:
             # no matches for this clause, but it's ok! keep going!
-            log.debug("No matches found for %s in %s" % (
-                pattern.pattern, received))
-            continue
+            log.debug("No matches found for %s in %s" % (pattern.pattern, received))
         elif len(matches) > 1:
             # uh, can't have more than one of each clause in a received.
             # so either there's more than one or the current regex is wrong
-            msg = "More than one match found for %s in %s" % (
-                pattern.pattern, received)
+            msg = "More than one match found for %s in %s" % (pattern.pattern, received)
             log.error(msg)
             raise MailParserReceivedParsingError(msg)
         else:
             # otherwise we have one matching clause!
-            log.debug("Found one match for %s in %s" % (
-                pattern.pattern, received))
+            log.debug("Found one match for %s in %s" % (pattern.pattern, received))
             match = matches[0].groupdict()
             if six.PY2:
                 values_by_clause[match.keys()[0]] = match.values()[0]
@@ -335,19 +345,21 @@ def receiveds_parsing(receiveds):
             values_by_clause = parse_received(received)
         except MailParserReceivedParsingError:
             # if we can't, let's append the raw
-            parsed.append({'raw': received})
+            parsed.append({"raw": received})
         else:
             # otherwise append the full values_by_clause dict
             parsed.append(values_by_clause)
 
-    log.debug("len(receiveds) %s, len(parsed) %s" % (
-        len(receiveds), len(parsed)))
+    log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
 
     if len(receiveds) != len(parsed):
         # something really bad happened,
         # so just return raw receiveds with hop indices
-        log.error("len(receiveds): %s, len(parsed): %s, receiveds: %s, \
-            parsed: %s" % (len(receiveds), len(parsed), receiveds, parsed))
+        log.error(
+            "len(receiveds): %s, len(parsed): %s, receiveds: %s, \
+            parsed: %s"
+            % (len(receiveds), len(parsed), receiveds, parsed)
+        )
         return receiveds_not_parsed(receiveds)
 
     else:
@@ -356,12 +368,15 @@ def receiveds_parsing(receiveds):
 
 
 def convert_mail_date(date):
+    """
+    Convert a mail date in a datetime object.
+    """
     log.debug("Date to parse: {!r}".format(date))
     d = email.utils.parsedate_tz(date)
     log.debug("Date parsed: {!r}".format(d))
     t = email.utils.mktime_tz(d)
     log.debug("Date parsed in timestamp: {!r}".format(t))
-    date_utc = datetime.datetime.utcfromtimestamp(t)
+    date_utc = datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
     timezone = d[9] / 3600.0 if d[9] else 0
     timezone = "{:+.1f}".format(timezone)
     log.debug("Calculated timezone: {!r}".format(timezone))
@@ -390,8 +405,8 @@ def receiveds_not_parsed(receiveds):
         j["hop"] = counter["hop"] + 1
         counter["hop"] += 1
         output.append(j)
-    else:
-        return output
+
+    return output
 
 
 def receiveds_format(receiveds):
@@ -445,12 +460,11 @@ def receiveds_format(receiveds):
 
         # new hop
         counter["hop"] += 1
-    else:
-        for i in output:
-            if i.get("date_utc"):
-                i["date_utc"] = i["date_utc"].isoformat()
-        else:
-            return output
+
+    for i in output:
+        if i.get("date_utc"):
+            i["date_utc"] = i["date_utc"].isoformat()
+    return output
 
 
 def get_to_domains(to=[], reply_to=[]):
@@ -460,8 +474,8 @@ def get_to_domains(to=[], reply_to=[]):
             domains.add(i[1].split("@")[-1].lower().strip())
         except KeyError:
             pass
-    else:
-        return list(domains)
+
+    return list(domains)
 
 
 def get_header(message, name):
@@ -518,7 +532,7 @@ def safe_print(data):  # pragma: no cover
     try:
         print(data)
     except UnicodeEncodeError:
-        print(data.encode('utf-8'))
+        print(data.encode("utf-8"))
 
 
 def print_mail_fingerprints(data):  # pragma: no cover
@@ -537,8 +551,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
             else:
                 payload = i["payload"]
 
-            i["md5"], i["sha1"], i["sha256"], i["sha512"] = \
-                fingerprints(payload)
+            i["md5"], i["sha1"], i["sha256"], i["sha512"] = fingerprints(payload)
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
@@ -578,7 +591,7 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
 
 
 def random_string(string_length=10):
-    """ Generate a random string of fixed length
+    """Generate a random string of fixed length
 
     Keyword Arguments:
         string_length {int} -- String length (default: {10})
@@ -587,4 +600,4 @@ def random_string(string_length=10):
         str -- Random string
     """
     letters = string.ascii_lowercase
-    return ''.join(random.choice(letters) for i in range(string_length))
+    return "".join(random.choice(letters) for _ in range(string_length))
