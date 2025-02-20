@@ -19,7 +19,6 @@ limitations under the License.
 
 import re
 
-
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 
 JUNK_PATTERN = r"[ \(\)\[\]\t\n]+"
@@ -39,7 +38,7 @@ RECEIVED_PATTERNS = [
     # envelope-from and -sender seem to optionally have space and/or
     # ( before them other clauses must have whitespace before
     (
-        r"(?:[^-]by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*"
+        r"(?:[^-\.]by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*"
         r"[(]?envelope-sender|\s+from|\s+with"
         r"(?! cipher)|\s+id|\s+for|\s+via|;))"
     ),
@@ -48,7 +47,7 @@ RECEIVED_PATTERNS = [
         r"envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))"
     ),
     (
-        r"[^\w](?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*"
+        r"[^\w\.](?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*"
         r"[(]?envelope-sender|\s+from|\s+by|\s+with"
         r"(?! cipher)|\s+for|\s+via|;))"
     ),
