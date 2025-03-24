@@ -601,7 +601,7 @@ class MailParser(object):
                                       parsed_address[-1].strip(">"))
                     return parsed_address
 
-        elif name_header in ADDRESSES_HEADERS:
+        if name_header in ADDRESSES_HEADERS:
             h = decode_header_part(self.message.get(name_header, six.text_type()))
             if h == "":
                 return []
