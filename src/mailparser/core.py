@@ -27,7 +27,7 @@ import ipaddress
 import six
 import json
 
-from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
+from mailparser.const import ADDRESS_HEADERS, ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
 
 from mailparser.utils import (
     convert_mail_date,
@@ -587,9 +587,33 @@ class MailParser(object):
             return json.dumps(raw, ensure_ascii=False)
 
         # object headers
+        elif name_header in ADDRESS_HEADERS:
+            h = decode_header_part(self.message.get(name_header, six.text_type()))
+            if h != "":
+                parsed_address = email.utils.parseaddr(h)
+                if parsed_address == ('',''):
+                    defect = "Invalid {} header".format(name_header)
+                    if defect not in self._defects:
+                        self._defects.append(defect)
+                        self._has_defects = True
+                    parsed_address = h.split("<")
+                    parsed_address = (parsed_address[0].strip(),
+                                      parsed_address[-1].strip(">"))
+                    return parsed_address
+
         elif name_header in ADDRESSES_HEADERS:
             h = decode_header_part(self.message.get(name_header, six.text_type()))
-            return email.utils.getaddresses([h])
+            if h == "":
+                return []
+            parsed_addresses = email.utils.getaddresses([h])
+            if ('','') in parsed_addresses:
+                while ('','') in parsed_addresses:
+                    parsed_addresses.remove(('',''))
+                defect = "Invalid {} header".format(name_header)
+                if defect not in self._defects:
+                    self._defects.append(defect)
+                    self._has_defects = True
+            return parsed_addresses
 
         # others headers
         else:

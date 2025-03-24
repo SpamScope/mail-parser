@@ -78,7 +78,8 @@ RECEIVED_COMPILED_LIST = [re.compile(i, re.I | re.DOTALL) for i in RECEIVED_PATT
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
-ADDRESSES_HEADERS = set(["bcc", "cc", "delivered-to", "from", "reply-to", "to"])
+ADDRESS_HEADERS = set(["delivered-to", "from", "sender"])
+ADDRESSES_HEADERS = set(["bcc", "cc", "reply-to", "to"])
 
 # These parts are always returned
 OTHERS_PARTS = set(
