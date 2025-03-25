@@ -597,7 +597,7 @@ class MailParser(object):
                         self._defects.append(defect)
                         self._has_defects = True
                     parsed_address = h.split("<")
-                    parsed_address = (parsed_address[0].strip(),
+                    parsed_address = (parsed_address[0].strip().strip('"'),
                                       parsed_address[-1].strip(">"))
                 return parsed_address
 
