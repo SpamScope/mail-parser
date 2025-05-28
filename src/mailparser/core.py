@@ -355,7 +355,7 @@ class MailParser(object):
                 charset = p.get_content_charset("utf-8")
                 charset_raw = p.get_content_charset()
                 log.debug("Charset {!r} part {!r}".format(charset, i))
-                content_disposition = ported_string(p.get("content-disposition"))
+                content_disposition = ported_string(p.get_content_disposition()).lower()
                 log.debug(
                     "content-disposition {!r} part {!r}".format(content_disposition, i)
                 )
