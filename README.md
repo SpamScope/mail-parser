@@ -187,7 +187,7 @@ $ uv sync
 
 With these commands, you’ll have all dependencies installed inside your virtual environment.
 
-For more detailed instructions about `uv`, please refer to the [uv documentation](https://docs.astral.sh/uv/)
+For more detailed instructions about `uv`, please refer to the [uv documentation](https://docs.astral.sh/uv/).
 
 
 # Usage in a project
