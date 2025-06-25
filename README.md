@@ -6,50 +6,72 @@
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
+mail-parser goes beyond being just a simple wrapper for the Python Standard Library's [email module](https://docs.python.org/2/library/email.message.html). It seamlessly transforms raw emails into versatile Python objects that you can integrate effortlessly into your projects. As the cornerstone of [SpamScope](https://github.com/SpamScope/spamscope), mail-parser empowers you to handle emails with ease and efficiency.
 
-mail-parser is not only a wrapper for [email](https://docs.python.org/2/library/email.message.html) Python Standard Library.
-It give you an easy way to pass from raw mail to Python object that you can use in your code.
-It's the key module of [SpamScope](https://github.com/SpamScope/spamscope).
-
-mail-parser can parse Outlook email format (.msg). To use this feature, you need to install `libemail-outlook-message-perl` package. For Debian based systems:
+Additionally, mail-parser supports the parsing of Outlook email formats (.msg). To enable this functionality on Debian-based systems, simply install the necessary package:
 
 ```
 $ apt-get install libemail-outlook-message-perl
 ```
 
-For more details:
+For further details about the package, you can run:
 
 ```
 $ apt-cache show libemail-outlook-message-perl
 ```
 
-mail-parser supports Python 3.
+mail-parser is fully compatible with Python 3, ensuring modern performance and reliability.
 
 
 # Apache 2 Open Source License
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-## Support the project
-If you find this project useful, you can support it by donating any amount you want. All donations are greatly appreciated and help maintain and develop the project.
+
+# Support the Future of mail-parser
+Every contribution fuels innovation! If you believe in a powerful and reliable email parsing tool, consider investing in mail-parser. Your donation directly supports ongoing development, ensuring that we continue providing a robust, cutting-edge solution for developers everywhere.
+
+**Invest in Innovation**
+By donating, you help us:
+- Enhance and expand features.
+- Maintain a secure and reliable project.
+- Continue offering a valuable tool to the community.
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+
+Or contribute with Bitcoin:
 
 <a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
   <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true" alt="Bitcoin" width="200">
 </a>
 
-Bitcoin Address: `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
+**Bitcoin Address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
+
+Thank you for supporting the evolution of mail-parser!
+
 
 # mail-parser on Web
- - [Splunk app](https://splunkbase.splunk.com/app/4129/)
- - [FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)
- - [Arch User Repository](https://aur.archlinux.org/packages/mailparser/)
- - [REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)
+Explore mail-parser on these platforms:
+
+- **[Splunk app](https://splunkbase.splunk.com/app/4129/)**
+- **[FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)**
+- **[Arch User Repository](https://aur.archlinux.org/packages/mailparser/)**
+- **[REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)**
+
 
 # Description
+mail-parser takes a raw email as input and converts it into a comprehensive Python object that mirrors the structure of an email as defined by the relevant RFCs. Each property of this object directly maps to standard [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml) such as "From", "To", "Cc", "Bcc", "Subject", and more.
 
-mail-parser takes as input a raw email and generates a parsed object. The properties of this object are the same name of
-[RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml):
+In addition, the parser extracts supplementary components including:
+- Plain text and HTML bodies for versatile processing.
+- Attachments along with their metadata (e.g., filename, content type, encoding, and more).
+- Detailed diagnostics like timestamp conversions, defects indicating non-compliant header formats, and custom header management (using underscore substitutions for hyphenated header names).
+
+Moreover, each header and property is accessible in multiple formats:
+- A native Python value for immediate use.
+- A raw string to retain original formatting.
+- A JSON representation for simplified integration with other tools or services.
+
+This rich parsing capability makes mail-parser a robust tool for email processing, enabling developers to handle, analyze, and even troubleshoot raw email data with comprehensive detail.
 
   - bcc
   - cc
@@ -102,7 +124,7 @@ The `received` header is parsed and splitted in hop. The fields supported are:
  - with
 
 
-mail-parser can detect defect in mail:
+> **Important:** mail-parser can detect defects in mail.
   - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
 
 All properties have a JSON and raw property that you can get with:
@@ -119,9 +141,17 @@ $ mail.to_raw (raw header)
 
 The command line tool use the JSON format.
 
-## Defects
-These defects can be used to evade the antispam filter. An example are the mails with a malformed boundary that can hide a not legitimate epilogue (often malware).
-This library can take these epilogues.
+
+## Defects and Their Impact on Email Security
+Email defects, such as malformed boundaries, can be exploited by malicious actors to bypass antispam filters. For instance, a poorly formatted boundary in an email might conceal an illegitimate epilogue that contains hidden malicious content, such as malware payloads or phishing links.
+
+mail-parser is built to detect these structural irregularities, ensuring that even subtle anomalies are captured and analyzed. By identifying these defects, the library provides an early warning system, allowing you to:
+
+- Uncover hidden parts of an email that may be deliberately obfuscated.
+- Diagnose potential security threats stemming from non-standard email formatting.
+- Facilitate deeper forensic analysis of suspicious emails where the epilogue might carry harmful code or deceitful information.
+
+This robust defect detection mechanism is essential for maintaining the integrity of your email processing systems and enhancing overall cybersecurity.
 
 
 # Authors
@@ -131,29 +161,31 @@ This library can take these epilogues.
 
 
 # Installation
+To install mail-parser, follow these simple steps:
 
-Clone repository
+1. Make sure you have Python 3 installed on your system.
+2. Open your terminal or command prompt.
+3. Run the following command to install mail-parser from PyPI:
 
-```
-git clone https://github.com/SpamScope/mail-parser.git
-```
+  $ pip install mail-parser
 
-and install mail-parser with `setup.py`:
+4. (Optional) To verify the installation, you can run:
 
-```
-$ cd mail-parser
+  $ pip show mail-parser
 
-$ python setup.py install
-```
 
-or use `pip`:
+If you plan to contribute or develop further, consider setting up a `uv` environment and syncing all development dependencies:
 
-```
-$ pip install mail-parser
-```
+  $ git clone https://github.com/SpamScope/mail-parser.git
+  $ cd mail-parser
+  $ uv sync
+
+With these commands, you’ll have all dependencies installed inside your virtual environment.
+
+For more detailed instructions about `uv`, please refer to the [uv documentation](https://docs.astral.sh/uv/)
+
 
 # Usage in a project
-
 Import `mailparser` module:
 
 ```
@@ -200,7 +232,6 @@ mail.write_attachments(base_path)
 ```
 
 # Usage from command-line
-
 If you installed mailparser with `pip` or `setup.py` you can use it with command-line.
 
 These are all swithes:
@@ -261,7 +292,6 @@ From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21
 
 
 # Exceptions
-
 Exceptions hierarchy of mail-parser:
 
 ```
@@ -275,26 +305,3 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
-
-# Development
-The first step is to install the development environment:
-
-```
-$ python3.10 -m virtualenv venv
-$ source venv/bin/activate
-$ pip install -e ".[dev, test]"
-```
-
-The second step is to run the tests:
-
-```
-$ make unittest
-```
-
-Then you can try to run the command line tool:
-
-```
-$ mail-parser -f tests/mails/mail_malformed_3 -j
-```
-
-If all is ok, you can start to develop.

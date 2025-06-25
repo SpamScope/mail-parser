@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2018 Fedele Mantuano (https://www.linkedin.com/in/fmantuano/)

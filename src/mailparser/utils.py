@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -17,27 +16,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from __future__ import unicode_literals
-
-from collections import namedtuple, Counter
-from email.errors import HeaderParseError
-from email.header import decode_header
-from unicodedata import normalize
-
 import base64
 import datetime
 import email
 import functools
 import hashlib
+import json
 import logging
 import os
 import random
 import re
-import json
 import string
 import subprocess
 import sys
 import tempfile
+from collections import Counter, namedtuple
+from email.errors import HeaderParseError
+from email.header import decode_header
+from unicodedata import normalize
 
 import six
 
@@ -47,9 +43,7 @@ from mailparser.const import (
     OTHERS_PARTS,
     RECEIVED_COMPILED_LIST,
 )
-
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
-
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +144,7 @@ def decode_header_part(header):
 
     # Header parsing failed, when header has charset Shift_JIS
     except (HeaderParseError, UnicodeError):
-        log.error("Failed decoding header part: {}".format(header))
+        log.error(f"Failed decoding header part: {header}")
         output += header
 
     return output.strip()
@@ -245,7 +239,7 @@ def msgconvert(email):
             )
 
     except OSError as e:
-        message = "Check if 'msgconvert' tool is installed / {!r}".format(e)
+        message = f"Check if 'msgconvert' tool is installed / {e!r}"
         log.exception(message)
         raise MailParserOSError(message)
 
@@ -335,11 +329,11 @@ def receiveds_parsing(receiveds):
     parsed = []
     receiveds = [re.sub(JUNK_PATTERN, " ", i).strip() for i in receiveds]
     n = len(receiveds)
-    log.debug("Nr. of receiveds. {}".format(n))
+    log.debug(f"Nr. of receiveds. {n}")
 
     for idx, received in enumerate(receiveds):
-        log.debug("Parsing received {}/{}".format(idx + 1, n))
-        log.debug("Try to parse {!r}".format(received))
+        log.debug(f"Parsing received {idx + 1}/{n}")
+        log.debug(f"Try to parse {received!r}")
         try:
             # try to parse the current received header...
             values_by_clause = parse_received(received)
@@ -371,15 +365,15 @@ def convert_mail_date(date):
     """
     Convert a mail date in a datetime object.
     """
-    log.debug("Date to parse: {!r}".format(date))
+    log.debug(f"Date to parse: {date!r}")
     d = email.utils.parsedate_tz(date)
-    log.debug("Date parsed: {!r}".format(d))
+    log.debug(f"Date parsed: {d!r}")
     t = email.utils.mktime_tz(d)
-    log.debug("Date parsed in timestamp: {!r}".format(t))
+    log.debug(f"Date parsed in timestamp: {t!r}")
     date_utc = datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
     timezone = d[9] / 3600.0 if d[9] else 0
-    timezone = "{:+.1f}".format(timezone)
-    log.debug("Calculated timezone: {!r}".format(timezone))
+    timezone = f"{timezone:+.1f}"
+    log.debug(f"Calculated timezone: {timezone!r}")
     return date_utc, timezone
 
 
@@ -493,7 +487,7 @@ def get_header(message, name):
     """
 
     headers = message.get_all(name)
-    log.debug("Getting header {!r}: {!r}".format(name, headers))
+    log.debug(f"Getting header {name!r}: {headers!r}")
     if headers:
         headers = [decode_header_part(i) for i in headers]
         if len(headers) == 1:
@@ -537,10 +531,10 @@ def safe_print(data):  # pragma: no cover
 
 def print_mail_fingerprints(data):  # pragma: no cover
     md5, sha1, sha256, sha512 = fingerprints(data)
-    print("md5:\t{}".format(md5))
-    print("sha1:\t{}".format(sha1))
-    print("sha256:\t{}".format(sha256))
-    print("sha512:\t{}".format(sha512))
+    print(f"md5:\t{md5}")
+    print(f"sha1:\t{sha1}")
+    print(f"sha256:\t{sha256}")
+    print(f"sha512:\t{sha512}")
 
 
 def print_attachments(attachments, flag_hash):  # pragma: no cover

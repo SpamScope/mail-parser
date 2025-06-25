@@ -1,17 +1,5 @@
-.PHONY: clean clean-test clean-pyc clean-build docs help
+.PHONY: help clean clean-build clean-test test lint format check install build release
 .DEFAULT_GOAL := help
-
-define BROWSER_PYSCRIPT
-import os, webbrowser, sys
-
-try:
-	from urllib import pathname2url
-except:
-	from urllib.request import pathname2url
-
-webbrowser.open("file://" + pathname2url(os.path.abspath(sys.argv[1])))
-endef
-export BROWSER_PYSCRIPT
 
 define PRINT_HELP_PYSCRIPT
 import re, sys
@@ -24,16 +12,18 @@ for line in sys.stdin:
 endef
 export PRINT_HELP_PYSCRIPT
 
-BROWSER := python -c "$$BROWSER_PYSCRIPT"
+help:  ## show this help message
+	@python3 -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-help:
-	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
+install:  ## install dependencies using uv
+	uv sync
 
-clean-build:  ## remove all build files
+clean-build:  ## remove build artifacts
 	find . -type d -name "build" -exec rm -rf {} +
 	find . -type d -name "dist" -exec rm -rf {} +
+	find . -type d -name "*.egg-info" -exec rm -rf {} +
 
-clean-tests: ## remove test and coverage artifacts
+clean-test:  ## remove test and coverage artifacts
 	find . -type f -name "*.log" -delete
 	find . -type f -name "coverage.xml" -delete
 	find . -type f -name "junit.xml" -delete
@@ -43,16 +33,24 @@ clean-tests: ## remove test and coverage artifacts
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 
-clean-all: clean-tests clean-build  ## remove all tests and build files
+clean: clean-test clean-build  ## remove all artifacts
 
-unittest: clean-tests ## run tests quickly with the default Python
-	pytest
+test:  ## run tests
+	uv run pytest
 
-pre-commit:  ## run pre-commit on all files
-	pre-commit run -a
+lint:  ## run linting with ruff
+	uv run ruff check .
 
-dist: clean-all ## builds source and wheel package
-	python -m build
+format:  ## format code with ruff
+	uv run ruff format .
 
-release: dist ## package and upload a release
-	twine upload dist/*
+check: lint test  ## run linting and tests
+
+build: clean  ## build package
+	uv build
+
+pre-commit:  ## run pre-commit hooks
+	uv run pre-commit run --all-files
+
+release: build  ## build and upload to PyPI
+	uv run twine upload dist/*

@@ -1,3 +1,104 @@
+[project]
+name = "mail-parser"
+dynamic = ["version"]
+description = "A tool that parses emails by enhancing the Python standard library, extracting all details into a comprehensive object."
+license = "Apache-2.0"
+readme = "README.md"
+requires-python = ">=3.9,<3.14"
+keywords = ["email", "mail", "parser", "security", "forensics", "threat detection", "phishing", "malware", "spam"]
+classifiers = [
+  "Natural Language :: English",
+  "Operating System :: Unix",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+authors = [
+  { name = "Fedele Mantuano", email = "mantuano.fedele@gmail.com" }
+]
+maintainers = [
+  { name = "Fedele Mantuano", email = "mantuano.fedele@gmail.com" }
+]
+dependencies = [
+    "six>=1.17.0",
+]
+
+[dependency-groups]
+dev = [
+    "build>=1.2.2.post1",
+    "hatch>=1.14.0",
+    "pre-commit>=4.0.1",
+    "ruff>=0.9.9",
+    "twine>=6.0.1",
+    "wheel>=0.45.1",
+]
+test = [
+    "coverage>=7.6.10",
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-ordering>=0.6",
+]
+
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+default-groups = ["dev", "test"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mailparser"]
+
+[tool.hatch.version]
+path = "src/mailparser/version.py"
+
+[project.scripts]
+mail-parser = "mailparser.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = "tests"
+markers = [
+  "integration: integration tests",
+]
+addopts = """
+--strict-markers
+--strict-config
+-ra
+--cov=src
+--cov=tests
+--cov-report=term
+--cov-branch
+--cov-report=xml
+--cov-report=html
+--junitxml=junit.xml
+--verbose
+"""
+
+[tool.ruff.lint]
+select = [
+  # pycodestyle
+  "E",
+  # pyflakes
+  "F",
+  # pyupgrade
+  # "UP",
+  # flask8-bugbear
+  # "B",
+  # flake8-simplify
+  # "SIM",
+  # isort
+  "I",
+  # flask8-bandit
+  # "S",
+  # flake8-pytest-style
+  # "PT",
+  # flake8-annotations
+  # "ANN",
+]

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -21,12 +20,12 @@ import datetime
 import hashlib
 import os
 import shutil
-import six
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
+import six
 
 import mailparser
 from mailparser.utils import (
@@ -35,11 +34,11 @@ from mailparser.utils import (
     get_header,
     get_mail_keys,
     get_to_domains,
+    parse_received,
     ported_open,
     ported_string,
-    receiveds_parsing,
-    parse_received,
     random_string,
+    receiveds_parsing,
 )
 
 # base paths
