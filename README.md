@@ -167,18 +167,23 @@ To install mail-parser, follow these simple steps:
 2. Open your terminal or command prompt.
 3. Run the following command to install mail-parser from PyPI:
 
-  $ pip install mail-parser
+```bash
+$ pip install mail-parser
+```
 
 4. (Optional) To verify the installation, you can run:
 
-  $ pip show mail-parser
-
+```bash
+$ pip show mail-parser
+```
 
 If you plan to contribute or develop further, consider setting up a `uv` environment and syncing all development dependencies:
 
-  $ git clone https://github.com/SpamScope/mail-parser.git
-  $ cd mail-parser
-  $ uv sync
+```bash
+$ git clone https://github.com/SpamScope/mail-parser.git
+$ cd mail-parser
+$ uv sync
+```
 
 With these commands, you’ll have all dependencies installed inside your virtual environment.
 
