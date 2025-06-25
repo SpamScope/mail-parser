@@ -202,7 +202,7 @@ def main():
         parser = get_parser(args)
         process_output(args, parser)
     except Exception as e:
-        log.error(f"An error occurred: {e}")
+        log.exception(f"An error occurred: {e}")
         sys.exit(1)
 
 

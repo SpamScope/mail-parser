@@ -638,14 +638,12 @@ class MailParser(object):
         )
 
     @property
-    def headers(self):
+    def headers(self) -> dict:
         """
         Return only the headers as Python object
         """
-        d = {}
-        for i in self.message.keys():
-            d[i] = getattr(self, i)
-        return d
+        all_headers = set(self.message.keys()) - set(["headers"])
+        return {i: getattr(self, i) for i in all_headers}
 
     @property
     def headers_json(self):

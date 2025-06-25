@@ -62,6 +62,7 @@ mail_test_12 = os.path.join(base_path, "mails", "mail_test_12")
 mail_test_13 = os.path.join(base_path, "mails", "mail_test_13")
 mail_test_14 = os.path.join(base_path, "mails", "mail_test_14")
 mail_test_15 = os.path.join(base_path, "mails", "mail_test_15")
+mail_test_16 = os.path.join(base_path, "mails", "mail_test_16")
 mail_malformed_1 = os.path.join(base_path, "mails", "mail_malformed_1")
 mail_malformed_2 = os.path.join(base_path, "mails", "mail_malformed_2")
 mail_malformed_3 = os.path.join(base_path, "mails", "mail_malformed_3")
@@ -646,3 +647,17 @@ class TestMailParser(unittest.TestCase):
             md5.update(f.read())
         shutil.rmtree(temp_dir)
         self.assertEqual(md5.hexdigest(), "4f2cf891e7cfb349fca812091f184ecc")
+
+    def test_issue_139(self):
+        mail = mailparser.parse_from_file(mail_test_16)
+        assert mail.headers == {
+            "MIME-Version": "1.0",
+            "Precedence": "junk",
+            "Content-Type": "text/plain; charset=us-ascii",
+            "From": [("Sender", "sender@example.net")],
+            "Date": "Wed, 23 Jul 2003 23:30:00 +0200",
+            "Content-Transfer-Encoding": "7bit",
+            "Message-ID": "<GTUBE1.1010101@example.net>",
+            "Subject": "Test spam mail (GTUBE)",
+            "To": [("Recipient", "recipient@example.net")],
+        }
