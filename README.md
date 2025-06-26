@@ -310,3 +310,30 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
+
+# fmantuano/spamscope-mail-parser
+This Docker image encapsulates the functionality of `mail-parser`. You can find the [official image on Docker Hub](https://hub.docker.com/r/fmantuano/spamscope-mail-parser/).
+
+## Running the Docker Image
+
+After installing Docker, you can run the container with the following command:
+
+```shell
+sudo docker run -it --rm -v ~/mails:/mails fmantuano/spamscope-mail-parser
+```
+
+This command mounts your local `~/mails` directory into the container at `/mails`. The image runs `mail-parser` in its default mode, but you can pass any additional options as needed.
+
+## Using docker-compose
+
+A `docker-compose.yml` file is also provided. From the directory containing the file, run:
+
+```shell
+sudo docker-compose up
+```
+
+The configuration in the `docker-compose.yml` file includes:
+- Mounting your local `~/mails` directory (read-only) into the container at `/mails`.
+- Running a command-line test example to verify functionality.
+
+Review the `docker-compose.yml` file to customize the launch parameters to suit your needs.
