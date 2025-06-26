@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2018 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -18,7 +17,6 @@ limitations under the License.
 """
 
 import re
-
 
 REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
 

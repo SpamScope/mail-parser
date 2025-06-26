@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2017 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -18,7 +17,9 @@ limitations under the License.
 """
 
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from mailparser.__main__ import get_args, process_output
 
 

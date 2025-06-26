@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -31,7 +30,6 @@ from mailparser.utils import (
     write_attachments,
 )
 from mailparser.version import __version__
-
 
 log = logging.getLogger("mailparser")
 
@@ -185,7 +183,7 @@ def get_args():
     )
 
     parser.add_argument(
-        "-v", "--version", action="version", version="%(prog)s {}".format(__version__)
+        "-v", "--version", action="version", version=f"%(prog)s {__version__}"
     )
 
     return parser

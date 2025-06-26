@@ -2,7 +2,7 @@ name: Python application and Docker image CI
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master, develop, feature/* ]
     tags: [ '*.*.*' ]  # Enable pipeline on tag pushes
   pull_request:
     branches: [ master, develop ]
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.8', '3.9', '3.10']
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -26,9 +26,10 @@ jobs:
 
       - name: Install dependencies
         run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
           sudo apt-get -qq update
           sudo apt-get install -y libemail-outlook-message-perl
-          pip install ".[dev, test]"
+          uv sync
           export PERL_MM_USE_DEFAULT=1
           sudo cpan -f -i Email::Outlook::Message
 
@@ -36,14 +37,13 @@ jobs:
         env:
           PYTHONPATH: src
         run: |
-          pytest --cov=mailparser --cov-report=xml
-          python -m mailparser -v
-          python -m mailparser -h
-          mail-parser -f tests/mails/mail_malformed_3 -j
-          cat tests/mails/mail_malformed_3 | mail-parser -k -j
+          make test
+          uv run mail-parser -v
+          uv run mail-parser -h
+          uv run mail-parser -f tests/mails/mail_malformed_3 -j
+          cat tests/mails/mail_malformed_3 | uv run mail-parser -k -j
 
       - name: Run pre-commit
-        if: matrix.python-version == '3.10'
         run: |
           make pre-commit
 
@@ -56,7 +56,7 @@ jobs:
       - name: Build
         if: matrix.python-version == '3.10'
         run: |
-          python -m build
+          uv build
 
       - name: Upload artifacts
         if: matrix.python-version == '3.10'
@@ -108,12 +108,8 @@ jobs:
           fi
           echo "REF_NAME=${REF_NAME,,}" >> $GITHUB_ENV
 
-      - name: Debug REF_NAME
-        run: echo "REF_NAME=${{ env.REF_NAME }}"
-
       - name: Build and push Docker image on GitHub Container Registry
         run: |
-          cd docker
           IMAGE_NAME=ghcr.io/ghcr.io/spamscope/mail-parser/mailparser
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             TAG=${GITHUB_REF#refs/tags/}
@@ -121,7 +117,6 @@ jobs:
               --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
               --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
               --label "org.opencontainers.image.licenses=Apache-2.0" \
-              --build-arg BRANCH=$TAG \
               -t $IMAGE_NAME:$TAG \
               -t $IMAGE_NAME:latest .
             docker push $IMAGE_NAME:$TAG
@@ -131,14 +126,12 @@ jobs:
               --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
               --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
               --label "org.opencontainers.image.licenses=Apache-2.0" \
-              --build-arg BRANCH=${{ env.REF_NAME }} \
               -t $IMAGE_NAME:develop .
             docker push $IMAGE_NAME:develop
           fi
 
       - name: Build and push Docker image on Docker Hub
         run: |
-          cd docker
           IMAGE_NAME=docker.io/${{ secrets.DOCKER_USERNAME }}/spamscope-mail-parser
           if [[ $GITHUB_REF == refs/tags/* ]]; then
             TAG=${GITHUB_REF#refs/tags/}
@@ -146,7 +139,6 @@ jobs:
               --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
               --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
               --label "org.opencontainers.image.licenses=Apache-2.0" \
-              --build-arg BRANCH=$TAG \
               -t $IMAGE_NAME:$TAG \
               -t $IMAGE_NAME:latest .
             docker push $IMAGE_NAME:$TAG
@@ -156,7 +148,6 @@ jobs:
               --label "org.opencontainers.image.source=${{ github.repositoryUrl }}" \
               --label "org.opencontainers.image.description=Easy way to pass from raw mail to Python object" \
               --label "org.opencontainers.image.licenses=Apache-2.0" \
-              --build-arg BRANCH=${{ env.REF_NAME }} \
               -t $IMAGE_NAME:develop .
             docker push $IMAGE_NAME:develop
           fi
