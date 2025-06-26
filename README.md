@@ -52,7 +52,6 @@ Thank you for supporting the evolution of mail-parser!
 # mail-parser on Web
 Explore mail-parser on these platforms:
 
-- **[Splunk app](https://splunkbase.splunk.com/app/4129/)**
 - **[FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)**
 - **[Arch User Repository](https://aur.archlinux.org/packages/mailparser/)**
 - **[REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)**
