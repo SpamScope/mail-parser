@@ -549,6 +549,48 @@ class TestMailParser(unittest.TestCase):
         s = ported_string(raw_data)
         self.assertEqual(s, "test")
 
+    def test_parse_domain_with_tld_dot_id(self):
+        """Support for .id tld (Indonesia)"""
+        received = """
+            from web.myhost.id
+            by smtp.domain.id (Proxmox) with ESMTPS id SOMEIDHERE
+            for <email@example.id>; Wed, 19 Feb 2025 15:00:00 +0700 (WIB)
+        """.strip()
+
+        expected = {
+            "from": "web.myhost.id",
+            "by": "smtp.domain.id (Proxmox)",
+            "with": "ESMTPS",
+            "id": "SOMEIDHERE",
+            "for": "<email@example.id>",
+            "date": "Wed, 19 Feb 2025 15:00:00 +0700 (WIB)",
+        }
+
+        values_by_clause = parse_received(received)
+
+        self.assertEqual(expected, values_by_clause)
+
+    def test_parse_domain_with_tld_dot_by(self):
+        """Support for .by tld (Belarus)"""
+        received = """
+            from web.myhost.by
+            by smtp.domain.by (Proxmox) with ESMTPS id SOMEIDHERE
+            for <email@example.by>; Wed, 19 Feb 2025 15:00:00 +0700 (WIB)
+        """.strip()
+
+        expected = {
+            "from": "web.myhost.by",
+            "by": "smtp.domain.by (Proxmox)",
+            "with": "ESMTPS",
+            "id": "SOMEIDHERE",
+            "for": "<email@example.by>",
+            "date": "Wed, 19 Feb 2025 15:00:00 +0700 (WIB)",
+        }
+
+        values_by_clause = parse_received(received)
+
+        self.assertEqual(expected, values_by_clause)
+
     def test_standard_outlook(self):
         """Verify a basic outlook received header works."""
         received = """
