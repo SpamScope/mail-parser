@@ -62,6 +62,7 @@ mail_test_13 = os.path.join(base_path, "mails", "mail_test_13")
 mail_test_14 = os.path.join(base_path, "mails", "mail_test_14")
 mail_test_15 = os.path.join(base_path, "mails", "mail_test_15")
 mail_test_16 = os.path.join(base_path, "mails", "mail_test_16")
+mail_test_17 = os.path.join(base_path, "mails", "mail_test_17")
 mail_malformed_1 = os.path.join(base_path, "mails", "mail_malformed_1")
 mail_malformed_2 = os.path.join(base_path, "mails", "mail_malformed_2")
 mail_malformed_3 = os.path.join(base_path, "mails", "mail_malformed_3")
@@ -702,3 +703,10 @@ class TestMailParser(unittest.TestCase):
             "Subject": "Test spam mail (GTUBE)",
             "To": [("Recipient", "recipient@example.net")],
         }
+
+    def test_issue_136(self):
+        mail = mailparser.parse_from_file(mail_test_17)
+        assert mail.from_ == [
+            ("", "notificaccion-clientes@bbva.mx"),
+            ("", "notificaccion-clientes@bbva.mx"),
+        ]
