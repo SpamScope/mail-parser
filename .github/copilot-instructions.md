@@ -1,219 +1,226 @@
 # Copilot Instructions for mail-parser
 
-## Project Overview
+mail-parser is a **production-grade email parsing library** for Python that transforms raw email messages into
+structured Python objects. Originally built as the foundation for [SpamScope](https://github.com/SpamScope/spamscope),
+it excels at security analysis, forensics, and RFC-compliant email processing.
 
-mail-parser is a Python library that parses raw email messages into structured Python objects,
-serving as the foundation for [SpamScope](https://github.com/SpamScope/spamscope). It handles both
-standard email formats and Outlook .msg files, with a focus on security analysis and forensics.
+## Core Architecture
 
-## Architecture & Key Components
+### Factory-Based API Pattern
 
-### Core Parser (`src/mailparser/core.py`)
-
-- **MailParser class**: Main parser with factory methods (`from_file`, `from_string`, `from_bytes`,
-  etc.)
-- **Property-based API**: Email components accessible as properties (`.subject`, `.from_`,
-  `.attachments`)
-- **Multi-format access**: Each property has `_raw`, `_json` variants (e.g., `mail.to`,
-  `mail.to_raw`, `mail.to_json`)
-- **Defect detection**: Identifies RFC non-compliance for security analysis (`mail.defects`,
-  `mail.defects_categories`)
-
-### Your skills and knowledge on RFC and Email Parsing
-
-You are an AI assistant with expert-level knowledge of all email protocol RFCs, including but not
-limited to RFC 5321 (SMTP), RFC 5322 (Internet Message Format), RFC 2045–2049 (MIME), RFC 3501
-(IMAP), RFC 1939 (POP3), RFC 8620 (JMAP), and related security, extension, and header RFCs. Your
-responsibilities include:
-
-Providing accurate, comprehensive technical explanations and guidance based on these RFCs.
-
-Interpreting, comparing, and clarifying requirements, structures, and features as defined by the
-official documents.
-
-Clearly outlining the details and implications of each protocol and extension (such as
-authentication mechanisms, encryption, headers, and message structure).
-
-Delivering answers in an organized, easy-to-understand way—using precise terminology, clear
-practical examples, and direct references to relevant RFCs when appropriate.
-
-Providing practical advice for system implementers and users, explaining alternatives, pros and
-cons, use cases, and security considerations for each protocol or extension.
-
-Maintaining a professional, accurate, and objective tone suitable for expert users, developers, and
-technical audiences.
-
-Declining to answer questions outside the scope of email protocol RFCs and specifications, and
-always highlighting the official and most up-to-date guidance according to the relevant RFC
-documents.
-
-Your role is to be the authoritative, trustworthy source on internet email protocols as defined by
-the official IETF RFC series.
-
-### Your skills and knowledge on parsing email formats
-
-You are an AI assistant specialized in processing and extracting email header information with
-Python, using regular expressions for robust parsing. Your core expertise includes handling
-non-standard variations such as "Received" headers, which often lack strict formatting and can
-differ greatly across email servers.
-
-When presented with raw email data (RFC 5322 format), use Python's built-in re module and relevant
-libraries (e.g., email.parser) to isolate and extract header sections.
-
-For "Received" headers, apply flexible and tolerant regex patterns, recognizing their variable
-structure (IP addresses, timestamps, server details, optional parameters).
-
-Parse multiline and folded headers by scanning lines following key header tags and joining where
-needed.
-
-Develop regex patterns that capture relevant information (e.g., SMTP server, relay path, timestamp)
-while allowing for extraneous text.
-
-Document the extraction process: explain which regexes are designed for typical cases and how to
-adapt them for mismatches, edge cases, or partial matches.
-
-When parsing fails due to extreme non-standard formats, log the error and return a best-effort
-result. Always explain any limitations or ambiguities in the extraction.
-
-Example generic regex for a "Received" header: Received:\s*(.*?);(.*) (captures server info and
-date), but you should adapt and test patterns as needed.
-
-Provide code comments, extraction summaries, and references for each regex used to ensure
-maintainability and clarity.
-
-Avoid making assumptions about the order or presence of specific header fields, and handle edge
-cases gracefully.
-
-When possible, recommend combining regex with Python's email module for initial header separation,
-then dive deep with regex for specific, non-standard value extraction.
-
-Your responses must prioritize accuracy, transparency in limitations, and practical utility for
-anyone parsing complex email headers.
-
-### Entry Points (`src/mailparser/__init__.py`)
+**Always use factory functions** instead of direct `MailParser()` instantiation:
 
 ```python
-# Factory functions are the primary API
 import mailparser
-mail = mailparser.parse_from_file(filepath)
-mail = mailparser.parse_from_string(raw_email)
-mail = mailparser.parse_from_bytes(email_bytes)
-mail = mailparser.parse_from_file_msg(outlook_file)  # .msg files
+mail = mailparser.parse_from_file(filepath)       # Standard email files
+mail = mailparser.parse_from_string(raw_email)    # Email as string
+mail = mailparser.parse_from_bytes(email_bytes)   # Email as bytes
+mail = mailparser.parse_from_file_msg(msg_file)   # Outlook .msg files
 ```
 
-### CLI Tool (`src/mailparser/__main__.py`)
+### Triple-Format Property Access
 
-- Entry point: `mail-parser` command
-- JSON output mode (`-j`) for integration with other tools
-- Multiple input methods: file (`-f`), string (`-s`), stdin (`-k`)
-- Outlook support (`-o`) with system dependency on `libemail-outlook-message-perl`
+Every parsed component offers **three access patterns** (`src/mailparser/core.py:550-570`):
+
+```python
+mail.subject          # Python object (decoded string)
+mail.subject_raw      # Raw header value (JSON list)
+mail.subject_json     # JSON-serialized version
+```
+
+This pattern applies to all properties via `__getattr__` magic in `core.py`.
+
+### Property Naming Convention
+
+Headers with hyphens use **underscore substitution** (`core.py:__getattr__`):
+
+```python
+mail.X_MSMail_Priority      # Accesses "X-MSMail-Priority" header
+mail.Content_Type           # Accesses "Content-Type" header
+```
 
 ## Development Workflows
 
-### Setup & Dependencies
+### Dependency Management with uv
+
+The project uses **[uv](https://github.com/astral-sh/uv)** (modern pip/virtualenv replacement) exclusively:
 
 ```bash
-# Use uv for dependency management (modern pip replacement)
-uv sync  # Installs all dev/test dependencies
-make install  # Alias for uv sync
+uv sync           # Install all dev/test dependencies (defined in pyproject.toml)
+make install      # Alias for uv sync
 ```
 
-### Testing & Quality
+Never use `pip` directly—all commands in Makefile use `uv run` prefix.
+
+### Testing Patterns
 
 ```bash
-make test     # pytest with coverage (outputs coverage.xml, junit.xml)
-make lint     # ruff linting
-make format   # ruff formatting
-make check    # lint + test
-make pre-commit  # runs pre-commit hooks
+make test         # pytest with coverage (generates coverage.xml, junit.xml, htmlcov/)
+make lint         # ruff check .
+make format       # ruff format .
+make check        # lint + test
+make pre-commit   # Run all pre-commit hooks
 ```
 
-For all unittest use `pytest` framework and mock external dependencies as needed.
-When you modify code, ensure all tests pass and coverage remains high.
+When adding features or fixing bugs you MUST follow these steps:
 
-### Build & Release
+1. Add relevant test email to `tests/mails/` if demonstrating new case
+2. Write tests in the corresponding test file following existing patterns, under `tests/`
+3. Run `make test` to verify all tests pass before committing
+4. Run `uv run mail-parser -f tests/mails/mail_test_11 -j` to manually verify JSON output and that new changes
+   work as expected
+5. Run `make pre-commit` to ensure code style compliance before pushing
+
+**Test data location**: `tests/mails/` contains malformed emails, Outlook files, and various encodings
+(`mail_test_1` through `mail_test_17`, `mail_malformed_1-3`, `mail_outlook_1`).
+
+**Critical testing rule**: When modifying parsing logic, test against malformed emails to ensure security defect
+detection still works.
+
+### Build & Release Process
 
 ```bash
-make build    # uv build (creates wheel/sdist in dist/)
-make release  # build + twine upload to PyPI
+make build        # uv build → creates dist/*.tar.gz and dist/*.whl
+make release      # build + twine upload to PyPI
 ```
 
-### Docker Development
+Version is **dynamically loaded** from `src/mailparser/version.py` (see
+`pyproject.toml:tool.hatch.version`).
 
-- Dockerfile uses Python 3.10-slim with `libemail-outlook-message-perl`
-- docker-compose.yml mounts `~/mails` for testing
-- Image available as `fmantuano/spamscope-mail-parser`
+## Security-First Parsing
 
-## Key Patterns & Conventions
+### Defect Detection System
 
-### Header Access Pattern
-
-Headers with hyphens use underscore substitution:
+The parser identifies RFC violations that could indicate malicious intent (`core.py:240-268`):
 
 ```python
-mail.X_MSMail_Priority  # for X-MSMail-Priority header
+mail.has_defects          # Boolean flag
+mail.defects              # List of defect dicts by content type
+mail.defects_categories   # Set of defect class names (e.g., "StartBoundaryNotFoundDefect")
 ```
 
-### Attachment Structure
+**Epilogue defect handling** (`core.py:320-335`): When `EPILOGUE_DEFECTS` are detected, parser extracts hidden
+content between MIME boundaries that could contain malicious payloads.
+
+### IP Address Extraction
+
+`get_server_ipaddress(trust)` method (`core.py:487-528`) extracts sender IPs with **trust-level validation**:
 
 ```python
-# Each attachment is a dict with standardized keys
-for attachment in mail.attachments:
-    attachment['filename']
-    attachment['payload']  # base64 encoded
-    attachment['content_transfer_encoding']
-    attachment['binary']  # boolean flag
+# Finds first non-private IP in trusted headers
+mail.get_server_ipaddress(trust="Received")
 ```
+
+Filters out private IP ranges using Python's `ipaddress` module.
 
 ### Received Header Parsing
 
-Complex parsing in `receiveds_parsing()` extracts hop-by-hop email routing:
+Complex regex-based parsing (`utils.py:302-360`, patterns in `const.py:24-73`) extracts hop-by-hop routing:
 
 ```python
-mail.received  # List of parsed received headers with structured data
-# Each hop contains: by, from, date, delay, envelope_from, etc.
+# Returns list of dicts with: by, from, date, date_utc, delay, envelope_from, hop, with
+mail.received
 ```
 
-### Error Handling Hierarchy
+**Key pattern**: `RECEIVED_COMPILED_LIST` contains pre-compiled regexes for "from", "by", "with", "id", "for",
+"via", "envelope-from", "envelope-sender", and date patterns. Recent fixes addressed IBM gateway duplicate matches
+(see comments in `const.py:26-38`).
 
-```python
-MailParserError  # Base exception
-├── MailParserOutlookError  # Outlook .msg issues
-├── MailParserEnvironmentError  # Missing dependencies
-├── MailParserOSError  # File system issues
-└── MailParserReceivedParsingError  # Header parsing failures
+If parsing fails, falls back to `receiveds_not_parsed()` returning `{"raw": <header>, "hop": <n>}`
+structure.
+
+## Project Structure Specifics
+
+### src/ Layout
+
+Package uses modern **src-layout** (`src/mailparser/`) for cleaner imports and testing isolation:
+
+```text
+src/mailparser/
+├── __init__.py      # Exports factory functions
+├── __main__.py      # CLI entry point (mail-parser command)
+├── core.py          # MailParser class (760 lines)
+├── utils.py         # Parsing utilities (582 lines)
+├── const.py         # Regex patterns and constants
+├── exceptions.py    # Exception hierarchy
+└── version.py       # Version string
 ```
 
-## Testing Approach
+### External Dependency: Outlook Support
 
-- Test emails in `tests/mails/` (malformed, Outlook, various encodings)
-- Comprehensive property testing for all email components
-- CLI integration tests in CI pipeline
-- Coverage reporting with pytest-cov
+Outlook `.msg` file parsing requires **system-level Perl module**:
 
-## Security Focus
+```bash
+apt-get install libemail-outlook-message-perl  # Debian/Ubuntu
+```
 
-- **Defect detection**: Identifies malformed boundaries that could hide malicious content
-- **IP extraction**: `get_server_ipaddress()` with trust levels for forensic analysis
-- **Epilogue analysis**: Detects hidden content in malformed MIME boundaries
-- **Fingerprinting**: Mail and attachment hashing for threat intelligence
+Triggered via `msgconvert()` function in `utils.py` that shells out to Perl script. Raises `MailParserOutlookError`
+if unavailable.
 
-## Build System Specifics
+### CLI Tool Pattern
 
-- **pyproject.toml**: Modern Python packaging with hatch backend
-- **uv**: Used instead of pip for faster, reliable dependency resolution
-- **src/ layout**: Package in `src/mailparser/` for cleaner imports
-- **Dynamic versioning**: Version from `src/mailparser/version.py`
+`__main__.py` provides production CLI with mutually exclusive input modes (`-f`, `-s`, `-k`), JSON output (`-j`),
+and selective printing (`-b`, `-a`, `-r`, `-t`).
 
-## External Dependencies
+**Entry point defined** in `pyproject.toml:project.scripts`:
 
-- **Outlook support**: Requires system package `libemail-outlook-message-perl` + Perl module `Email::Outlook::Message`
-- **six**: Python 2/3 compatibility (legacy requirement)
-- **Minimal runtime deps**: Only `six>=1.17.0` required
+```toml
+[project.scripts]
+mail-parser = "mailparser.__main__:main"
+```
 
-When working with this codebase:
+## Code Style & Tooling
 
-- Use factory functions, not direct MailParser() instantiation
-- Test with various malformed emails from `tests/mails/`
-- Remember header property naming (underscores for hyphens)
-- Consider security implications of email parsing edge cases
+### Ruff Configuration
+
+Single linter/formatter (replaces black, isort, flake8):
+
+```toml
+[tool.ruff.lint]
+select = ["E", "F", "I"]  # pycodestyle, pyflakes, isort
+# "UP", "B", "SIM", "S", "PT" commented out in pyproject.toml
+```
+
+### Pytest Configuration
+
+Key markers in `pyproject.toml:tool.pytest.ini_options`:
+
+- `integration`: marks integration tests
+- Coverage outputs: XML (for CI), HTML (for local), terminal
+- JUnit XML for CI integration
+
+## Common Pitfalls
+
+1. **Don't instantiate `MailParser()` directly**—use factory functions from `__init__.py`
+2. **Don't use `pip`**—always use `uv` or Makefile targets
+3. **Don't ignore defects**—they're critical for security analysis
+4. **Don't assume headers exist**—use `.get()` pattern or handle `None`
+5. **Test against malformed emails**—`tests/mails/mail_malformed_*` files exist for this reason
+
+## Docker Development
+
+Dockerfile uses **Python 3.10-slim-bookworm** with Outlook dependencies pre-installed. Container runs as non-root
+`mailparser` user.
+
+```bash
+docker build -t mail-parser .
+docker run mail-parser -f /path/to/email
+```
+
+## Key Reference Points
+
+- **Property implementation**: `core.py:540-730` (all `@property` decorators)
+- **Attachment extraction**: `core.py:355-475` (walks multipart, handles encoding)
+- **Received parsing logic**: `utils.py:302-455` + `const.py:24-73` (regex patterns)
+- **CLI implementation**: `__main__.py:30-347` (argparse + output formatting)
+- **Exception hierarchy**: `exceptions.py:20-60` (5 exception types)
+
+## Testing Strategy
+
+When adding features:
+
+1. Add test email to `tests/mails/` if demonstrating new case
+2. Write tests in `tests/test_mail_parser.py` following existing patterns
+3. Test both normal and `_raw`/`_json` property variants
+4. Verify defect detection for security-relevant changes
+5. Run `make check` before committing
