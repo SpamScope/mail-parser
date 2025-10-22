@@ -24,41 +24,46 @@ JUNK_PATTERN = r"[ \(\)\[\]\t\n]+"
 
 # Patterns for receiveds
 RECEIVED_PATTERNS = [
-    # each pattern handles matching a single clause
-    # need to exclude withs followed by cipher (e.g., google); (?! cipher)
-    # TODO: ideally would do negative matching for with in parens
-    # need the beginning or space to differentiate from envelope-from
+    # FIXED: More restrictive 'from' clause
+    # Only matches 'from' at the beginning of the header (^) or after
+    # newline/whitespace to avoid matching within "for <email> from <email>"
+    # constructs which caused duplicate matches in IBM gateway headers
     (
-        r"(?:(?:^|\s)from\s+(?P<from>.+?)(?:\s*[(]?"
+        r"(?:(?:^|\n\s*)from\s+(?P<from>.+?)(?:\s*[(]?"
         r"envelope-from|\s*[(]?envelope-sender|\s+"
-        r"by|\s+with(?! cipher)|\s+id|\s+for|\s+via|;))"
+        r"by|\s+with(?! cipher)|\s+id|\s+via|;))"
     ),
-    # need to make sure envelope-from comes before from to prevent mismatches
-    # envelope-from and -sender seem to optionally have space and/or
-    # ( before them other clauses must have whitespace before
+    # IMPROVED: More precise 'by' clause
+    # Modified to not consume 'with' clause, allowing proper separation
+    # of 'by' (server name) and 'with' (protocol) fields
     (
-        r"(?:[^-\.]by\s+(?P<by>.+?)(?:\s*[(]?envelope-from|\s*"
-        r"[(]?envelope-sender|\s+from|\s+with"
-        r"(?! cipher)|\s+id|\s+for|\s+via|;))"
+        r"(?:(?:^|\s)by\s+(?P<by>[^\s]+(?:\s+[^\s]+)*?)"
+        r"(?:\s+with(?! cipher)|\s*[(]?envelope-from|\s*"
+        r"[(]?envelope-sender|\s+id|\s+for|\s+via|;))"
     ),
+    # IMPROVED: 'with' clause with better boundary detection
     (
-        r"(?:with(?! cipher)\s+(?P<with>.+?)(?:\s*[(]?envelope-from|\s*[(]?"
-        r"envelope-sender|\s+from|\s+by|\s+id|\s+for|\s+via|;))"
+        r"(?:(?:^|\s)with(?! cipher)\s+(?P<with>.+?)"
+        r"(?:\s*[(]?envelope-from|\s*[(]?"
+        r"envelope-sender|\s+id|\s+for|\s+via|;))"
     ),
+    # IMPROVED: 'id' clause with cleaner boundaries
     (
-        r"[^\w\.](?:id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*"
-        r"[(]?envelope-sender|\s+from|\s+by|\s+with"
-        r"(?! cipher)|\s+for|\s+via|;))"
+        r"(?:(?:^|\s)id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*"
+        r"[(]?envelope-sender|\s+for|\s+via|;))"
     ),
+    # IMPROVED: 'for' clause - handles "for <email> from <email>" pattern
+    # Stops before 'from' keyword to prevent the 'from' pattern from
+    # matching the sender email in this construct
     (
-        r"(?:for\s+(?P<for>.+?)(?:\s*[(]?envelope-from|\s*[(]?"
-        r"envelope-sender|\s+from|\s+by|\s+with"
-        r"(?! cipher)|\s+id|\s+via|;))"
+        r"(?:(?:^|\s)for\s+(?P<for><[^>]+>|[^\s]+)"
+        r"(?:\s+from|\s*[(]?envelope-from|\s*[(]?"
+        r"envelope-sender|\s+via|;))"
     ),
+    # IMPROVED: 'via' clause with better termination
     (
-        r"(?:via\s+(?P<via>.+?)(?:\s*[(]?"
-        r"envelope-from|\s*[(]?envelope-sender|\s+"
-        r"from|\s+by|\s+id|\s+for|\s+with(?! cipher)|;))"
+        r"(?:(?:^|\s)via\s+(?P<via>.+?)(?:\s*[(]?"
+        r"envelope-from|\s*[(]?envelope-sender|;))"
     ),
     # assumes emails are always inside <>
     r"(?:envelope-from\s+<(?P<envelope_from>.+?)>)",

@@ -2,245 +2,365 @@
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/mail-parser?color=blue)](https://pypistats.org/packages/mail-parser)
 
-
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
-mail-parser goes beyond being just a simple wrapper for the Python Standard Library's [email module](https://docs.python.org/2/library/email.message.html). It seamlessly transforms raw emails into versatile Python objects that you can integrate effortlessly into your projects. As the cornerstone of [SpamScope](https://github.com/SpamScope/spamscope), mail-parser empowers you to handle emails with ease and efficiency.
 
-Additionally, mail-parser supports the parsing of Outlook email formats (.msg). To enable this functionality on Debian-based systems, simply install the necessary package:
+mail-parser is a **production-grade, RFC-compliant email parsing library** that goes far beyond a
+simple wrapper for Python's [email module](https://docs.python.org/2/library/email.message.html).
+It transforms raw email messages into richly structured Python objects with unparalleled precision,
+making complex email processing accessible and reliable.
 
-```
-$ apt-get install libemail-outlook-message-perl
+As the **battle-tested foundation of [SpamScope](https://github.com/SpamScope/spamscope)**—a
+powerful email security and threat analysis platform—mail-parser has proven itself in demanding
+production environments where accuracy and security matter most.
+
+## Why Choose mail-parser?
+
+**🔒 Security-First Design**: Built specifically for email security analysis and digital forensics,
+mail-parser excels at detecting malformed structures, hidden content, and RFC non-compliance that
+could indicate malicious intent.
+
+**🎯 Comprehensive Parsing**: Extracts every component of an email—headers, bodies (plain text and
+HTML), attachments, metadata, routing information, and even subtle defects that other parsers miss.
+
+**🔍 Multi-Format Access**: Every parsed element is accessible in three formats (Python object, raw
+string, and JSON), enabling seamless integration with any workflow or downstream system.
+
+**🛡️ Defect Detection**: Identifies and categorizes RFC violations, malformed MIME boundaries, and
+structural anomalies that could hide malicious payloads or bypass security filters.
+
+**📧 Outlook Support**: Native handling of Microsoft Outlook .msg files alongside standard email
+formats, making it versatile for diverse email ecosystems.
+
+**⚡ Production-Ready**: Trusted by security professionals and developers worldwide, with extensive
+test coverage and proven reliability in high-stakes environments.
+
+Additionally, mail-parser provides full support for parsing Outlook email formats (.msg). To enable
+this functionality on Debian-based systems, simply install the required system package:
+
+```bash
+apt-get install libemail-outlook-message-perl
 ```
 
 For further details about the package, you can run:
 
-```
-$ apt-cache show libemail-outlook-message-perl
+```bash
+apt-cache show libemail-outlook-message-perl
 ```
 
 mail-parser is fully compatible with Python 3, ensuring modern performance and reliability.
 
-
 # Apache 2 Open Source License
+
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-
 # Support the Future of mail-parser
-Every contribution fuels innovation! If you believe in a powerful and reliable email parsing tool, consider investing in mail-parser. Your donation directly supports ongoing development, ensuring that we continue providing a robust, cutting-edge solution for developers everywhere.
 
-**Invest in Innovation**
-By donating, you help us:
-- Enhance and expand features.
-- Maintain a secure and reliable project.
-- Continue offering a valuable tool to the community.
+mail-parser is a **labor of love and commitment to the open-source community**. Thousands of
+developers and security professionals worldwide rely on this library for critical email processing
+and threat analysis. Your support directly fuels continued innovation and excellence.
+
+## Invest in Innovation
+
+Your contribution—no matter the size—makes a real difference. By supporting mail-parser, you enable us to:
+
+- **Advance Security Capabilities**: Develop cutting-edge detection mechanisms for emerging email
+  threats and attack vectors.
+- **Expand Format Support**: Add compatibility with new email formats and standards as they evolve.
+- **Enhance Performance**: Optimize parsing speed and memory efficiency for large-scale deployments.
+- **Maintain Excellence**: Ensure comprehensive testing, documentation, and bug-free releases that
+  you can trust in production.
+- **Foster Community**: Respond to issues, review contributions, and build a thriving ecosystem
+  around email security.
+- **Stay RFC-Compliant**: Keep pace with evolving email standards and specifications to ensure
+  maximum compatibility.
+
+Every donation, whether $5 or $500, directly funds development time and infrastructure costs. Join
+the community of supporters who believe in **accessible, reliable, and secure email parsing for
+everyone**.
 
 [![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
 
 Or contribute with Bitcoin:
 
 <a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
-  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true" alt="Bitcoin" width="200">
+  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"
+       alt="Bitcoin" width="200">
 </a>
 
 **Bitcoin Address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
 
 Thank you for supporting the evolution of mail-parser!
 
-
 # mail-parser on Web
+
 Explore mail-parser on these platforms:
 
 - **[FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)**
 - **[Arch User Repository](https://aur.archlinux.org/packages/mailparser/)**
 - **[REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)**
 
-
 # Description
-mail-parser takes a raw email as input and converts it into a comprehensive Python object that mirrors the structure of an email as defined by the relevant RFCs. Each property of this object directly maps to standard [RFC headers](https://www.iana.org/assignments/message-headers/message-headers.xhtml) such as "From", "To", "Cc", "Bcc", "Subject", and more.
 
-In addition, the parser extracts supplementary components including:
-- Plain text and HTML bodies for versatile processing.
-- Attachments along with their metadata (e.g., filename, content type, encoding, and more).
-- Detailed diagnostics like timestamp conversions, defects indicating non-compliant header formats, and custom header management (using underscore substitutions for hyphenated header names).
+mail-parser transforms raw email messages into comprehensive, RFC-compliant Python objects that
+faithfully mirror the structure defined by [IETF email protocol standards](https://www.iana.org/assignments/message-headers/message-headers.xhtml).
+Each property of the parsed object directly corresponds to standard RFC headers—"From", "To", "Cc",
+"Bcc", "Subject", and many more—providing intuitive, Pythonic access to every email component.
 
-Moreover, each header and property is accessible in multiple formats:
-- A native Python value for immediate use.
-- A raw string to retain original formatting.
-- A JSON representation for simplified integration with other tools or services.
+## Core Parsing Capabilities
 
-This rich parsing capability makes mail-parser a robust tool for email processing, enabling developers to handle, analyze, and even troubleshoot raw email data with comprehensive detail.
+The library extracts and structures every aspect of an email message:
 
-  - bcc
-  - cc
-  - date
-  - delivered_to
-  - from\_ (not `from` because is a keyword of Python)
-  - message_id
-  - received
-  - reply_to
-  - subject
-  - to
+- **Multi-format Bodies**: Both plain text and HTML body content, cleanly separated and accessible.
+- **Complete Attachments**: Full metadata extraction including filename, content type, encoding,
+  content disposition, content-ID, charset, and base64-encoded payloads.
+- **Routing Intelligence**: Parsed "Received" headers revealing the complete email journey,
+  including hop-by-hop analysis with timestamps, delays, server information, and envelope data.
+- **Advanced Diagnostics**: Timestamp parsing with timezone detection, defect identification for
+  RFC non-compliance, and structural anomaly detection.
+- **Custom Headers**: Full support for non-standard and vendor-specific headers using intuitive
+  underscore substitution for hyphenated names.
 
-There are other properties to get:
-  - body
-  - body html
-  - body plain
-  - headers
-  - attachments
-  - sender IP address
-  - to domains
-  - timezone
+## Triple-Format Property Access
 
-The `attachments` property is a list of objects. Every object has the following keys:
-  - binary: it's true if the attachment is a binary
-  - charset
-  - content_transfer_encoding
-  - content-disposition
-  - content-id
-  - filename
-  - mail_content_type
-  - payload: attachment payload in base64
+Every parsed element offers **three distinct access patterns** for maximum flexibility:
 
-To get custom headers you should replace "-" with "\_".
-Example for header `X-MSMail-Priority`:
+- **Native Python objects**: Structured, typed data ready for immediate programmatic use
+  (`mail.to`, `mail.date`, `mail.attachments`).
+- **Raw strings**: Original, unprocessed header content preserving exact formatting
+  (`mail.to_raw`, `mail.subject_raw`).
+- **JSON serialization**: Clean, standardized JSON representations for easy integration with APIs,
+  databases, or other tools (`mail.to_json`, `mail.headers_json`).
 
+This versatile architecture makes mail-parser exceptionally powerful for diverse use cases—from
+security analysis and forensics to email migration, compliance auditing, and automated processing
+pipelines.
+
+**Standard RFC Headers** (directly accessible as properties):
+
+- `bcc` - Blind carbon copy recipients
+- `cc` - Carbon copy recipients
+- `date` - Parsed timestamp with timezone support
+- `delivered_to` - Final delivery address
+- `from_` - Sender address (underscore used since `from` is a Python keyword)
+- `message_id` - Unique message identifier
+- `received` - Parsed routing chain with hop-by-hop details
+- `reply_to` - Reply-to address
+- `subject` - Email subject line
+- `to` - Primary recipients
+
+**Additional Parsed Components**:
+
+- `body` - Complete message body
+- `text_html` - HTML body parts (list)
+- `text_plain` - Plain text body parts (list)
+- `headers` - All headers as a structured object
+- `attachments` - Complete attachment metadata and payloads
+- `get_server_ipaddress()` - Reliable sender IP extraction with trust levels
+- `to_domains` - Extracted recipient domains for analysis
+- `timezone` - Detected timezone information
+- `defects` - RFC compliance issues for security analysis
+- `defects_categories` - Categorized defect types
+
+The `attachments` property returns a list of dictionaries, each containing comprehensive metadata:
+
+- `binary` - Boolean flag indicating binary content
+- `charset` - Character encoding of the attachment
+- `content_transfer_encoding` - Transfer encoding method (e.g., base64, quoted-printable)
+- `content-disposition` - Disposition type (attachment, inline, etc.)
+- `content-id` - Content identifier for referencing within HTML bodies
+- `filename` - Original filename of the attachment
+- `mail_content_type` - MIME content type
+- `payload` - Base64-encoded attachment data, ready for decoding or storage
+
+To access custom or vendor-specific headers, replace hyphens with underscores. For example, to
+access the `X-MSMail-Priority` header:
+
+```python
+mail.X_MSMail_Priority
 ```
-$ mail.X_MSMail_Priority
+
+The `received` header is intelligently parsed into individual hops, revealing the complete email
+routing path. Each hop contains structured fields:
+
+- `by` - Receiving mail server
+- `date` - Timestamp of receipt (original timezone)
+- `date_utc` - Normalized UTC timestamp
+- `delay` - Time elapsed between consecutive hops
+- `envelope_from` - SMTP envelope sender
+- `envelope_sender` - Alternative envelope sender field
+- `for` - Intended recipient
+- `from` - Sending mail server
+- `hop` - Sequential hop number
+- `with` - Protocol used for transmission (SMTP, ESMTP, etc.)
+
+> **Critical Security Feature**: mail-parser detects and reports structural defects in email
+> messages.
+
+The [defects](https://docs.python.org/3/library/email.message.html#email.message.Message.defects)
+property identifies RFC non-compliance issues that may indicate malformed or malicious emails—a
+crucial capability for security analysis and threat detection.
+
+**Multi-Format Property Access Pattern**:
+
+All parsed properties provide three access variants using intuitive suffixes:
+
+- `property_name` - Returns structured Python object
+- `property_name_json` - Returns JSON-serialized representation
+- `property_name_raw` - Returns original, unprocessed header string
+
+Example usage:
+
+```python
+mail.to          # Python list of recipient objects
+mail.to_json     # JSON string representation
+mail.to_raw      # Original "To:" header string as it appears in the email
 ```
 
-The `received` header is parsed and splitted in hop. The fields supported are:
- - by
- - date
- - date_utc
- - delay (between two hop)
- - envelope_from
- - envelope_sender
- - for
- - from
- - hop
- - with
+The command-line tool outputs parsed emails in JSON format by default for easy integration with
+other tools and pipelines.
 
+## Defects and Their Critical Role in Email Security
 
-> **Important:** mail-parser can detect defects in mail.
-  - [defects](https://docs.python.org/2/library/email.message.html#email.message.Message.defects): mail with some not compliance RFC part
+Email structural defects are not merely technical curiosities—they represent **potential security
+vulnerabilities** that sophisticated attackers actively exploit to bypass spam filters, antivirus
+scanners, and email security gateways.
 
-All properties have a JSON and raw property that you can get with:
- - name_json
- - name_raw
+### Real-World Threat Scenarios
 
-Example:
+Malformed MIME boundaries, for example, can conceal illegitimate epilogue sections containing:
 
-```
-$ mail.to (Python object)
-$ mail.to_json (JSON)
-$ mail.to_raw (raw header)
-```
+- **Malware Payloads**: Executable files or scripts hidden in non-standard message parts
+- **Phishing Links**: Obfuscated URLs that bypass pattern-matching filters
+- **Command-and-Control Data**: Encoded instructions for compromised systems
+- **Data Exfiltration**: Steganographically hidden sensitive information
 
-The command line tool use the JSON format.
+### mail-parser's Security Advantage
 
+mail-parser was **specifically engineered for security analysis and digital forensics**, with defect
+detection as a core feature rather than an afterthought. The library captures and categorizes even
+subtle structural anomalies that other parsers silently ignore or mishandle.
 
-## Defects and Their Impact on Email Security
-Email defects, such as malformed boundaries, can be exploited by malicious actors to bypass antispam filters. For instance, a poorly formatted boundary in an email might conceal an illegitimate epilogue that contains hidden malicious content, such as malware payloads or phishing links.
+By leveraging mail-parser's defect detection, security teams can:
 
-mail-parser is built to detect these structural irregularities, ensuring that even subtle anomalies are captured and analyzed. By identifying these defects, the library provides an early warning system, allowing you to:
+- **Expose Hidden Content**: Discover deliberately obfuscated message parts that may contain
+  malicious payloads.
+- **Identify Attack Patterns**: Recognize non-standard formatting techniques used by threat actors
+  to evade detection.
+- **Enable Deep Forensics**: Conduct thorough structural analysis of suspicious emails during
+  incident response.
+- **Strengthen Defenses**: Build more resilient email security rules based on identified defect
+  patterns.
+- **Ensure Compliance**: Verify that outbound emails meet RFC standards to avoid delivery issues.
 
-- Uncover hidden parts of an email that may be deliberately obfuscated.
-- Diagnose potential security threats stemming from non-standard email formatting.
-- Facilitate deeper forensic analysis of suspicious emails where the epilogue might carry harmful code or deceitful information.
-
-This robust defect detection mechanism is essential for maintaining the integrity of your email processing systems and enhancing overall cybersecurity.
-
+This robust defect detection mechanism has made mail-parser the **trusted choice for security
+platforms like SpamScope**, where identifying malicious intent hidden in structural anomalies can
+mean the difference between a blocked threat and a successful attack.
 
 # Authors
 
 ## Main Author
+
 **Fedele Mantuano**: [LinkedIn](https://www.linkedin.com/in/fmantuano/)
 
-
 # Installation
-To install mail-parser, follow these simple steps:
 
-1. Make sure you have Python 3 installed on your system.
-2. Open your terminal or command prompt.
-3. Run the following command to install mail-parser from PyPI:
+mail-parser requires Python 3 and can be installed in seconds using pip. Follow these steps:
 
-```bash
-$ pip install mail-parser
-```
+## Quick Install
 
-4. (Optional) To verify the installation, you can run:
+1. Ensure Python 3 is installed on your system.
+1. Open your terminal or command prompt.
+1. Install mail-parser from PyPI:
 
 ```bash
-$ pip show mail-parser
+pip install mail-parser
 ```
 
-If you plan to contribute or develop further, consider setting up a `uv` environment and syncing all development dependencies:
+1. (Optional) Verify the installation:
 
 ```bash
-$ git clone https://github.com/SpamScope/mail-parser.git
-$ cd mail-parser
-$ uv sync
+pip show mail-parser
 ```
 
-With these commands, you’ll have all dependencies installed inside your virtual environment.
+## Development Installation
 
-For more detailed instructions about `uv`, please refer to the [uv documentation](https://docs.astral.sh/uv/).
+For contributors and developers who want to work with the source code, we recommend using `uv` for
+dependency management:
 
-
-# Usage in a project
-Import `mailparser` module:
-
+```bash
+git clone https://github.com/SpamScope/mail-parser.git
+cd mail-parser
+uv sync
 ```
+
+This setup installs all development and testing dependencies in an isolated virtual environment,
+ensuring a clean and reproducible development workflow.
+
+For comprehensive documentation about `uv`, visit the [official uv documentation](https://docs.astral.sh/uv/).
+
+# Usage in a Project
+
+## Basic Usage
+
+Import the `mailparser` module and use the convenient factory functions:
+
+```python
 import mailparser
 
-mail = mailparser.parse_from_bytes(byte_mail)
-mail = mailparser.parse_from_file(f)
-mail = mailparser.parse_from_file_msg(outlook_mail)
-mail = mailparser.parse_from_file_obj(fp)
-mail = mailparser.parse_from_string(raw_mail)
+mail = mailparser.parse_from_bytes(byte_mail)      # Parse from bytes object
+mail = mailparser.parse_from_file(f)               # Parse from file path
+mail = mailparser.parse_from_file_msg(outlook_mail) # Parse Outlook .msg file
+mail = mailparser.parse_from_file_obj(fp)          # Parse from file object
+mail = mailparser.parse_from_string(raw_mail)      # Parse from string
 ```
 
-Then you can get all parts
+## Accessing Parsed Components
 
-```
-mail.attachments: list of all attachments
-mail.body
-mail.date: datetime object in UTC
-mail.defects: defect RFC not compliance
-mail.defects_categories: only defects categories
-mail.delivered_to
-mail.from_
-mail.get_server_ipaddress(trust="my_server_mail_trust")
-mail.headers
-mail.mail: tokenized mail in a object
-mail.message: email.message.Message object
-mail.message_as_string: message as string
-mail.message_id
-mail.received
-mail.subject
-mail.text_plain: only text plain mail parts in a list
-mail.text_html: only text html mail parts in a list
-mail.text_not_managed: all not managed text (check the warning logs to find content subtype)
-mail.to
-mail.to_domains
-mail.timezone: returns the timezone, offset from UTC
-mail.mail_partial: returns only the mains parts of emails
+Once parsed, access all email components through intuitive properties:
+
+```python
+mail.attachments              # List of all attachments with metadata
+mail.body                     # Complete message body
+mail.date                     # Parsed datetime object (UTC)
+mail.defects                  # List of RFC compliance defects
+mail.defects_categories       # Categorized defect types
+mail.delivered_to             # Delivery address
+mail.from_                    # Sender information
+mail.get_server_ipaddress(trust="my_server_mail_trust")  # Reliable sender IP
+mail.headers                  # All headers as structured object
+mail.mail                     # Fully tokenized mail object
+mail.message                  # Underlying email.message.Message object
+mail.message_as_string        # Reconstructed message as string
+mail.message_id               # Unique message identifier
+mail.received                 # Parsed routing information (hop-by-hop)
+mail.subject                  # Email subject
+mail.text_plain               # Plain text body parts (list)
+mail.text_html                # HTML body parts (list)
+mail.text_not_managed         # Unprocessed text parts (check logs for subtypes)
+mail.to                       # Recipient information
+mail.to_domains               # Extracted recipient domains
+mail.timezone                 # Timezone information (offset from UTC)
+mail.mail_partial             # Partial mail object (main parts only)
 ```
 
-It's possible to write the attachments on disk with the method:
+## Saving Attachments to Disk
 
-```
+Write all attachments to a specified directory:
+
+```python
 mail.write_attachments(base_path)
 ```
 
-# Usage from command-line
-If you installed mailparser with `pip` or `setup.py` you can use it with command-line.
+# Usage from Command Line
 
-These are all swithes:
+After installing mail-parser with pip, you can use the `mailparser` command-line tool for quick
+email analysis, batch processing, or integration with shell scripts and pipelines.
 
-```
+## Command-Line Options
+
+```text
 usage: mailparser [-h] (-f FILE | -s STRING | -k)
                    [-l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}] [-j] [-b]
                    [-a] [-r] [-t] [-dt] [-m] [-u] [-c] [-d] [-o]
@@ -283,22 +403,40 @@ optional arguments:
 It takes as input a raw mail and generates a parsed object.
 ```
 
-Example:
+## Examples
+
+Parse an email file and output as formatted JSON:
 
 ```shell
-$ mailparser -f example_mail -j
+mailparser -f example_mail -j
 ```
 
-This example will show you the tokenized mail in a JSON pretty format.
+Extract only the subject and sender:
 
-From [raw mail](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e) to
-[parsed mail](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).
-
-
-# Exceptions
-Exceptions hierarchy of mail-parser:
-
+```shell
+mailparser -f example_mail -u -m
 ```
+
+Analyze an Outlook .msg file with defect detection:
+
+```shell
+mailparser -f email.msg -o -d -j
+```
+
+Parse from stdin (useful for pipelines):
+
+```shell
+cat raw_email.eml | mailparser -k -j
+```
+
+See the transformation from [raw email](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e)
+to [beautifully parsed JSON output](https://gist.github.com/fedelemantuano/e958aa2813c898db9d2d09469db8e6f6).
+
+# Exception Hierarchy
+
+mail-parser uses a well-structured exception hierarchy for precise error handling:
+
+```text
 MailParserError: Base MailParser Exception
 |
 \── MailParserOutlookError: Raised with Outlook integration errors
@@ -310,29 +448,35 @@ MailParserError: Base MailParser Exception
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 ```
 
-# fmantuano/spamscope-mail-parser
-This Docker image encapsulates the functionality of `mail-parser`. You can find the [official image on Docker Hub](https://hub.docker.com/r/fmantuano/spamscope-mail-parser/).
+# Docker Deployment
 
-## Running the Docker Image
+A pre-built Docker image is available for easy deployment and containerized workflows. Find the
+[official image on Docker Hub](https://hub.docker.com/r/fmantuano/spamscope-mail-parser/).
 
-After installing Docker, you can run the container with the following command:
+## Quick Start with Docker
+
+After installing Docker, run the containerized mail-parser:
 
 ```shell
 sudo docker run -it --rm -v ~/mails:/mails fmantuano/spamscope-mail-parser
 ```
 
-This command mounts your local `~/mails` directory into the container at `/mails`. The image runs `mail-parser` in its default mode, but you can pass any additional options as needed.
+This command mounts your local `~/mails` directory into the container at `/mails`, allowing
+mail-parser to access your email files. You can pass any command-line options supported by
+mail-parser.
 
-## Using docker-compose
+## Using Docker Compose
 
-A `docker-compose.yml` file is also provided. From the directory containing the file, run:
+For more complex setups, a `docker-compose.yml` file is included in the repository. Run it with:
 
 ```shell
 sudo docker-compose up
 ```
 
-The configuration in the `docker-compose.yml` file includes:
-- Mounting your local `~/mails` directory (read-only) into the container at `/mails`.
-- Running a command-line test example to verify functionality.
+The default configuration includes:
 
-Review the `docker-compose.yml` file to customize the launch parameters to suit your needs.
+- Read-only mount of your local `~/mails` directory to `/mails` in the container.
+- A test command demonstrating mail-parser functionality.
+
+Customize the `docker-compose.yml` file to adjust mount points, command-line options, or
+environment variables for your specific use case.

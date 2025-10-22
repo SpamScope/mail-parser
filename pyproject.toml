@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "A tool that parses emails by enhancing the Python standard library, extracting all details into a comprehensive object."
 license = "Apache-2.0"
 readme = "README.md"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.9,<3.15"
 keywords = ["email", "mail", "parser", "security", "forensics", "threat detection", "phishing", "malware", "spam"]
 classifiers = [
   "Natural Language :: English",
@@ -18,6 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 authors = [
   { name = "Fedele Mantuano", email = "mantuano.fedele@gmail.com" }
@@ -25,9 +26,7 @@ authors = [
 maintainers = [
   { name = "Fedele Mantuano", email = "mantuano.fedele@gmail.com" }
 ]
-dependencies = [
-    "six>=1.17.0",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [

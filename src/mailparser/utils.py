@@ -35,8 +35,6 @@ from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
 
-import six
-
 from mailparser.const import (
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
@@ -90,52 +88,45 @@ def sanitize(func):
 @sanitize
 def ported_string(raw_data, encoding="utf-8", errors="ignore"):
     """
-    Give as input raw data and output a str in Python 3
-    and unicode in Python 2.
+    Give as input raw data and output a str in Python 3.
 
     Args:
-        raw_data: Python 2 str, Python 3 bytes or str to porting
+        raw_data: bytes or str to convert to str
         encoding: string giving the name of an encoding
-        errors: his specifies the treatment of characters
+        errors: specifies the treatment of characters
             which are invalid in the input encoding
 
     Returns:
-        str (Python 3) or unicode (Python 2)
+        str
     """
 
     if not raw_data:
-        return six.text_type()
+        return str()
 
-    if isinstance(raw_data, six.text_type):
+    if isinstance(raw_data, str):
         return raw_data
 
-    if six.PY2:
-        try:
-            return six.text_type(raw_data, encoding, errors)
-        except LookupError:
-            return six.text_type(raw_data, "utf-8", errors)
-
-    if six.PY3:
-        try:
-            return six.text_type(raw_data, encoding)
-        except (LookupError, UnicodeDecodeError):
-            return six.text_type(raw_data, "utf-8", errors)
+    # raw_data is bytes, decode it
+    try:
+        return str(raw_data, encoding)
+    except (LookupError, UnicodeDecodeError):
+        return str(raw_data, "utf-8", errors)
 
 
 def decode_header_part(header):
     """
-    Given an raw header returns an decoded header
+    Given a raw header returns a decoded header
 
     Args:
         header (string): header to decode
 
     Returns:
-        str (Python 3) or unicode (Python 2)
+        str
     """
     if not header:
-        return six.text_type()
+        return str()
 
-    output = six.text_type()
+    output = str()
 
     try:
         for d, c in decode_header(header):
@@ -151,10 +142,15 @@ def decode_header_part(header):
 
 
 def ported_open(file_):
-    if six.PY2:
-        return open(file_)
-    elif six.PY3:
-        return open(file_, encoding="utf-8", errors="ignore")
+    """Open a file with UTF-8 encoding and ignore errors.
+
+    Args:
+        file_: path to the file to open
+
+    Returns:
+        file object
+    """
+    return open(file_, encoding="utf-8", errors="ignore")
 
 
 def find_between(text, first_token, last_token):
@@ -179,7 +175,7 @@ def fingerprints(data):
 
     hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
 
-    if not isinstance(data, six.binary_type):
+    if not isinstance(data, bytes):
         data = data.encode("utf-8")
 
     # md5
@@ -215,28 +211,19 @@ def msgconvert(email):
 
     Returns:
         tuple with file path of mail converted and
-        standard output data (unicode Python 2, str Python 3)
+        standard output data (str)
     """
     log.debug("Started converting Outlook email")
     temph, temp = tempfile.mkstemp(prefix="outlook_")
     command = ["msgconvert", "--outfile", temp, email]
 
     try:
-        if six.PY2:
-            with open(os.devnull, "w") as devnull:
-                out = subprocess.Popen(
-                    command,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=devnull,
-                )
-        elif six.PY3:
-            out = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
+        out = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
 
     except OSError as e:
         message = f"Check if 'msgconvert' tool is installed / {e!r}"
@@ -284,12 +271,9 @@ def parse_received(received):
             # otherwise we have one matching clause!
             log.debug("Found one match for %s in %s" % (pattern.pattern, received))
             match = matches[0].groupdict()
-            if six.PY2:
-                values_by_clause[match.keys()[0]] = match.values()[0]
-            elif six.PY3:
-                key = list(match.keys())[0]
-                value = list(match.values())[0]
-                values_by_clause[key] = value
+            key = list(match.keys())[0]
+            value = list(match.values())[0]
+            values_by_clause[key] = value
 
     if len(values_by_clause) == 0:
         # we weren't able to match anything...
@@ -466,7 +450,7 @@ def get_to_domains(to=[], reply_to=[]):
     for i in to + reply_to:
         try:
             domains.add(i[1].split("@")[-1].lower().strip())
-        except KeyError:
+        except (KeyError, IndexError):
             pass
 
     return list(domains)
@@ -495,7 +479,7 @@ def get_header(message, name):
             return headers[0].strip()
         # in this case return a list
         return headers
-    return six.text_type()
+    return str()
 
 
 def get_mail_keys(message, complete=True):

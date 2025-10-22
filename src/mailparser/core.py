@@ -23,10 +23,7 @@ import json
 import logging
 import os
 
-import six
-
 from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
-from mailparser.exceptions import MailParserEnvironmentError
 from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
@@ -132,7 +129,7 @@ class MailParser:
         if self.message:
             return self.subject
         else:
-            return six.text_type()
+            return str()
 
     @classmethod
     def from_file_obj(cls, fp):
@@ -225,10 +222,6 @@ class MailParser:
             Instance of MailParser
         """
         log.debug("Parsing email from bytes")
-        if six.PY2:
-            raise MailParserEnvironmentError(
-                "Parsing from bytes is valid only for Python 3.x version"
-            )
         message = email.message_from_bytes(bt)
         return cls(message)
 
@@ -527,7 +520,7 @@ class MailParser:
         check = REGXIP.findall(received_header[0 : received_header.find("by")])
         if check:
             try:
-                ip_str = six.text_type(check[-1])
+                ip_str = str(check[-1])
                 log.debug(f"Found sender IP {ip_str!r} in {received_header!r}")
                 ip = ipaddress.ip_address(ip_str)
             except ValueError:
@@ -563,7 +556,7 @@ class MailParser:
 
         # object headers
         elif name_header in ADDRESSES_HEADERS:
-            h = decode_header_part(self.message.get(name_header, six.text_type()))
+            h = decode_header_part(self.message.get(name_header, str()))
             h_parsed = email.utils.getaddresses([h], strict=True)
             return (
                 h_parsed

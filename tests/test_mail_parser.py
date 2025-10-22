@@ -25,8 +25,6 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import six
-
 import mailparser
 from mailparser.utils import (
     convert_mail_date,
@@ -115,13 +113,13 @@ class TestMailParser(unittest.TestCase):
     def test_html_field(self):
         mail = mailparser.parse_from_file(mail_malformed_1)
         self.assertIsInstance(mail.text_html, list)
-        self.assertIsInstance(mail.text_html_json, six.text_type)
+        self.assertIsInstance(mail.text_html_json, str)
         self.assertEqual(len(mail.text_html), 1)
 
     def test_text_not_managed(self):
         mail = mailparser.parse_from_file(mail_test_14)
         self.assertIsInstance(mail.text_not_managed, list)
-        self.assertIsInstance(mail.text_not_managed_json, six.text_type)
+        self.assertIsInstance(mail.text_not_managed_json, str)
         self.assertEqual(len(mail.text_not_managed), 1)
         self.assertEqual("PNG here", mail.text_not_managed[0])
 
@@ -141,7 +139,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("x-ibm-av-version", mail.mail)
         self.assertNotIn("x-ibm-av-version", mail.mail_partial)
         result = mail.mail_partial_json
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
         nr_attachments = len(mail._attachments)
         self.assertEqual(nr_attachments, 4)
 
@@ -160,7 +158,7 @@ class TestMailParser(unittest.TestCase):
     def test_get_header(self):
         mail = mailparser.parse_from_file(mail_test_1)
         h1 = get_header(mail.message, "from")
-        self.assertIsInstance(h1, six.text_type)
+        self.assertIsInstance(h1, str)
 
     def test_receiveds_parsing(self):
         for i in self.all_mails:
@@ -228,7 +226,7 @@ class TestMailParser(unittest.TestCase):
         self.assertNotIn("reply_to", mail.mail)
         reply_to = [("VICTORIA Souvenirs", "smgesi4@gmail.com")]
         self.assertEqual(mail.reply_to, reply_to)
-        self.assertEqual(mail.fake_header, six.text_type())
+        self.assertEqual(mail.fake_header, str())
 
         # This email has header X-MSMail-Priority
         msmail_priority = mail.X_MSMail_Priority
@@ -238,12 +236,12 @@ class TestMailParser(unittest.TestCase):
         mail = mailparser.parse_from_file(mail_test_5)
         self.assertEqual(len(mail.attachments), 5)
         for i in mail.attachments:
-            self.assertIsInstance(i["filename"], six.text_type)
+            self.assertIsInstance(i["filename"], str)
 
     def test_filename_decode(self):
         mail = mailparser.parse_from_file(mail_test_11)
         for i in mail.attachments:
-            self.assertIsInstance(i["filename"], six.text_type)
+            self.assertIsInstance(i["filename"], str)
 
     def test_valid_mail(self):
         m = mailparser.parse_from_string("fake mail")
@@ -259,9 +257,9 @@ class TestMailParser(unittest.TestCase):
 
         self.assertIsInstance(mail.received_raw, list)
         for i in mail.received_raw:
-            self.assertIsInstance(i, six.text_type)
+            self.assertIsInstance(i, str)
 
-        self.assertIsInstance(mail.received_json, six.text_type)
+        self.assertIsInstance(mail.received_json, str)
 
     def test_parsing_know_values(self):
         mail = mailparser.parse_from_file(mail_test_2)
@@ -282,8 +280,8 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], tuple)
-        self.assertIsInstance(mail.to_json, six.text_type)
-        self.assertIsInstance(mail.to_raw, six.text_type)
+        self.assertIsInstance(mail.to_json, str)
+        self.assertIsInstance(mail.to_raw, str)
         self.assertEqual(raw, result[0][1])
 
         raw = "meteo@regione.vda.it"
@@ -300,8 +298,8 @@ class TestMailParser(unittest.TestCase):
         result = len(mail.attachments)
         self.assertEqual(3, result)
 
-        self.assertIsInstance(mail.date_raw, six.text_type)
-        self.assertIsInstance(mail.date_json, six.text_type)
+        self.assertIsInstance(mail.date_raw, str)
+        self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
@@ -318,19 +316,19 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("has_defects", result)
 
         result = mail.get_server_ipaddress(trust)
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.mail_json
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.headers_json
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.headers
         self.assertIsInstance(result, dict)
 
         result = mail.body
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.date
         self.assertIsInstance(result, datetime.datetime)
@@ -345,10 +343,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(len(result[0]), 2)
 
         result = mail.subject
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.message_id
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.attachments
         self.assertIsInstance(result, list)
@@ -367,21 +365,17 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
         self.assertIn("StartBoundaryNotFoundDefect", mail.defects_categories)
-        self.assertIsInstance(mail.mail_json, six.text_type)
+        self.assertIsInstance(mail.mail_json, str)
 
         result = len(mail.attachments)
         self.assertEqual(1, result)
 
         mail = mailparser.parse_from_file(mail_test_1)
-        if six.PY2:
-            self.assertFalse(mail.has_defects)
-            self.assertNotIn("defects", mail.mail)
-        elif six.PY3:
-            self.assertTrue(mail.has_defects)
-            self.assertEqual(1, len(mail.defects))
-            self.assertEqual(1, len(mail.defects_categories))
-            self.assertIn("defects", mail.mail)
-            self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
+        self.assertTrue(mail.has_defects)
+        self.assertEqual(1, len(mail.defects))
+        self.assertEqual(1, len(mail.defects_categories))
+        self.assertIn("defects", mail.mail)
+        self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
 
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
@@ -391,7 +385,7 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(1, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
         self.assertIn("StartBoundaryNotFoundDefect", mail.defects_categories)
-        self.assertIsInstance(mail.parsed_mail_json, six.text_type)
+        self.assertIsInstance(mail.parsed_mail_json, str)
 
         result = len(mail.attachments)
         self.assertEqual(1, result)
@@ -404,11 +398,9 @@ class TestMailParser(unittest.TestCase):
         result = mail.mail
 
         self.assertEqual(len(result["attachments"]), 1)
-        self.assertIsInstance(
-            result["attachments"][0]["mail_content_type"], six.text_type
-        )
+        self.assertIsInstance(result["attachments"][0]["mail_content_type"], str)
         self.assertFalse(result["attachments"][0]["binary"])
-        self.assertIsInstance(result["attachments"][0]["payload"], six.text_type)
+        self.assertIsInstance(result["attachments"][0]["payload"], str)
         self.assertEqual(
             result["attachments"][0]["content_transfer_encoding"], "quoted-printable"
         )
@@ -435,7 +427,7 @@ class TestMailParser(unittest.TestCase):
     def test_bug_UnicodeDecodeError(self):
         m = mailparser.parse_from_file(mail_test_6)
         self.assertIsInstance(m.mail, dict)
-        self.assertIsInstance(m.mail_json, six.text_type)
+        self.assertIsInstance(m.mail_json, str)
 
     @patch("mailparser.core.os.remove")
     @patch("mailparser.core.msgconvert")
@@ -471,19 +463,19 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("has_defects", result)
 
         result = mail.get_server_ipaddress(trust)
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.mail_json
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.headers
         self.assertIsInstance(result, dict)
 
         result = mail.headers_json
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.body
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.date
         self.assertIsInstance(result, datetime.datetime)
@@ -498,10 +490,10 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(len(result[0]), 2)
 
         result = mail.subject
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.message_id
-        self.assertIsInstance(result, six.text_type)
+        self.assertIsInstance(result, str)
 
         result = mail.attachments
         self.assertIsInstance(result, list)
@@ -527,7 +519,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIn("test.it", domains_2)
         self.assertEqual(domains_1, domains_2)
 
-        self.assertIsInstance(m.to_domains_json, six.text_type)
+        self.assertIsInstance(m.to_domains_json, str)
 
     def test_convert_mail_date(self):
         s = "Mon, 20 Mar 2017 05:12:54 +0600"
@@ -544,7 +536,7 @@ class TestMailParser(unittest.TestCase):
     def test_ported_string(self):
         raw_data = ""
         s = ported_string(raw_data)
-        self.assertEqual(s, six.text_type())
+        self.assertEqual(s, str())
 
         raw_data = "test"
         s = ported_string(raw_data)
@@ -656,8 +648,8 @@ class TestMailParser(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertIsInstance(result, list)
         self.assertIsInstance(result[0], tuple)
-        self.assertIsInstance(mail.to_json, six.text_type)
-        self.assertIsInstance(mail.to_raw, six.text_type)
+        self.assertIsInstance(mail.to_json, str)
+        self.assertIsInstance(mail.to_raw, str)
         self.assertEqual(raw, result[0][1])
 
         raw = "meteo@regione.vda.it"
@@ -674,8 +666,8 @@ class TestMailParser(unittest.TestCase):
         result = len(mail.attachments)
         self.assertEqual(3, result)
 
-        self.assertIsInstance(mail.date_raw, six.text_type)
-        self.assertIsInstance(mail.date_json, six.text_type)
+        self.assertIsInstance(mail.date_raw, str)
+        self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
@@ -710,3 +702,239 @@ class TestMailParser(unittest.TestCase):
             ("", "notificaccion-clientes@bbva.mx"),
             ("", "notificaccion-clientes@bbva.mx"),
         ]
+
+    def test_str_method_with_message(self):
+        """Test __str__ method returns subject when message exists"""
+        mail = mailparser.parse_from_file(mail_test_1)
+        str_result = str(mail)
+        self.assertEqual(str_result, mail.subject)
+
+    def test_str_method_without_message(self):
+        """Test __str__ method returns empty string when no message"""
+        # Create a MailParser with None message
+        parser = mailparser.MailParser.__new__(mailparser.MailParser)
+        parser._message = None
+        str_result = str(parser)
+        self.assertEqual(str_result, "")
+
+    def test_from_file_obj_seekable(self):
+        """Test from_file_obj with seekable file object"""
+        import os
+        import tempfile
+
+        content = "From: test@example.com\nSubject: Test Seekable\n\nBody"
+        # Create a real file to test seekable behavior
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".eml") as f:
+            f.write(content)
+            fname = f.name
+
+        try:
+            with ported_open(fname) as fp:
+                mail = mailparser.parse_from_file_obj(fp)
+                self.assertEqual(mail.subject, "Test Seekable")
+        finally:
+            os.unlink(fname)
+
+    def test_from_file_obj_non_seekable(self):
+        """Test from_file_obj with non-seekable file object (like stdin/TTY)"""
+        import io
+
+        content = "From: test@example.com\nSubject: Test Non-Seekable\n\nBody"
+
+        # Create a mock non-seekable file object that acts like text
+        class NonSeekableIO(io.StringIO):
+            def seek(self, *args):
+                raise OSError("File is not seekable")
+
+        fp = NonSeekableIO(content)
+
+        mail = mailparser.parse_from_file_obj(fp)
+        self.assertEqual(mail.subject, "Test Non-Seekable")
+
+    def test_get_server_ipaddress_invalid_ip(self):
+        """Test get_server_ipaddress with invalid IP that raises ValueError"""
+        # Create mail with received header containing invalid IP
+        raw_mail = """Received: from invalid.example.com (999.999.999.999)
+    by mail.example.com
+Subject: Test
+From: test@example.com
+
+Body"""
+        mail = mailparser.parse_from_string(raw_mail)
+
+        # Should return None for invalid IP
+        result = mail.get_server_ipaddress("trust")
+        # The IP validation should fail and return None
+        self.assertIsNone(result)
+
+    def test_get_server_ipaddress_private_ip(self):
+        """Test get_server_ipaddress with private IP address"""
+        raw_mail = """Received: from internal.example.com (192.168.1.100)
+    by mail.example.com
+Subject: Test
+From: test@example.com
+
+Body"""
+        mail = mailparser.parse_from_string(raw_mail)
+
+        # Private IP should return None
+        result = mail.get_server_ipaddress("trust")
+        self.assertIsNone(result)
+
+    def test_epilogue_parsing_typeerror(self):
+        """Test epilogue parsing with TypeError"""
+        # Create mail with problematic epilogue that causes TypeError
+        # This is edge case where epilogue exists but can't be parsed
+        raw_mail = """Content-Type: multipart/mixed; boundary=boundary
+
+--boundary
+Content-Type: text/plain
+
+Test
+--boundary--
+InvalidEpilogueData"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        # Should handle TypeError gracefully
+        self.assertIsNotNone(mail)
+
+    def test_epilogue_parsing_typeerror_coverage(self):
+        """Test epilogue parsing TypeError exception handler coverage"""
+        import email
+        from unittest.mock import patch
+
+        # Create a mail with StartBoundaryNotFoundDefect to trigger epilogue parsing
+        raw_mail = """Content-Type: multipart/mixed; boundary="boundary123"
+
+--boundary123
+Content-Type: text/plain
+
+Test content
+--boundary123--
+Extra epilogue content here"""
+
+        # Parse to get the message
+        msg = email.message_from_string(raw_mail)
+
+        # Mock email.message_from_string to raise TypeError
+        with patch("email.message_from_string") as mock_parse:
+            # First call is for initial parsing (let it pass)
+            # Second call is for epilogue parsing (raise TypeError)
+            mock_parse.side_effect = [msg, TypeError("Test TypeError")]
+
+            # This won't trigger the epilogue path without defects
+            # So we need to mock find_between to return something
+            with patch("mailparser.core.find_between") as mock_find:
+                mock_find.return_value = "epilogue content"
+
+                # Mock the message to have epilogue defects
+                with patch.object(
+                    mailparser.MailParser,
+                    "defects_categories",
+                    {"StartBoundaryNotFoundDefect"},
+                ):
+                    mail = mailparser.parse_from_string(raw_mail)
+                    # Should handle TypeError and continue
+                    self.assertIsNotNone(mail)
+
+    def test_epilogue_parsing_general_exception_coverage(self):
+        """Test epilogue parsing general Exception handler coverage"""
+        import email
+        from unittest.mock import patch
+
+        # Create a mail with boundary
+        raw_mail = """Content-Type: multipart/mixed; boundary="boundary123"
+
+--boundary123
+Content-Type: text/plain
+
+Test content
+--boundary123--
+Extra epilogue content"""
+
+        # Parse to get the message
+        msg = email.message_from_string(raw_mail)
+
+        # Mock email.message_from_string to raise a general Exception
+        with patch("email.message_from_string") as mock_parse:
+            mock_parse.side_effect = [msg, Exception("General error")]
+
+            with patch("mailparser.core.find_between") as mock_find:
+                mock_find.return_value = "epilogue content"
+
+                # Mock defects_categories to trigger epilogue parsing
+                with patch.object(
+                    mailparser.MailParser,
+                    "defects_categories",
+                    {"StartBoundaryNotFoundDefect"},
+                ):
+                    mail = mailparser.parse_from_string(raw_mail)
+                    # Should handle Exception and log error
+                    self.assertIsNotNone(mail)
+
+    def test_attachment_with_content_id_no_subtype(self):
+        """Test attachment handling with content-id but no html/plain subtype"""
+        raw_mail = """Content-Type: multipart/mixed; boundary=boundary
+
+--boundary
+Content-Type: image/png
+Content-ID: <image001>
+
+ImageData
+--boundary--"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        self.assertGreater(len(mail.attachments), 0)
+
+    def test_attachment_rtf_type(self):
+        """Test attachment handling for RTF content subtype"""
+        raw_mail = """Content-Type: multipart/mixed; boundary=boundary
+
+--boundary
+Content-Type: application/rtf
+
+RTFData
+--boundary--"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        attachments = mail.attachments
+        self.assertGreater(len(attachments), 0)
+        # Should have generated RTF filename
+        self.assertTrue(any(".rtf" in att.get("filename", "") for att in attachments))
+
+    def test_attachment_disposition_without_filename(self):
+        """Test attachment with content-disposition but no filename"""
+        raw_mail = """Content-Type: multipart/mixed; boundary=boundary
+
+--boundary
+Content-Type: text/plain
+Content-Disposition: attachment
+
+PlainTextData
+--boundary--"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        attachments = mail.attachments
+        self.assertGreater(len(attachments), 0)
+        # Should have generated .txt filename
+        self.assertTrue(any(".txt" in att.get("filename", "") for att in attachments))
+
+    def test_text_plain_7bit_encoding(self):
+        """Test text/plain body part with 7bit encoding"""
+        raw_mail = """Content-Type: text/plain
+Content-Transfer-Encoding: 7bit
+
+This is plain text with 7bit encoding."""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        self.assertIn("This is plain text", mail.body)
+
+    def test_text_plain_8bit_encoding(self):
+        """Test text/plain body part with 8bit encoding"""
+        raw_mail = """Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+This is plain text with 8bit encoding."""
+
+        mail = mailparser.parse_from_string(raw_mail)
+        self.assertIn("This is plain text", mail.body)
