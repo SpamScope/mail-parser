@@ -27,3 +27,9 @@ repos:
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
+
+- repo: https://github.com/igorshubovych/markdownlint-cli
+  rev: v0.42.0
+  hooks:
+    - id: markdownlint
+      args: ['--fix']

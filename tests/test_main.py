@@ -236,13 +236,22 @@ class TestMain:
 
     def test_parse_file_outlook(self, parser, tmp_path):
         """Test parse_file with Outlook flag"""
+        from unittest.mock import patch
+
         from mailparser.__main__ import parse_file
+        from mailparser.exceptions import MailParserOSError
 
-        # This will fail without msgconvert but we test the code path
-        args = parser.parse_args(["--file", "dummy.msg", "--outlook"])
+        # Create a non-existent file path
+        non_existent_file = str(tmp_path / "non_existent.msg")
+        args = parser.parse_args(["--file", non_existent_file, "--outlook"])
 
-        with pytest.raises(Exception):  # Will raise MailParserOSError or similar
-            parse_file(args)
+        # Mock msgconvert to raise OSError (simulating msgconvert unavailable)
+        with patch(
+            "mailparser.utils.subprocess.Popen",
+            side_effect=OSError("msgconvert not found"),
+        ):
+            with pytest.raises(MailParserOSError, match="msgconvert"):
+                parse_file(args)
 
     def test_parse_stdin(self, parser):
         """Test parse_stdin function"""
