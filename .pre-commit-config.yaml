@@ -33,3 +33,4 @@ repos:
   hooks:
     - id: markdownlint
       args: ['--fix']
+      exclude: '^\.github/instructions/'
