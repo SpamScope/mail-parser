@@ -88,6 +88,8 @@ make format   # ruff formatting
 make check    # lint + test
 make pre-commit  # runs pre-commit hooks
 ```
+For all unittest use `pytest` framework and mock external dependencies as needed.
+When you modify code, ensure all tests pass and coverage remains high.
 
 ### Build & Release
 ```bash

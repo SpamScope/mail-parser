@@ -25,9 +25,7 @@ authors = [
 maintainers = [
   { name = "Fedele Mantuano", email = "mantuano.fedele@gmail.com" }
 ]
-dependencies = [
-    "six>=1.17.0",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
