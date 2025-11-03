@@ -61,6 +61,7 @@ mail_test_14 = os.path.join(base_path, "mails", "mail_test_14")
 mail_test_15 = os.path.join(base_path, "mails", "mail_test_15")
 mail_test_16 = os.path.join(base_path, "mails", "mail_test_16")
 mail_test_17 = os.path.join(base_path, "mails", "mail_test_17")
+mail_test_18 = os.path.join(base_path, "mails", "mail_test_18")
 mail_malformed_1 = os.path.join(base_path, "mails", "mail_malformed_1")
 mail_malformed_2 = os.path.join(base_path, "mails", "mail_malformed_2")
 mail_malformed_3 = os.path.join(base_path, "mails", "mail_malformed_3")
@@ -698,10 +699,7 @@ class TestMailParser(unittest.TestCase):
 
     def test_issue_136(self):
         mail = mailparser.parse_from_file(mail_test_17)
-        assert mail.from_ == [
-            ("", "notificaccion-clientes@bbva.mx"),
-            ("", "notificaccion-clientes@bbva.mx"),
-        ]
+        assert mail.from_ == [("", "notificaccion-clientes@bbva.mx"),]
 
     def test_str_method_with_message(self):
         """Test __str__ method returns subject when message exists"""
@@ -938,3 +936,16 @@ This is plain text with 8bit encoding."""
 
         mail = mailparser.parse_from_string(raw_mail)
         self.assertIn("This is plain text", mail.body)
+
+
+    def test_comma_in_name(self):
+        """
+        Tests the fixes for both the 'comma-in-encoded-name' issue and the
+        'encoded-name-equals-email' issue (from test_issue_136).
+        """
+
+        mail = mailparser.parse_from_file(mail_test_18)
+
+        assert mail.from_ == [('LastßlName, FirstName', 'comma.name@example.com')]
+        assert mail.to == [('', 'tony.stark@example.com')]
+        assert mail.cc == [('', 'simple@example.net'), ('John "Johnny" Doe', 'john.doe@example.com')]
