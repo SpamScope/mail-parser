@@ -554,7 +554,7 @@ class MailParser:
             raw = self.message.get_all(name)
             return json.dumps(raw, ensure_ascii=False)
 
-       # object headers
+        # object headers
         elif name_header in ADDRESSES_HEADERS:
             raw_header = self.message.get(name_header, "")
             # parse before decoding
@@ -562,7 +562,14 @@ class MailParser:
 
             # decoded addresses
             return [
-                (("" if (decoded_name := decode_header_part(name)) == email_addr else decoded_name), email_addr)
+                (
+                    (
+                        ""
+                        if (decoded_name := decode_header_part(name)) == email_addr
+                        else decoded_name
+                    ),
+                    email_addr,
+                )
                 for name, email_addr in parsed_addresses
             ]
 
