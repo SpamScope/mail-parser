@@ -1,0 +1,14 @@
+MIME-Version: 1.0
+Date: Mon, 3 Nov 2025 18:23:00 +0100
+Content-Type: text/plain; charset=utf-8
+Subject: Test for Comma and Name Bugs
+From: =?iso-8859-1?Q?Last=DFlName=2C_FirstName?= <comma.name@example.com>
+To: =?UTF-8?B?dG9ueS5zdGFya0BleGFtcGxlLmNvbQ==?= <tony.stark@example.com>
+Cc: simple@example.net, =?UTF-8?Q?John_=22Johnny=22_Doe?= <john.doe@example.com>
+
+This is a test email body.
+
+It validates two specific fixes:
+1.  The 'From' header contains a comma in the encoded display name.
+2.  The 'To' header has an encoded display name that matches the email address.
+3.  The 'Cc' header has a mix of simple and encoded addresses.

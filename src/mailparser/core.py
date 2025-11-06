@@ -556,13 +556,22 @@ class MailParser:
 
         # object headers
         elif name_header in ADDRESSES_HEADERS:
-            h = decode_header_part(self.message.get(name_header, str()))
-            h_parsed = email.utils.getaddresses([h], strict=True)
-            return (
-                h_parsed
-                if h_parsed != [("", "")]
-                else email.utils.getaddresses([h], strict=False)
-            )
+            raw_header = self.message.get(name_header, "")
+            # parse before decoding
+            parsed_addresses = email.utils.getaddresses([raw_header], strict=True)
+
+            # decoded addresses
+            return [
+                (
+                    (
+                        ""
+                        if (decoded_name := decode_header_part(name)) == email_addr
+                        else decoded_name
+                    ),
+                    email_addr,
+                )
+                for name, email_addr in parsed_addresses
+            ]
 
         # others headers
         else:
