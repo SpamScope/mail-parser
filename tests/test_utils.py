@@ -586,3 +586,15 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(result[1]["delay"], 0)
         # But should have a valid date itself
         self.assertIsNotNone(result[1].get("date_utc"))
+
+    def test_ported_string_handles_header_object(self):
+        """
+        Test that ported_string can accept an email.header.Header object 
+        and return a decoded string without crashing.
+        """
+        from email.header import Header
+        raw_val = 'attachment;\r\nfilename="Just a text – 2026.pdf'
+        header_obj = Header(raw_val, charset="utf-8")
+        result = ported_string(header_obj)
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, raw_val)

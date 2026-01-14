@@ -103,6 +103,9 @@ def ported_string(raw_data, encoding="utf-8", errors="ignore"):
     if not raw_data:
         return str()
 
+    if isinstance(raw_data, email.header.Header):
+        return str(raw_data)
+
     if isinstance(raw_data, str):
         return raw_data
 
