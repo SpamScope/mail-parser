@@ -18,66 +18,66 @@ limitations under the License.
 
 import re
 
-REGXIP = re.compile(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}")
+# IPv4 pattern - validates octet range (0-255) per RFC 791
+REGXIP = re.compile(
+    r"(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
+    r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)"
+)
 
-JUNK_PATTERN = r"[ \(\)\[\]\t\n]+"
+# IPv6 pattern - matches standard and common compressed forms per RFC 5952
+REGXIP6 = re.compile(
+    r"(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}"  # full form
+    r"|(?:[0-9a-fA-F]{1,4}:){1,7}:"  # trailing ::
+    r"|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}"  # :: with 1 group after
+    r"|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}"
+    r"|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}"
+    r"|:(?::[0-9a-fA-F]{1,4}){1,7}"  # ::x:x...
+    r"|::)"  # just ::
+)
 
-# Patterns for receiveds
-RECEIVED_PATTERNS = [
-    # FIXED: More restrictive 'from' clause
-    # Only matches 'from' at the beginning of the header (^) or after
-    # newline/whitespace to avoid matching within "for <email> from <email>"
-    # constructs which caused duplicate matches in IBM gateway headers
-    (
-        r"(?:(?:^|\n\s*)from\s+(?P<from>.+?)(?:\s*[(]?"
-        r"envelope-from|\s*[(]?envelope-sender|\s+"
-        r"by|\s+with(?! cipher)|\s+id|\s+via|;))"
-    ),
-    # IMPROVED: More precise 'by' clause
-    # Modified to not consume 'with' clause, allowing proper separation
-    # of 'by' (server name) and 'with' (protocol) fields
-    (
-        r"(?:(?:^|\s)by\s+(?P<by>[^\s]+(?:\s+[^\s]+)*?)"
-        r"(?:\s+with(?! cipher)|\s*[(]?envelope-from|\s*"
-        r"[(]?envelope-sender|\s+id|\s+for|\s+via|;))"
-    ),
-    # IMPROVED: 'with' clause with better boundary detection
-    (
-        r"(?:(?:^|\s)with(?! cipher)\s+(?P<with>.+?)"
-        r"(?:\s*[(]?envelope-from|\s*[(]?"
-        r"envelope-sender|\s+id|\s+for|\s+via|;))"
-    ),
-    # IMPROVED: 'id' clause with cleaner boundaries
-    (
-        r"(?:(?:^|\s)id\s+(?P<id>.+?)(?:\s*[(]?envelope-from|\s*"
-        r"[(]?envelope-sender|\s+for|\s+via|;))"
-    ),
-    # IMPROVED: 'for' clause - handles "for <email> from <email>" pattern
-    # Stops before 'from' keyword to prevent the 'from' pattern from
-    # matching the sender email in this construct
-    (
-        r"(?:(?:^|\s)for\s+(?P<for><[^>]+>|[^\s]+)"
-        r"(?:\s+from|\s*[(]?envelope-from|\s*[(]?"
-        r"envelope-sender|\s+via|;))"
-    ),
-    # IMPROVED: 'via' clause with better termination
-    (
-        r"(?:(?:^|\s)via\s+(?P<via>.+?)(?:\s*[(]?"
-        r"envelope-from|\s*[(]?envelope-sender|;))"
-    ),
-    # assumes emails are always inside <>
-    r"(?:envelope-from\s+<(?P<envelope_from>.+?)>)",
-    r"(?:envelope-sender\s+<(?P<envelope_sender>.+?)>)",
-    # datetime comes after ; at the end
-    r";\s*(?P<date>.*)",
-    # sendgrid datetime
-    (
-        r"(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:"
-        r"\d{2}\.\d{9} \+0000 UTC) m=\+\d+\.\d+"
-    ),
-]
+# Normalize whitespace: collapse tabs and newlines to single space.
+# Parenthesized comments and bracketed IPs are preserved.
+JUNK_PATTERN = r"[\t\n]+"
 
-RECEIVED_COMPILED_LIST = [re.compile(i, re.I | re.DOTALL) for i in RECEIVED_PATTERNS]
+# ------------------------------------------------------------------ #
+# Received header parsing — RFC 5321 §4.4 grammar:
+#
+#   Received     = "Received:" *( received-token / comment ) ";" date-time
+#   received-token = "from" domain / "by" domain / "via" atom
+#                  / "with" atom  / "id"  atom   / "for" addr-spec
+#
+# Strategy: tokenize on clause keywords, then extract values per clause.
+# This eliminates the duplicated boundary lookaheads of the old
+# per-clause pattern list and matches the RFC grammar directly.
+# ------------------------------------------------------------------ #
+
+# Pattern that splits a received header into clause tokens.
+# Matches each RFC 5321 keyword at a word boundary followed by its value,
+# which extends up to the next keyword or semicolon.
+# The keywords are: from, by, via, with (not "with cipher"), id, for,
+# plus the non-standard envelope-from and envelope-sender.
+_CLAUSE_SPLITTER = re.compile(
+    r"(?:^|\s+)"
+    r"(from|by|via|with(?!\s+cipher)|id|for|envelope-from|envelope-sender)"
+    r"\s+",
+    re.I,
+)
+
+# Extracts envelope-from email: envelope-from <addr>
+_ENVELOPE_FROM_RE = re.compile(r"<([^>]+)>")
+
+# Date after semicolon (standard RFC 5321)
+_DATE_RE = re.compile(r";\s*(.*)", re.DOTALL)
+
+# SendGrid non-standard date format (no semicolon)
+_SENDGRID_DATE_RE = re.compile(
+    r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{9}\s+\+0000\s+UTC)"
+    r"\s+m=\+\d+\.\d+",
+    re.I,
+)
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 

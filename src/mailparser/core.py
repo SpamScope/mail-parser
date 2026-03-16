@@ -23,7 +23,7 @@ import json
 import logging
 import os
 
-from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
+from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
 from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
@@ -510,6 +510,7 @@ class MailParser:
     def _extract_ip(self, received_header):
         """
         Extract the IP address from the received header if it is not private.
+        Supports both IPv4 (RFC 791) and IPv6 (RFC 5952) addresses.
 
         Args:
             received_header (string): The received header string
@@ -517,7 +518,14 @@ class MailParser:
         Returns:
             string with the ip address or None
         """
-        check = REGXIP.findall(received_header[0 : received_header.find("by")])
+        by_idx = received_header.find("by")
+        from_part = received_header[:by_idx] if by_idx != -1 else received_header
+
+        # Try IPv4 first, then IPv6
+        check = REGXIP.findall(from_part)
+        if not check:
+            check = REGXIP6.findall(from_part)
+
         if check:
             try:
                 ip_str = str(check[-1])
