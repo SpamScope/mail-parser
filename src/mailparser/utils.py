@@ -448,9 +448,12 @@ def receiveds_format(receiveds):
             # Modify date to manage strange header like:
             # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
             i["date"] = i["date"].split(";")[-1]
+            # Strip leading RFC 2822 comments like:
+            # "(version=TLSv1/SSLv3 cipher=AES128-GCM-SHA256 bits=128/128) Wed, ..."
+            i["date"] = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", i["date"])
             try:
                 j["date_utc"], _ = convert_mail_date(i["date"])
-            except TypeError:
+            except (TypeError, ValueError):
                 j["date_utc"] = None
 
         # Add delay

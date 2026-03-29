@@ -344,3 +344,17 @@ class TestMain:
         with patch("mailparser.__main__.print_attachments") as mock_print:
             print_attachments_details(mock_parser, args)
             mock_print.assert_called_once_with(mock_parser.attachments, False)
+
+    def test_get_parser_with_stdin(self, parser):
+        """Test get_parser returns parse_stdin result when args.stdin is True"""
+        import io
+
+        from mailparser.__main__ import get_parser
+
+        test_content = "From: test@example.com\nSubject: Stdin Test\n\nBody"
+        args = parser.parse_args(["--stdin"])
+
+        with patch("sys.stdin", io.StringIO(test_content)):
+            result = get_parser(args)
+            assert result is not None
+            assert result.subject == "Stdin Test"
