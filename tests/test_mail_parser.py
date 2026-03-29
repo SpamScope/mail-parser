@@ -302,6 +302,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.date_raw, str)
         self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
+        assert mail.date is not None
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
@@ -670,6 +671,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.date_raw, str)
         self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
+        assert mail.date is not None
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 

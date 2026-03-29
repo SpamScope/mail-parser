@@ -213,7 +213,9 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_no_from_clause(self):
         """Header starting with 'by' (internal delivery)."""
-        header = "by mail.example.com (Postfix) id XYZ789; Mon, 1 Jan 2024 00:00:00 +0000"
+        header = (
+            "by mail.example.com (Postfix) id XYZ789; Mon, 1 Jan 2024 00:00:00 +0000"
+        )
         parsed = parse_received(header)
         self.assertIn("by", parsed)
         self.assertIn("date", parsed)
@@ -242,8 +244,10 @@ class TestEdgeCases(unittest.TestCase):
     def test_receiveds_parsing_integration(self):
         """Test full pipeline through receiveds_parsing."""
         headers = [
-            "from a.example.com by b.example.com with SMTP; Mon, 1 Jan 2024 12:00:00 +0000",
-            "from c.example.com by d.example.com with ESMTP; Mon, 1 Jan 2024 12:01:00 +0000",
+            "from a.example.com by b.example.com with SMTP;"
+            " Mon, 1 Jan 2024 12:00:00 +0000",
+            "from c.example.com by d.example.com with ESMTP;"
+            " Mon, 1 Jan 2024 12:01:00 +0000",
         ]
         result = receiveds_parsing(headers)
         self.assertEqual(len(result), 2)

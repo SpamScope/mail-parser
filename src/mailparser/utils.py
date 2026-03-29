@@ -19,6 +19,7 @@ limitations under the License.
 import base64
 import datetime
 import email
+import email.utils
 import functools
 import hashlib
 import json
@@ -36,13 +37,13 @@ from email.header import decode_header
 from unicodedata import normalize
 
 from mailparser.const import (
-    ADDRESSES_HEADERS,
-    JUNK_PATTERN,
-    OTHERS_PARTS,
     _CLAUSE_SPLITTER,
     _DATE_RE,
     _ENVELOPE_FROM_RE,
     _SENDGRID_DATE_RE,
+    ADDRESSES_HEADERS,
+    JUNK_PATTERN,
+    OTHERS_PARTS,
 )
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
@@ -381,6 +382,8 @@ def convert_mail_date(date):
     """
     log.debug(f"Date to parse: {date!r}")
     d = email.utils.parsedate_tz(date)
+    if d is None:
+        raise ValueError(f"Cannot parse date: {date!r}")
     log.debug(f"Date parsed: {d!r}")
     t = email.utils.mktime_tz(d)
     log.debug(f"Date parsed in timestamp: {t!r}")
