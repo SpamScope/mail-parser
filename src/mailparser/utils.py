@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -17,39 +16,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-from __future__ import unicode_literals
-
-from collections import namedtuple, Counter
-from email.errors import HeaderParseError
-from email.header import decode_header
-from unicodedata import normalize
-
 import base64
 import datetime
 import email
+import email.utils
 import functools
 import hashlib
+import json
 import logging
 import os
 import random
 import re
-import json
 import string
 import subprocess
 import sys
 import tempfile
-
-import six
+from collections import Counter, namedtuple
+from email.errors import HeaderParseError
+from email.header import decode_header
+from unicodedata import normalize
 
 from mailparser.const import (
+    _CLAUSE_SPLITTER,
+    _DATE_RE,
+    _ENVELOPE_FROM_RE,
+    _SENDGRID_DATE_RE,
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
-    RECEIVED_COMPILED_LIST,
 )
-
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
-
 
 log = logging.getLogger(__name__)
 
@@ -96,52 +92,45 @@ def sanitize(func):
 @sanitize
 def ported_string(raw_data, encoding="utf-8", errors="ignore"):
     """
-    Give as input raw data and output a str in Python 3
-    and unicode in Python 2.
+    Give as input raw data and output a str in Python 3.
 
     Args:
-        raw_data: Python 2 str, Python 3 bytes or str to porting
+        raw_data: bytes or str to convert to str
         encoding: string giving the name of an encoding
-        errors: his specifies the treatment of characters
+        errors: specifies the treatment of characters
             which are invalid in the input encoding
 
     Returns:
-        str (Python 3) or unicode (Python 2)
+        str
     """
 
     if not raw_data:
-        return six.text_type()
+        return str()
 
-    if isinstance(raw_data, six.text_type):
+    if isinstance(raw_data, str):
         return raw_data
 
-    if six.PY2:
-        try:
-            return six.text_type(raw_data, encoding, errors)
-        except LookupError:
-            return six.text_type(raw_data, "utf-8", errors)
-
-    if six.PY3:
-        try:
-            return six.text_type(raw_data, encoding)
-        except (LookupError, UnicodeDecodeError):
-            return six.text_type(raw_data, "utf-8", errors)
+    # raw_data is bytes, decode it
+    try:
+        return str(raw_data, encoding)
+    except (LookupError, UnicodeDecodeError):
+        return str(raw_data, "utf-8", errors)
 
 
 def decode_header_part(header):
     """
-    Given an raw header returns an decoded header
+    Given a raw header returns a decoded header
 
     Args:
         header (string): header to decode
 
     Returns:
-        str (Python 3) or unicode (Python 2)
+        str
     """
     if not header:
-        return six.text_type()
+        return str()
 
-    output = six.text_type()
+    output = str()
 
     try:
         for d, c in decode_header(header):
@@ -150,17 +139,22 @@ def decode_header_part(header):
 
     # Header parsing failed, when header has charset Shift_JIS
     except (HeaderParseError, UnicodeError):
-        log.error("Failed decoding header part: {}".format(header))
+        log.error(f"Failed decoding header part: {header}")
         output += header
 
     return output.strip()
 
 
 def ported_open(file_):
-    if six.PY2:
-        return open(file_)
-    elif six.PY3:
-        return open(file_, encoding="utf-8", errors="ignore")
+    """Open a file with UTF-8 encoding and ignore errors.
+
+    Args:
+        file_: path to the file to open
+
+    Returns:
+        file object
+    """
+    return open(file_, encoding="utf-8", errors="ignore")
 
 
 def find_between(text, first_token, last_token):
@@ -185,7 +179,7 @@ def fingerprints(data):
 
     hashes = namedtuple("Hashes", "md5 sha1 sha256 sha512")
 
-    if not isinstance(data, six.binary_type):
+    if not isinstance(data, bytes):
         data = data.encode("utf-8")
 
     # md5
@@ -221,31 +215,22 @@ def msgconvert(email):
 
     Returns:
         tuple with file path of mail converted and
-        standard output data (unicode Python 2, str Python 3)
+        standard output data (str)
     """
     log.debug("Started converting Outlook email")
     temph, temp = tempfile.mkstemp(prefix="outlook_")
     command = ["msgconvert", "--outfile", temp, email]
 
     try:
-        if six.PY2:
-            with open(os.devnull, "w") as devnull:
-                out = subprocess.Popen(
-                    command,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=devnull,
-                )
-        elif six.PY3:
-            out = subprocess.Popen(
-                command,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            )
+        out = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
 
     except OSError as e:
-        message = "Check if 'msgconvert' tool is installed / {!r}".format(e)
+        message = f"Check if 'msgconvert' tool is installed / {e!r}"
         log.exception(message)
         raise MailParserOSError(message)
 
@@ -259,8 +244,11 @@ def msgconvert(email):
 
 def parse_received(received):
     """
-    Parse a single received header.
-    Return a dictionary of values by clause.
+    Parse a single received header by tokenizing on RFC 5321 §4.4 keywords.
+
+    Uses a keyword-based splitter to divide the header into clauses
+    (from, by, via, with, id, for, envelope-from, envelope-sender),
+    then extracts the date from after the semicolon.
 
     Arguments:
         received {str} -- single received header
@@ -274,50 +262,71 @@ def parse_received(received):
     """
 
     values_by_clause = {}
-    for pattern in RECEIVED_COMPILED_LIST:
-        matches = [match for match in pattern.finditer(received)]
 
-        if len(matches) == 0:
-            # no matches for this clause, but it's ok! keep going!
-            log.debug("No matches found for %s in %s" % (pattern.pattern, received))
-        elif len(matches) > 1:
-            # uh, can't have more than one of each clause in a received.
-            # so either there's more than one or the current regex is wrong
-            msg = "More than one match found for %s in %s" % (pattern.pattern, received)
-            log.error(msg)
-            raise MailParserReceivedParsingError(msg)
+    # --- Step 1: Extract date (after semicolon, or SendGrid format) ---
+    date_match = _DATE_RE.search(received)
+    if date_match:
+        values_by_clause["date"] = date_match.group(1)
+        # Work only on the part before the semicolon for clause parsing
+        header_body = received[: date_match.start()]
+    else:
+        # Try SendGrid non-standard date
+        sg_match = _SENDGRID_DATE_RE.search(received)
+        if sg_match:
+            values_by_clause["date"] = sg_match.group(1)
+            header_body = received[: sg_match.start()]
         else:
-            # otherwise we have one matching clause!
-            log.debug("Found one match for %s in %s" % (pattern.pattern, received))
-            match = matches[0].groupdict()
-            if six.PY2:
-                values_by_clause[match.keys()[0]] = match.values()[0]
-            elif six.PY3:
-                key = list(match.keys())[0]
-                value = list(match.values())[0]
-                values_by_clause[key] = value
+            header_body = received
 
-    if len(values_by_clause) == 0:
-        # we weren't able to match anything...
+    # --- Step 2: Tokenize on clause keywords ---
+    # _CLAUSE_SPLITTER.split gives: [preamble, kw1, val1, kw2, val2, ...]
+    parts = _CLAUSE_SPLITTER.split(header_body)
+
+    # parts[0] is preamble (before first keyword), then alternating kw/value
+    i = 1  # skip preamble
+    while i + 1 < len(parts):
+        keyword = parts[i].lower()
+        value = parts[i + 1].strip()
+        i += 2
+
+        if keyword in ("envelope-from", "envelope-sender"):
+            # Extract email from angle brackets
+            m = _ENVELOPE_FROM_RE.search(value)
+            if m:
+                values_by_clause[keyword.replace("-", "_")] = m.group(1)
+        elif keyword == "for":
+            values_by_clause[keyword] = value
+        elif keyword == "from":
+            # RFC 5321: only one 'from' clause per received header.
+            # Only accept the first occurrence; subsequent ones come from
+            # IBM-style "for <addr> from <sender>" constructs.
+            if "from" not in values_by_clause:
+                values_by_clause[keyword] = value
+        else:
+            values_by_clause[keyword] = value
+
+    # --- Step 3: Extract envelope-from/sender from within clause values ---
+    # Some MTAs embed envelope-from inside parenthesized comments in the
+    # 'by' clause, e.g.: "by host.com (envelope-from <addr>)"
+    for clause_key in ("by", "from", "with"):
+        clause_val = values_by_clause.get(clause_key, "")
+        for env_key, env_name in (
+            ("envelope_from", "envelope-from"),
+            ("envelope_sender", "envelope-sender"),
+        ):
+            if env_key not in values_by_clause and env_name in clause_val.lower():
+                m = re.search(
+                    r"(?i)" + re.escape(env_name) + r"\s+<([^>]+)>",
+                    clause_val,
+                )
+                if m:
+                    values_by_clause[env_key] = m.group(1)
+
+    if not values_by_clause:
         msg = "Unable to match any clauses in %s" % (received)
-
-        # Modification #1: Commenting the following log as
-        # this raised exception is caught above and then
-        # raw header is updated in response
-        # We dont want to get so many errors in our error
-        # logger as we are not even trying to parse the
-        # received headers
-        # Wanted to make it configurable via settiings,
-        # but this package does not depend on django and
-        # making configurable setting
-        # will make it django dependent,
-        # so better to keep it working with only python
-        # dependent and on any framework of python
-        # commenting it just for our use
-
-        # log.error(msg)
-
         raise MailParserReceivedParsingError(msg)
+
+    log.debug("Parsed clauses: %s", list(values_by_clause.keys()))
     return values_by_clause
 
 
@@ -335,11 +344,11 @@ def receiveds_parsing(receiveds):
     parsed = []
     receiveds = [re.sub(JUNK_PATTERN, " ", i).strip() for i in receiveds]
     n = len(receiveds)
-    log.debug("Nr. of receiveds. {}".format(n))
+    log.debug(f"Nr. of receiveds. {n}")
 
     for idx, received in enumerate(receiveds):
-        log.debug("Parsing received {}/{}".format(idx + 1, n))
-        log.debug("Try to parse {!r}".format(received))
+        log.debug(f"Parsing received {idx + 1}/{n}")
+        log.debug(f"Try to parse {received!r}")
         try:
             # try to parse the current received header...
             values_by_clause = parse_received(received)
@@ -371,15 +380,17 @@ def convert_mail_date(date):
     """
     Convert a mail date in a datetime object.
     """
-    log.debug("Date to parse: {!r}".format(date))
+    log.debug(f"Date to parse: {date!r}")
     d = email.utils.parsedate_tz(date)
-    log.debug("Date parsed: {!r}".format(d))
+    if d is None:
+        raise ValueError(f"Cannot parse date: {date!r}")
+    log.debug(f"Date parsed: {d!r}")
     t = email.utils.mktime_tz(d)
-    log.debug("Date parsed in timestamp: {!r}".format(t))
+    log.debug(f"Date parsed in timestamp: {t!r}")
     date_utc = datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
     timezone = d[9] / 3600.0 if d[9] else 0
-    timezone = "{:+.1f}".format(timezone)
-    log.debug("Calculated timezone: {!r}".format(timezone))
+    timezone = f"{timezone:+.1f}"
+    log.debug(f"Calculated timezone: {timezone!r}")
     return date_utc, timezone
 
 
@@ -437,9 +448,12 @@ def receiveds_format(receiveds):
             # Modify date to manage strange header like:
             # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
             i["date"] = i["date"].split(";")[-1]
+            # Strip leading RFC 2822 comments like:
+            # "(version=TLSv1/SSLv3 cipher=AES128-GCM-SHA256 bits=128/128) Wed, ..."
+            i["date"] = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", i["date"])
             try:
                 j["date_utc"], _ = convert_mail_date(i["date"])
-            except TypeError:
+            except (TypeError, ValueError):
                 j["date_utc"] = None
 
         # Add delay
@@ -472,7 +486,7 @@ def get_to_domains(to=[], reply_to=[]):
     for i in to + reply_to:
         try:
             domains.add(i[1].split("@")[-1].lower().strip())
-        except KeyError:
+        except (KeyError, IndexError):
             pass
 
     return list(domains)
@@ -493,7 +507,7 @@ def get_header(message, name):
     """
 
     headers = message.get_all(name)
-    log.debug("Getting header {!r}: {!r}".format(name, headers))
+    log.debug(f"Getting header {name!r}: {headers!r}")
     if headers:
         headers = [decode_header_part(i) for i in headers]
         if len(headers) == 1:
@@ -501,7 +515,7 @@ def get_header(message, name):
             return headers[0].strip()
         # in this case return a list
         return headers
-    return six.text_type()
+    return str()
 
 
 def get_mail_keys(message, complete=True):
@@ -537,10 +551,10 @@ def safe_print(data):  # pragma: no cover
 
 def print_mail_fingerprints(data):  # pragma: no cover
     md5, sha1, sha256, sha512 = fingerprints(data)
-    print("md5:\t{}".format(md5))
-    print("sha1:\t{}".format(sha1))
-    print("sha256:\t{}".format(sha256))
-    print("sha512:\t{}".format(sha512))
+    print(f"md5:\t{md5}")
+    print(f"sha1:\t{sha1}")
+    print(f"sha256:\t{sha256}")
+    print(f"sha512:\t{sha512}")
 
 
 def print_attachments(attachments, flag_hash):  # pragma: no cover

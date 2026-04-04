@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -17,4 +16,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
-__version__ = "4.1.4"
+__version__ = "4.2.0"

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Copyright 2016 Fedele Mantuano (https://twitter.com/fedelemantuano)
@@ -25,7 +24,6 @@ from mailparser.core import (
     parse_from_file_obj,
     parse_from_string,
 )
-
 from mailparser.utils import get_header
 
 __all__ = [

@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v5.0.0
+  rev: v6.0.0
   hooks:
     - id: trailing-whitespace
     - id: end-of-file-fixer
@@ -20,10 +20,37 @@ repos:
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.7.3
+  rev: v0.14.1
   hooks:
     # Run the linter.
     - id: ruff
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
+
+- repo: https://github.com/executablebooks/mdformat
+  rev: 0.7.17
+  hooks:
+    - id: mdformat
+      exclude: '^\.github/'
+      additional_dependencies:
+        - mdformat-frontmatter
+        - mdformat-gfm
+        - mdformat-tables
+
+- repo: https://github.com/DavidAnson/markdownlint-cli2
+  rev: v0.18.1
+  hooks:
+    - id: markdownlint-cli2
+      args: ['--config', '.markdownlint.json']
+      exclude: '^\.github/'
+
+- repo: local
+  hooks:
+    - id: pyright
+      name: pyright
+      entry: uv run npx pyright
+      args: [src/, tests/]
+      language: system
+      pass_filenames: false
+      types: [python]
