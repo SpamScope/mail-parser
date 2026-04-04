@@ -19,6 +19,7 @@ limitations under the License.
 import base64
 import datetime
 import email
+import email.header
 import email.utils
 import functools
 import hashlib
@@ -48,6 +49,88 @@ from mailparser.const import (
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# RFC 5322 address parsing — fallback for non-compliant display names
+# ---------------------------------------------------------------------------
+# RFC 5322 §3.4 defines the display-name as a "phrase", which must not contain
+# unquoted special characters such as "@".  A header like
+#
+#     From: alice@example.com <bob@example.com>
+#
+# is therefore *technically non-conforming*: the display name contains an
+# unquoted "@".  Python's ``email.utils.getaddresses`` with ``strict=True``
+# (hardened against CVE-2023-27043) correctly rejects this and returns
+# ``[('', '')]``, leaving the real address invisible.
+#
+# mail-parser is a security / forensics tool, not an MTA.  Silently hiding an
+# address because its display-name looks like an e-mail address defeats the
+# purpose of the tool — analysts *need* to see those values.  We therefore
+# bypass strict compliance with a regex fallback whenever strict parsing yields
+# an empty address, always surfacing the value that is actually in the header.
+_ADDR_FALLBACK_RE = re.compile(
+    r'"([^"]*?)"\s*<([^>]+)>'  # "Quoted Name" <email@addr>
+    r"|([^<,]*?)\s*<([^>]+)>"  # Any Name <email@addr>  (incl. email-as-name)
+    r"|([^\s,<>]+@[^\s,<>]+)"  # bare email@addr
+)
+
+
+def get_addresses(raw_header):
+    """
+    Parse email addresses from a raw address header with a fallback for
+    RFC-non-compliant but real-world-common formats.
+
+    RFC 5322 §3.4 requires the display name (phrase) before an angle-bracket
+    address to consist only of printable ASCII characters that are *not*
+    special.  The ``@`` character is special, so a header such as::
+
+        From: alice@example.com <bob@example.com>
+
+    is technically non-conforming because the display name contains an
+    unquoted ``@``.  Python's ``email.utils.getaddresses`` with
+    ``strict=True`` (hardened against CVE-2023-27043) correctly returns
+    ``[('', '')]`` for this input, making the real sender invisible.
+
+    mail-parser is a *security / forensics* tool, not an MTA.  Silently
+    discarding an address because its display name happens to look like an
+    e-mail address would hide relevant forensic information from analysts —
+    the very opposite of what the tool is for.  We therefore bypass strict
+    RFC compliance by applying a regex-based fallback whenever the strict
+    parser yields only empty addresses, so that analysts always see the value
+    that was actually present in the header.
+
+    Args:
+        raw_header (str): raw value of an address header
+            (e.g. ``From``, ``To``, ``CC`` …)
+
+    Returns:
+        list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples.
+            ``display_name`` is an empty string when absent.
+    """
+    parsed = email.utils.getaddresses([raw_header], strict=True)
+
+    # If every result from the strict parser has an empty address — while the
+    # raw header is non-empty — fall back to regex extraction so that the
+    # actual address values are not silently lost.
+    if raw_header.strip() and all(not addr for _, addr in parsed):
+        results = []
+        for m in _ADDR_FALLBACK_RE.finditer(raw_header):
+            if m.group(2):  # "Quoted Name" <email>
+                results.append((m.group(1).strip(), m.group(2).strip()))
+            elif m.group(4):  # Any Name <email>  (incl. email-as-display-name)
+                results.append((m.group(3).strip(), m.group(4).strip()))
+            elif m.group(5):  # bare email
+                results.append(("", m.group(5).strip()))
+        if results:
+            log.debug(
+                "Strict address parsing yielded empty results for %r; "
+                "regex fallback recovered %d address(es)",
+                raw_header,
+                len(results),
+            )
+            return results
+
+    return parsed
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
@@ -106,6 +189,9 @@ def ported_string(raw_data, encoding="utf-8", errors="ignore"):
 
     if not raw_data:
         return str()
+
+    if isinstance(raw_data, email.header.Header):
+        return str(raw_data)
 
     if isinstance(raw_data, str):
         return raw_data

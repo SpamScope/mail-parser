@@ -587,6 +587,19 @@ class TestUtilsEdgeCases(unittest.TestCase):
         # But should have a valid date itself
         self.assertIsNotNone(result[1].get("date_utc"))
 
+    def test_ported_string_handles_header_object(self):
+        """
+        Test that ported_string can accept an email.header.Header object
+        and return a decoded string without crashing.
+        """
+        from email.header import Header
+
+        raw_val = 'attachment;\r\nfilename="Just a text – 2026.pdf'
+        header_obj = Header(raw_val, charset="utf-8")
+        result = ported_string(header_obj)
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, raw_val)
+
     def test_parse_received_envelope_from_with_angle_brackets(self):
         """Test utils.py:294-296 — envelope-from clause with angle-bracket match"""
         # When envelope-from keyword is present AND its value has angle
