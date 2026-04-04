@@ -1,0 +1,12 @@
+From: alice@example.com <bob@example.com>
+To: "Charlie Brown" <charlie@example.com>, dave@example.com
+CC: eve@example.com <frank@example.com>
+Reply-To: henry@example.com <ivan@example.com>
+Subject: Test email with email address as display name
+Message-ID: <test-email-as-name@example.com>
+Date: Mon, 01 Jan 2024 12:00:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+This email tests parsing of address headers where the display name is itself
+an email address (RFC non-compliant but common in real-world mail).

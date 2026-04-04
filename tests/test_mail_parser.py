@@ -29,6 +29,7 @@ import mailparser
 from mailparser.utils import (
     convert_mail_date,
     fingerprints,
+    get_addresses,
     get_header,
     get_mail_keys,
     get_to_domains,
@@ -62,6 +63,7 @@ mail_test_15 = os.path.join(base_path, "mails", "mail_test_15")
 mail_test_16 = os.path.join(base_path, "mails", "mail_test_16")
 mail_test_17 = os.path.join(base_path, "mails", "mail_test_17")
 mail_test_18 = os.path.join(base_path, "mails", "mail_test_18")
+mail_test_19 = os.path.join(base_path, "mails", "mail_test_19")
 mail_malformed_1 = os.path.join(base_path, "mails", "mail_malformed_1")
 mail_malformed_2 = os.path.join(base_path, "mails", "mail_malformed_2")
 mail_malformed_3 = os.path.join(base_path, "mails", "mail_malformed_3")
@@ -1084,3 +1086,162 @@ This is plain text with 8bit encoding."""
         mail = mailparser.parse_from_string(raw_mail)
         # Should have parsed successfully and body contains the text
         self.assertIn("hello", mail.body)
+
+
+class TestEmailAsDisplayName(unittest.TestCase):
+    """
+    Tests for address parsing when the display name is itself an email address.
+
+    RFC 5322 §3.4 forbids unquoted "@" in the display-name phrase, so a header
+    like ``From: alice@example.com <bob@example.com>`` is technically
+    non-conforming.  Python's strict parser (CVE-2023-27043 hardening) returns
+    ``[('', '')]`` for such input, which would silently hide the real sender.
+
+    mail-parser is a security/forensics tool: it intentionally bypasses this
+    strict compliance and applies a regex fallback so that analysts always see
+    the address values that are actually present in the header.
+    """
+
+    def test_from_email_as_display_name(self):
+        """From header with an email address as display name is parsed correctly."""
+        mail = mailparser.parse_from_file(mail_test_19)
+        result = mail.from_
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "bob@example.com")
+        self.assertEqual(name, "alice@example.com")
+
+    def test_cc_email_as_display_name(self):
+        """CC header with an email address as display name is parsed correctly."""
+        mail = mailparser.parse_from_file(mail_test_19)
+        result = mail.cc
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "frank@example.com")
+        self.assertEqual(name, "eve@example.com")
+
+    def test_reply_to_email_as_display_name(self):
+        """Reply-To header with an email address as display name is parsed correctly."""
+        mail = mailparser.parse_from_file(mail_test_19)
+        result = mail.reply_to
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "ivan@example.com")
+        self.assertEqual(name, "henry@example.com")
+
+    def test_to_mixed_addresses(self):
+        """To header with a mix of quoted name and bare address is parsed correctly."""
+        mail = mailparser.parse_from_file(mail_test_19)
+        result = mail.to
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        # "Charlie Brown" <charlie@example.com>
+        name0, addr0 = result[0]
+        self.assertEqual(addr0, "charlie@example.com")
+        self.assertEqual(name0, "Charlie Brown")
+        # dave@example.com  (bare address, no display name)
+        name1, addr1 = result[1]
+        self.assertEqual(addr1, "dave@example.com")
+        self.assertEqual(name1, "")
+
+    # ------------------------------------------------------------------
+    # Edge-case tests via parse_from_string (no additional mail files needed)
+    # ------------------------------------------------------------------
+
+    def test_same_email_as_name_and_address_suppresses_name(self):
+        """When display name == address, name is suppressed to empty string.
+
+        This covers the case ``From: bob@example.com <bob@example.com>`` which
+        is both RFC non-compliant (unquoted @) AND redundant.  After the regex
+        fallback recovers the address, the existing name-suppression logic
+        (decoded_name == email_addr → "") must still fire correctly.
+        """
+        mail = mailparser.parse_from_string(
+            "From: bob@example.com <bob@example.com>\nSubject: x\n\nBody"
+        )
+        result = mail.from_
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "bob@example.com")
+        self.assertEqual(name, "")
+
+    def test_quoted_email_as_display_name(self):
+        """Properly quoted email-as-name (RFC-compliant) is parsed by strict parser."""
+        mail = mailparser.parse_from_string(
+            'From: "alice@example.com" <bob@example.com>\nSubject: x\n\nBody'
+        )
+        result = mail.from_
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "bob@example.com")
+        self.assertEqual(name, "alice@example.com")
+
+    def test_standard_display_name_unchanged(self):
+        """Standard ``Name <email>`` format still works correctly (no regression)."""
+        mail = mailparser.parse_from_string(
+            "From: Alice Smith <alice@example.com>\nSubject: x\n\nBody"
+        )
+        result = mail.from_
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "alice@example.com")
+        self.assertEqual(name, "Alice Smith")
+
+    def test_bare_address_no_display_name(self):
+        """Bare address with no display name returns empty name (no regression)."""
+        mail = mailparser.parse_from_string(
+            "From: alice@example.com\nSubject: x\n\nBody"
+        )
+        result = mail.from_
+        self.assertEqual(len(result), 1)
+        name, addr = result[0]
+        self.assertEqual(addr, "alice@example.com")
+        self.assertEqual(name, "")
+
+    def test_empty_header_returns_empty_list(self):
+        """A missing address header returns [] — absent headers must not appear."""
+        mail = mailparser.parse_from_string("Subject: x\n\nBody")
+        # Python's getaddresses("") yields [('', '')], but we filter out entries
+        # with an empty address so that absent headers are not included in the
+        # parsed mail object.
+        self.assertEqual(mail.from_, [])
+
+    # ------------------------------------------------------------------
+    # Unit tests for get_addresses() helper directly
+    # ------------------------------------------------------------------
+
+    def test_get_addresses_email_as_name(self):
+        """get_addresses() fallback recovers address when display name is an email."""
+        result = get_addresses("alice@example.com <bob@example.com>")
+        self.assertEqual(result, [("alice@example.com", "bob@example.com")])
+
+    def test_get_addresses_standard_format(self):
+        """get_addresses() strict path handles normal ``Name <email>`` correctly."""
+        result = get_addresses("Alice Smith <alice@example.com>")
+        self.assertEqual(result, [("Alice Smith", "alice@example.com")])
+
+    def test_get_addresses_bare_email(self):
+        """get_addresses() handles bare email address with no display name."""
+        result = get_addresses("alice@example.com")
+        self.assertEqual(result, [("", "alice@example.com")])
+
+    def test_get_addresses_empty_header(self):
+        """get_addresses() on empty string returns [('', '')] — raw Python lib result.
+
+        The ('', '') entry is filtered out in __getattr__ (core.py) so that
+        absent headers do not appear in the parsed mail output.
+        """
+        result = get_addresses("")
+        self.assertEqual(result, [("", "")])
+
+    def test_get_addresses_multiple_with_email_as_name(self):
+        """get_addresses() fallback handles multiple addresses when all fail strict."""
+        result = get_addresses(
+            "alice@example.com <bob@example.com>, eve@example.com <frank@example.com>"
+        )
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], ("alice@example.com", "bob@example.com"))
+        self.assertEqual(result[1], ("eve@example.com", "frank@example.com"))
