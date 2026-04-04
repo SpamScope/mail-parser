@@ -579,7 +579,7 @@ class MailParser:
             # in utils.py for the full rationale.
             parsed_addresses = get_addresses(raw_header)
 
-            # decoded addresses
+            # decoded addresses — skip entries with no address (absent header)
             return [
                 (
                     (
@@ -590,6 +590,7 @@ class MailParser:
                     email_addr,
                 )
                 for name, email_addr in parsed_addresses
+                if email_addr
             ]
 
         # others headers

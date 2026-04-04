@@ -1201,14 +1201,13 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(addr, "alice@example.com")
         self.assertEqual(name, "")
 
-    def test_empty_header_returns_empty_address(self):
-        """Missing address header returns [('', '')] — pre-existing Python behaviour."""
+    def test_empty_header_returns_empty_list(self):
+        """A missing address header returns [] — absent headers must not appear."""
         mail = mailparser.parse_from_string("Subject: x\n\nBody")
-        # Python's getaddresses("") returns [('', '')] for an absent header;
-        # mail-parser preserves this behaviour unchanged.
-        result = mail.from_
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0], ("", ""))
+        # Python's getaddresses("") yields [('', '')], but we filter out entries
+        # with an empty address so that absent headers are not included in the
+        # parsed mail object.
+        self.assertEqual(mail.from_, [])
 
     # ------------------------------------------------------------------
     # Unit tests for get_addresses() helper directly
@@ -1230,7 +1229,11 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(result, [("", "alice@example.com")])
 
     def test_get_addresses_empty_header(self):
-        """get_addresses() on empty string returns [('', '')] — Python lib behaviour."""
+        """get_addresses() on empty string returns [('', '')] — raw Python lib result.
+
+        The ('', '') entry is filtered out in __getattr__ (core.py) so that
+        absent headers do not appear in the parsed mail output.
+        """
         result = get_addresses("")
         self.assertEqual(result, [("", "")])
 
