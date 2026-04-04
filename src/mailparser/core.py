@@ -18,7 +18,6 @@ limitations under the License.
 
 import base64
 import email
-import email.utils
 import ipaddress
 import json
 import logging
@@ -29,6 +28,7 @@ from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
     find_between,
+    get_addresses,
     get_header,
     get_mail_keys,
     get_to_domains,
@@ -569,8 +569,15 @@ class MailParser:
         # object headers
         elif name_header in ADDRESSES_HEADERS:
             raw_header = self.message.get(name_header, "") if self.message else ""
-            # parse before decoding
-            parsed_addresses = email.utils.getaddresses([raw_header], strict=True)
+            # Parse addresses. RFC 5322 §3.4 does not allow unquoted "@" in
+            # display names, so a strict parser correctly rejects headers like
+            #   From: alice@example.com <bob@example.com>
+            # and returns ('', '').  mail-parser is a security/forensics tool,
+            # not an MTA: hiding addresses from analysts is worse than accepting
+            # non-conforming input.  get_addresses() applies a regex fallback
+            # when strict parsing yields only empty results — see its docstring
+            # in utils.py for the full rationale.
+            parsed_addresses = get_addresses(raw_header)
 
             # decoded addresses
             return [
