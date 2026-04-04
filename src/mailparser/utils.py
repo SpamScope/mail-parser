@@ -19,6 +19,8 @@ limitations under the License.
 import base64
 import datetime
 import email
+import email.header
+import email.utils
 import functools
 import hashlib
 import json
@@ -36,10 +38,13 @@ from email.header import decode_header
 from unicodedata import normalize
 
 from mailparser.const import (
+    _CLAUSE_SPLITTER,
+    _DATE_RE,
+    _ENVELOPE_FROM_RE,
+    _SENDGRID_DATE_RE,
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
-    RECEIVED_COMPILED_LIST,
 )
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
@@ -243,8 +248,11 @@ def msgconvert(email):
 
 def parse_received(received):
     """
-    Parse a single received header.
-    Return a dictionary of values by clause.
+    Parse a single received header by tokenizing on RFC 5321 §4.4 keywords.
+
+    Uses a keyword-based splitter to divide the header into clauses
+    (from, by, via, with, id, for, envelope-from, envelope-sender),
+    then extracts the date from after the semicolon.
 
     Arguments:
         received {str} -- single received header
@@ -258,47 +266,71 @@ def parse_received(received):
     """
 
     values_by_clause = {}
-    for pattern in RECEIVED_COMPILED_LIST:
-        matches = [match for match in pattern.finditer(received)]
 
-        if len(matches) == 0:
-            # no matches for this clause, but it's ok! keep going!
-            log.debug("No matches found for %s in %s" % (pattern.pattern, received))
-        elif len(matches) > 1:
-            # uh, can't have more than one of each clause in a received.
-            # so either there's more than one or the current regex is wrong
-            msg = "More than one match found for %s in %s" % (pattern.pattern, received)
-            log.error(msg)
-            raise MailParserReceivedParsingError(msg)
+    # --- Step 1: Extract date (after semicolon, or SendGrid format) ---
+    date_match = _DATE_RE.search(received)
+    if date_match:
+        values_by_clause["date"] = date_match.group(1)
+        # Work only on the part before the semicolon for clause parsing
+        header_body = received[: date_match.start()]
+    else:
+        # Try SendGrid non-standard date
+        sg_match = _SENDGRID_DATE_RE.search(received)
+        if sg_match:
+            values_by_clause["date"] = sg_match.group(1)
+            header_body = received[: sg_match.start()]
         else:
-            # otherwise we have one matching clause!
-            log.debug("Found one match for %s in %s" % (pattern.pattern, received))
-            match = matches[0].groupdict()
-            key = list(match.keys())[0]
-            value = list(match.values())[0]
-            values_by_clause[key] = value
+            header_body = received
 
-    if len(values_by_clause) == 0:
-        # we weren't able to match anything...
+    # --- Step 2: Tokenize on clause keywords ---
+    # _CLAUSE_SPLITTER.split gives: [preamble, kw1, val1, kw2, val2, ...]
+    parts = _CLAUSE_SPLITTER.split(header_body)
+
+    # parts[0] is preamble (before first keyword), then alternating kw/value
+    i = 1  # skip preamble
+    while i + 1 < len(parts):
+        keyword = parts[i].lower()
+        value = parts[i + 1].strip()
+        i += 2
+
+        if keyword in ("envelope-from", "envelope-sender"):
+            # Extract email from angle brackets
+            m = _ENVELOPE_FROM_RE.search(value)
+            if m:
+                values_by_clause[keyword.replace("-", "_")] = m.group(1)
+        elif keyword == "for":
+            values_by_clause[keyword] = value
+        elif keyword == "from":
+            # RFC 5321: only one 'from' clause per received header.
+            # Only accept the first occurrence; subsequent ones come from
+            # IBM-style "for <addr> from <sender>" constructs.
+            if "from" not in values_by_clause:
+                values_by_clause[keyword] = value
+        else:
+            values_by_clause[keyword] = value
+
+    # --- Step 3: Extract envelope-from/sender from within clause values ---
+    # Some MTAs embed envelope-from inside parenthesized comments in the
+    # 'by' clause, e.g.: "by host.com (envelope-from <addr>)"
+    for clause_key in ("by", "from", "with"):
+        clause_val = values_by_clause.get(clause_key, "")
+        for env_key, env_name in (
+            ("envelope_from", "envelope-from"),
+            ("envelope_sender", "envelope-sender"),
+        ):
+            if env_key not in values_by_clause and env_name in clause_val.lower():
+                m = re.search(
+                    r"(?i)" + re.escape(env_name) + r"\s+<([^>]+)>",
+                    clause_val,
+                )
+                if m:
+                    values_by_clause[env_key] = m.group(1)
+
+    if not values_by_clause:
         msg = "Unable to match any clauses in %s" % (received)
-
-        # Modification #1: Commenting the following log as
-        # this raised exception is caught above and then
-        # raw header is updated in response
-        # We dont want to get so many errors in our error
-        # logger as we are not even trying to parse the
-        # received headers
-        # Wanted to make it configurable via settiings,
-        # but this package does not depend on django and
-        # making configurable setting
-        # will make it django dependent,
-        # so better to keep it working with only python
-        # dependent and on any framework of python
-        # commenting it just for our use
-
-        # log.error(msg)
-
         raise MailParserReceivedParsingError(msg)
+
+    log.debug("Parsed clauses: %s", list(values_by_clause.keys()))
     return values_by_clause
 
 
@@ -354,6 +386,8 @@ def convert_mail_date(date):
     """
     log.debug(f"Date to parse: {date!r}")
     d = email.utils.parsedate_tz(date)
+    if d is None:
+        raise ValueError(f"Cannot parse date: {date!r}")
     log.debug(f"Date parsed: {d!r}")
     t = email.utils.mktime_tz(d)
     log.debug(f"Date parsed in timestamp: {t!r}")
@@ -418,9 +452,12 @@ def receiveds_format(receiveds):
             # Modify date to manage strange header like:
             # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
             i["date"] = i["date"].split(";")[-1]
+            # Strip leading RFC 2822 comments like:
+            # "(version=TLSv1/SSLv3 cipher=AES128-GCM-SHA256 bits=128/128) Wed, ..."
+            i["date"] = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", i["date"])
             try:
                 j["date_utc"], _ = convert_mail_date(i["date"])
-            except TypeError:
+            except (TypeError, ValueError):
                 j["date_utc"] = None
 
         # Add delay

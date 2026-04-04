@@ -18,12 +18,13 @@ limitations under the License.
 
 import base64
 import email
+import email.utils
 import ipaddress
 import json
 import logging
 import os
 
-from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP
+from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
 from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
@@ -122,12 +123,13 @@ class MailParser:
         Init a new object from a message object structure.
         """
         self._message = message
-        log.debug("All headers of emails: {}".format(", ".join(message.keys())))
+        if message is not None:
+            log.debug("All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.message:
-            return self.subject
+            return str(self.subject)
         else:
             return str()
 
@@ -326,13 +328,12 @@ class MailParser:
                 "{}".format("--" + self.message.get_boundary() + "--"),
             )
 
-            try:
-                p = email.message_from_string(epilogue)
-                parts.append(p)
-            except TypeError:
-                log.debug("Failed to get epilogue part for TypeError")
-            except Exception:
-                log.error("Failed to get epilogue part. Check raw mail.")
+            if epilogue is not None:
+                try:
+                    p = email.message_from_string(epilogue)
+                    parts.append(p)
+                except Exception:
+                    log.error("Failed to get epilogue part. Check raw mail.")
 
         # walk all mail parts
         for i, p in enumerate(parts):
@@ -497,6 +498,9 @@ class MailParser:
         if not trust.strip():
             return
 
+        if not self.message:
+            return
+
         received = self.message.get_all("received", [])
 
         for i in received:
@@ -510,6 +514,7 @@ class MailParser:
     def _extract_ip(self, received_header):
         """
         Extract the IP address from the received header if it is not private.
+        Supports both IPv4 (RFC 791) and IPv6 (RFC 5952) addresses.
 
         Args:
             received_header (string): The received header string
@@ -517,7 +522,14 @@ class MailParser:
         Returns:
             string with the ip address or None
         """
-        check = REGXIP.findall(received_header[0 : received_header.find("by")])
+        by_idx = received_header.find("by")
+        from_part = received_header[:by_idx] if by_idx != -1 else received_header
+
+        # Try IPv4 first, then IPv6
+        check = REGXIP.findall(from_part)
+        if not check:
+            check = REGXIP6.findall(from_part)
+
         if check:
             try:
                 ip_str = str(check[-1])
@@ -551,12 +563,12 @@ class MailParser:
         # raw headers
         elif name.endswith("_raw"):
             name = name[:-4]
-            raw = self.message.get_all(name)
+            raw = self.message.get_all(name) if self.message else None
             return json.dumps(raw, ensure_ascii=False)
 
         # object headers
         elif name_header in ADDRESSES_HEADERS:
-            raw_header = self.message.get(name_header, "")
+            raw_header = self.message.get(name_header, "") if self.message else ""
             # parse before decoding
             parsed_addresses = email.utils.getaddresses([raw_header], strict=True)
 
@@ -605,7 +617,7 @@ class MailParser:
         Return a list of all received headers in raw format
         """
         output = []
-        for i in self.message.get_all("received", []):
+        for i in self.message.get_all("received", []) if self.message else []:
             output.append(decode_header_part(i))
         return output
 
@@ -624,7 +636,7 @@ class MailParser:
         """
         Return only the headers as Python object
         """
-        all_headers = set(self.message.keys()) - set(["headers"])
+        all_headers = set(self.message.keys() if self.message else []) - {"headers"}
         return {i: getattr(self, i) for i in all_headers}
 
     @property
@@ -660,7 +672,7 @@ class MailParser:
         """
         Return the mail date in datetime.datetime format and UTC.
         """
-        date = self.message.get("date")
+        date = self.message.get("date") if self.message else None
         conv = None
 
         try:
@@ -674,7 +686,7 @@ class MailParser:
         """
         Return timezone. Offset from UTC.
         """
-        date = self.message.get("date")
+        date = self.message.get("date") if self.message else None
         timezone = 0
 
         try:
@@ -703,7 +715,7 @@ class MailParser:
         """
         Return the JSON of mail parsed
         """
-        if self.mail.get("date"):
+        if self.mail.get("date") and self.date:
             self._mail["date"] = self.date.isoformat()
         return json.dumps(self.mail, ensure_ascii=False, indent=2)
 
@@ -720,7 +732,7 @@ class MailParser:
         """
         Return the JSON of mail parsed partial
         """
-        if self.mail_partial.get("date"):
+        if self.mail_partial.get("date") and self.date:
             self._mail_partial["date"] = self.date.isoformat()
         return json.dumps(self.mail_partial, ensure_ascii=False, indent=2)
 
@@ -758,7 +770,7 @@ class MailParser:
         """
         Return the entire message flattened as a string.
         """
-        return self.message.as_string()
+        return self.message.as_string() if self.message else ""
 
     @property
     def to_domains(self):

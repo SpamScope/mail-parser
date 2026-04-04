@@ -589,12 +589,58 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
     def test_ported_string_handles_header_object(self):
         """
-        Test that ported_string can accept an email.header.Header object 
+        Test that ported_string can accept an email.header.Header object
         and return a decoded string without crashing.
         """
         from email.header import Header
+
         raw_val = 'attachment;\r\nfilename="Just a text – 2026.pdf'
         header_obj = Header(raw_val, charset="utf-8")
         result = ported_string(header_obj)
         self.assertIsInstance(result, str)
         self.assertEqual(result, raw_val)
+
+    def test_parse_received_envelope_from_with_angle_brackets(self):
+        """Test utils.py:294-296 — envelope-from clause with angle-bracket match"""
+        # When envelope-from keyword is present AND its value has angle
+        # brackets, _ENVELOPE_FROM_RE.search() succeeds and line 296 runs.
+        received = (
+            "from mail.example.com by mx.example.org"
+            " envelope-from <sender@example.com>"
+            "; Mon, 01 Jan 2024 00:00:00 +0000"
+        )
+        result = parse_received(received)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result.get("envelope_from"), "sender@example.com")
+
+    def test_parse_received_envelope_from_no_angle_brackets(self):
+        """Test utils.py:294-296 — envelope-from clause with no angle-bracket match"""
+        # When the envelope-from keyword is present but its value has no
+        # angle brackets, _ENVELOPE_FROM_RE.search() returns None and the
+        # if-branch (line 295) is skipped, leaving no envelope_from key.
+        received = (
+            "from mail.example.com by mx.example.org"
+            " envelope-from no-brackets-here"
+            "; Mon, 01 Jan 2024 00:00:00 +0000"
+        )
+        result = parse_received(received)
+        # The parser should succeed (other clauses are present)
+        self.assertIsInstance(result, dict)
+        # envelope_from must NOT be set because there were no angle brackets
+        self.assertNotIn("envelope_from", result)
+
+    def test_parse_received_envelope_from_in_clause_no_angle_brackets(self):
+        """Test utils.py:322->313 — inline envelope-from without angle brackets"""
+        # Step 3 of parse_received searches clause values for "envelope-from"
+        # text, then applies _ENVELOPE_FROM_RE.  When the keyword appears but
+        # has no <…>, the inner `if m:` at line 322 is False and the key is
+        # not added.
+        received = (
+            "from mail.example.com"
+            " by mx.example.org (envelope-from no-angle-bracket)"
+            "; Mon, 01 Jan 2024 00:00:00 +0000"
+        )
+        result = parse_received(received)
+        self.assertIsInstance(result, dict)
+        # envelope_from must NOT be set
+        self.assertNotIn("envelope_from", result)

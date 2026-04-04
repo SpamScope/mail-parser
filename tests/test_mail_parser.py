@@ -302,6 +302,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.date_raw, str)
         self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
+        assert mail.date is not None
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
@@ -670,6 +671,7 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(mail.date_raw, str)
         self.assertIsInstance(mail.date_json, str)
         raw_utc = "2015-11-29T08:45:18+00:00"
+        assert mail.date is not None
         result = mail.date.isoformat()
         self.assertEqual(raw_utc, result)
 
@@ -953,3 +955,132 @@ This is plain text with 8bit encoding."""
             ("", "simple@example.net"),
             ('John "Johnny" Doe', "john.doe@example.com"),
         ]
+
+    def test_init_with_message_object_logs_headers(self):
+        """Test core.py:126->128 — MailParser.__init__ with message is not None"""
+        import email as email_module
+
+        from mailparser.core import MailParser
+
+        raw = "From: test@example.com\nSubject: LogTest\n\nBody"
+        msg = email_module.message_from_string(raw)
+
+        with self.assertLogs("mailparser", level="DEBUG") as cm:
+            parser = MailParser(message=msg)
+
+        # The debug log about headers must have been emitted
+        self.assertTrue(any("All headers of emails" in line for line in cm.output))
+        self.assertEqual(parser.subject, "LogTest")
+
+    def test_init_with_none_message_skips_log(self):
+        """Test core.py:126->128 — MailParser.__init__ message=None skips debug log"""
+        from mailparser.core import MailParser
+
+        # message=None: the if-branch is False, no log.debug call
+        parser = MailParser(message=None)
+        self.assertFalse(parser.message)
+
+    def test_date_json_returns_none_when_no_date(self):
+        """Test core.py:703->exit — date_json returns None when self.date is falsy"""
+        # A mail with no Date header will have self.date == None
+        raw = "From: test@example.com\nSubject: NoDat\n\nBody"
+        mail = mailparser.parse_from_string(raw)
+        # date should be None/falsy
+        self.assertIsNone(mail.date)
+        # date_json should return None (the if branch is not taken)
+        self.assertIsNone(mail.date_json)
+
+    def test_mail_partial_json_date_branch(self):
+        """Test core.py:735->737 — mail_partial_json sets isoformat date"""
+        raw = (
+            "From: test@example.com\n"
+            "Subject: PartialDate\n"
+            "Date: Mon, 01 Jan 2024 12:00:00 +0000\n"
+            "\nBody"
+        )
+        mail = mailparser.parse_from_string(raw)
+        self.assertIsNotNone(mail.date)
+        # mail_partial_json should include the isoformat date string
+        result = mail.mail_partial_json
+        self.assertIsInstance(result, str)
+        self.assertIn("2024-01-01", result)
+
+    def test_mail_partial_json_no_date(self):
+        """Test core.py:735->737 False branch — mail_partial_json without date"""
+        # Mail with no Date header: condition is False, skip line 736
+        raw = "From: test@example.com\nSubject: NoDate\n\nBody"
+        mail = mailparser.parse_from_string(raw)
+        self.assertIsNone(mail.date)
+        result = mail.mail_partial_json
+        self.assertIsInstance(result, str)
+
+    def test_sender_ip_no_message(self):
+        """Test core.py:502 — get_server_ipaddress returns None with no message"""
+        mail = mailparser.parse_from_string("fake mail")
+        self.assertFalse(mail.message)
+        result = mail.get_server_ipaddress("anything")
+        self.assertIsNone(result)
+
+    def test_extract_ip_ipv6_fallback(self):
+        """Test core.py:531 — _extract_ip uses IPv6 when IPv4 not found"""
+        raw_mail = (
+            "Received: from sender.example.com (IPv6:2001:db8::1)\n"
+            " by mail.trusted.net; Mon, 01 Jan 2024 12:00:00 +0000\n"
+            "From: test@example.com\n"
+            "Subject: IPv6 test\n\nBody"
+        )
+        mail = mailparser.parse_from_string(raw_mail)
+        # 2001:db8:: is documentation range — it is not private
+        result = mail.get_server_ipaddress("trusted.net")
+        # Should find the IPv6 address (it is globally routable)
+        self.assertIsNotNone(result)
+
+    def test_extract_ip_invalid_ip_returns_none(self):
+        """Test core.py:538-539 — _extract_ip returns None for unparsable IP string"""
+        parser = mailparser.parse_from_string("From: t@example.com\nSubject: x\n\nBody")
+        # Patch REGXIP to return a value that ipaddress.ip_address() cannot parse
+        with patch("mailparser.core.REGXIP") as mock_regxip:
+            with patch("mailparser.core.REGXIP6") as mock_regxip6:
+                mock_regxip.findall.return_value = []
+                mock_regxip6.findall.return_value = ["not_a_valid_ip"]
+                result = parser._extract_ip("from invalid by host")
+        self.assertIsNone(result)
+
+    def test_extract_ip_private_ip_returns_none(self):
+        """Test core.py:544 — _extract_ip returns None when IP is private"""
+        raw_mail = (
+            "Received: from internal.corp (10.0.0.1)\n"
+            " by mail.trusted.org; Mon, 01 Jan 2024 12:00:00 +0000\n"
+            "From: test@example.com\n"
+            "Subject: Private IP\n\nBody"
+        )
+        mail = mailparser.parse_from_string(raw_mail)
+        result = mail.get_server_ipaddress("trusted.org")
+        self.assertIsNone(result)
+
+    def test_extract_ip_no_ip_found_returns_none(self):
+        """Test core.py:533->544 — _extract_ip returns None when no IP found at all"""
+        mail = mailparser.parse_from_string("From: t@example.com\nSubject: x\n\nBody")
+        # A received header with no IP addresses at all
+        result = mail._extract_ip("from hostname by other-hostname")
+        self.assertIsNone(result)
+
+    def test_unicode_decode_error_in_payload(self):
+        """Test core.py:447-448 — UnicodeDecodeError fallback when decoding payload"""
+        # A body containing a backslash-u followed by non-hex characters
+        # causes raw-unicode-escape to raise UnicodeDecodeError (line 447),
+        # which is caught and falls back to ported_string (line 448).
+        # The part has no CTE so the try/except branch is entered.
+        backslash_u_invalid = chr(92) + "uggg"
+        raw_mail = (
+            "Content-Type: multipart/mixed; boundary=TEST_BOUND\n"
+            "\n"
+            "--TEST_BOUND\n"
+            "Content-Type: text/plain; charset=utf-8\n"
+            "\n"
+            "hello " + backslash_u_invalid + " world\n"
+            "--TEST_BOUND--\n"
+        )
+        mail = mailparser.parse_from_string(raw_mail)
+        # Should have parsed successfully and body contains the text
+        self.assertIn("hello", mail.body)
