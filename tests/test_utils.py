@@ -615,16 +615,16 @@ class TestUtilsEdgeCases(unittest.TestCase):
         """
         from email.header import Header
 
-        raw_val = "=?utf-8?q?=C3=81lp=C3=A1m_Longsom?= <recipient@example.com>"
-        header_obj = Header(raw_val, charset="utf-8")
+        header_obj = Header("Álpám Longsom", charset="utf-8")
+        header_obj.append(" <recipient@example.com>", charset="us-ascii")
         result = get_addresses(header_obj)
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 1)
         display_name, addr = result[0]
         self.assertEqual(addr, "recipient@example.com")
-        # Header.__str__ yields the encoded-word form; the display name
-        # is preserved (decoding happens in core.py via decode_header_part).
-        self.assertIn("=?utf-8?q?=C3=81lp=C3=A1m_Longsom?=", display_name)
+        # get_addresses returns encoded-word form for the display name.
+        # Decoding to Unicode happens in core.py via decode_header_part.
+        self.assertIn("=?utf-8?b?", display_name)
 
     def test_get_addresses_handles_none(self):
         """
@@ -641,6 +641,29 @@ class TestUtilsEdgeCases(unittest.TestCase):
         """
         result = get_addresses("Plain Name <plain@example.com>")
         self.assertEqual(result, [("Plain Name", "plain@example.com")])
+
+    def test_mailparser_from_bytes_preserves_unicode_display_name(self):
+        """
+        Regression: Header objects from Message.get(name) must round-trip
+        through get_addresses() without introducing replacement characters.
+
+        The parser should expose the decoded Unicode display name on
+        MailParser.to.
+        """
+        from mailparser.core import MailParser
+
+        raw_email = (
+            b"From: Sender <sender@example.com>\r\n"
+            b"To: =?utf-8?b?w4FscMOhbSBMb25nc29t?= <recipient@example.com>\r\n"
+            b"Subject: Test\r\n"
+            b"Date: Tue, 12 May 2026 18:00:00 +0000\r\n"
+            b"Content-Type: text/plain; charset=utf-8\r\n"
+            b"\r\n"
+            b"hello\r\n"
+        )
+
+        mail = MailParser.from_bytes(raw_email)
+        self.assertEqual(mail.to, [("Álpám Longsom", "recipient@example.com")])
 
     def test_parse_received_envelope_from_with_angle_brackets(self):
         """Test utils.py:294-296 — envelope-from clause with angle-bracket match"""

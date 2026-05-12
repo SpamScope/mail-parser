@@ -115,11 +115,17 @@ def get_addresses(raw_header):
     # whose value contains RFC 2047 encoded-words (typical for non-ASCII
     # display names like ``=?utf-8?q?=C3=81rp=C3=A1d?=``). ``Header`` does
     # not implement string methods such as ``.strip()`` and is not a valid
-    # input to ``email.utils.getaddresses``. Normalise once here so callers
-    # can pass whatever ``Message.get`` returned without having to coerce.
+    # input to ``email.utils.getaddresses``.
+    #
+    # Important: use ``Header.encode()`` (not ``str(Header)``) to preserve the
+    # original RFC 2047 encoded-word form. ``core.py`` decodes display names
+    # later via ``decode_header_part()``; keeping encoded-words intact here
+    # avoids lossy intermediate conversion that can introduce replacement chars.
     if raw_header is None:
         return []
-    if not isinstance(raw_header, str):
+    if isinstance(raw_header, email.header.Header):
+        raw_header = raw_header.encode()
+    elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
 
     parsed = email.utils.getaddresses([raw_header], strict=True)
