@@ -117,14 +117,16 @@ def get_addresses(raw_header):
     # not implement string methods such as ``.strip()`` and is not a valid
     # input to ``email.utils.getaddresses``.
     #
-    # Important: use ``Header.encode()`` (not ``str(Header)``) to preserve the
-    # original RFC 2047 encoded-word form. ``core.py`` decodes display names
-    # later via ``decode_header_part()``; keeping encoded-words intact here
-    # avoids lossy intermediate conversion that can introduce replacement chars.
+    # Important: decode ``Header`` values into a plain parseable string first.
+    # In practice, strict address parsing can treat raw encoded-word tokens like
+    # ``=?unknown-8bit?...?=`` as the *address* itself, producing output such as
+    # ``To: =?unknown-8bit?...?=``.  Decoding first gives
+    # ``Álpám Longsom <recipient@example.com>`` so getaddresses() can split
+    # name/address correctly.
     if raw_header is None:
         return []
     if isinstance(raw_header, email.header.Header):
-        raw_header = raw_header.encode()
+        raw_header = decode_header_part(raw_header.encode())
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
 

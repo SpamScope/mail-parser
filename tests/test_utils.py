@@ -624,7 +624,23 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(addr, "recipient@example.com")
         # get_addresses returns encoded-word form for the display name.
         # Decoding to Unicode happens in core.py via decode_header_part.
-        self.assertIn("=?utf-8?b?", display_name)
+        self.assertEqual(display_name, "Álpám Longsom")
+
+    def test_get_addresses_handles_unknown_8bit_header_object(self):
+        """
+        Regression for real-world unknown-8bit encoded-word headers.
+        Address parsing must not treat the encoded-word token itself as
+        the address.
+        """
+        from email.header import Header
+
+        encoded_name = "=?unknown-8bit?b?w4FscMOhbSBMb25nc29t?="
+        header_obj = Header()
+        header_obj.append(encoded_name, charset="us-ascii")
+        header_obj.append(" <recipient@example.com>", charset="us-ascii")
+
+        result = get_addresses(header_obj)
+        self.assertEqual(result, [("Álpám Longsom", "recipient@example.com")])
 
     def test_get_addresses_handles_none(self):
         """
@@ -655,6 +671,25 @@ class TestUtilsEdgeCases(unittest.TestCase):
         raw_email = (
             b"From: Sender <sender@example.com>\r\n"
             b"To: =?utf-8?b?w4FscMOhbSBMb25nc29t?= <recipient@example.com>\r\n"
+            b"Subject: Test\r\n"
+            b"Date: Tue, 12 May 2026 18:00:00 +0000\r\n"
+            b"Content-Type: text/plain; charset=utf-8\r\n"
+            b"\r\n"
+            b"hello\r\n"
+        )
+
+        mail = MailParser.from_bytes(raw_email)
+        self.assertEqual(mail.to, [("Álpám Longsom", "recipient@example.com")])
+
+    def test_mailparser_from_bytes_unknown_8bit_display_name(self):
+        """
+        End-to-end regression for unknown-8bit encoded-word in To header.
+        """
+        from mailparser.core import MailParser
+
+        raw_email = (
+            b"From: Sender <sender@example.com>\r\n"
+            b"To: =?unknown-8bit?b?w4FscMOhbSBMb25nc29t?= <recipient@example.com>\r\n"
             b"Subject: Test\r\n"
             b"Date: Tue, 12 May 2026 18:00:00 +0000\r\n"
             b"Content-Type: text/plain; charset=utf-8\r\n"
