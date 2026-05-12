@@ -100,13 +100,28 @@ def get_addresses(raw_header):
     that was actually present in the header.
 
     Args:
-        raw_header (str): raw value of an address header
-            (e.g. ``From``, ``To``, ``CC`` …)
+        raw_header (str | email.header.Header | None): raw value of an
+            address header (e.g. ``From``, ``To``, ``CC`` …). Accepts a
+            plain ``str``, an ``email.header.Header`` instance (returned
+            by ``email.message.Message.get`` for headers containing
+            RFC 2047 encoded-words such as non-ASCII display names), or
+            ``None``.
 
     Returns:
         list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples.
             ``display_name`` is an empty string when absent.
     """
+    # ``Message.get(name)`` returns an ``email.header.Header`` for any header
+    # whose value contains RFC 2047 encoded-words (typical for non-ASCII
+    # display names like ``=?utf-8?q?=C3=81rp=C3=A1d?=``). ``Header`` does
+    # not implement string methods such as ``.strip()`` and is not a valid
+    # input to ``email.utils.getaddresses``. Normalise once here so callers
+    # can pass whatever ``Message.get`` returned without having to coerce.
+    if raw_header is None:
+        return []
+    if not isinstance(raw_header, str):
+        raw_header = str(raw_header)
+
     parsed = email.utils.getaddresses([raw_header], strict=True)
 
     # If every result from the strict parser has an empty address — while the

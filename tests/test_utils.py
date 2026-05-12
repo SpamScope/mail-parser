@@ -26,6 +26,7 @@ from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingEr
 from mailparser.utils import (
     decode_header_part,
     find_between,
+    get_addresses,
     msgconvert,
     parse_received,
     ported_open,
@@ -599,6 +600,47 @@ class TestUtilsEdgeCases(unittest.TestCase):
         result = ported_string(header_obj)
         self.assertIsInstance(result, str)
         self.assertEqual(result, raw_val)
+
+    def test_get_addresses_handles_header_object(self):
+        """
+        Test that get_addresses accepts an email.header.Header instance
+        without raising AttributeError on `.strip()`.
+
+        Regression for the case where Message.get(name) returns a Header
+        for address headers containing RFC 2047 encoded-words (e.g.
+        non-ASCII display names like ``=?utf-8?q?=C3=81lp=C3=A1m_Longsom?=``).
+        Before the fix, this raised:
+
+            AttributeError: 'Header' object has no attribute 'strip'
+        """
+        from email.header import Header
+
+        raw_val = "=?utf-8?q?=C3=81lp=C3=A1m_Longsom?= <recipient@example.com>"
+        header_obj = Header(raw_val, charset="utf-8")
+        result = get_addresses(header_obj)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        display_name, addr = result[0]
+        self.assertEqual(addr, "recipient@example.com")
+        # Header.__str__ yields the encoded-word form; the display name
+        # is preserved (decoding happens in core.py via decode_header_part).
+        self.assertIn("=?utf-8?q?=C3=81lp=C3=A1m_Longsom?=", display_name)
+
+    def test_get_addresses_handles_none(self):
+        """
+        Test that get_addresses returns an empty list when given None,
+        rather than crashing on attribute access.
+        """
+        self.assertEqual(get_addresses(None), [])
+
+    def test_get_addresses_plain_string_unchanged(self):
+        """
+        Test that the existing plain-string path still works. This guards
+        against accidentally regressing the common case while adding
+        Header / None handling.
+        """
+        result = get_addresses("Plain Name <plain@example.com>")
+        self.assertEqual(result, [("Plain Name", "plain@example.com")])
 
     def test_parse_received_envelope_from_with_angle_brackets(self):
         """Test utils.py:294-296 — envelope-from clause with angle-bracket match"""
