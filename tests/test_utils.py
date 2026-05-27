@@ -241,23 +241,14 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(len(result.sha256), 64)
         self.assertEqual(len(result.sha512), 128)
 
-    def test_parse_received_with_multiple_matches_error(self):
-        """Test parse_received raises error on multiple matches for same pattern"""
-        # This tests the error branch when multiple matches are found
-        # We need a received header that triggers duplicate matches
+    def test_parse_received_with_multiple_from_clauses(self):
+        """parse_received keeps only first 'from' clause (RFC 5321 one-from rule)"""
         received = (
             "from server.example.com from server2.example.com by mail.example.com"
         )
-
-        # Depending on the patterns, this might raise an error or succeed
-        # We test that it handles the scenario correctly
-        try:
-            result = parse_received(received)
-            # If it succeeds, it should return a dict
-            self.assertIsInstance(result, dict)
-        except MailParserReceivedParsingError as e:
-            # This is the expected path for multiple matches
-            self.assertIn("More than one match", str(e))
+        result = parse_received(received)
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["from"], "server.example.com")
 
     def test_get_to_domains_with_keyerror(self):
         """Test get_to_domains handles KeyError gracefully"""
@@ -443,10 +434,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         result = receiveds_format(parsed)
         self.assertIsInstance(result, list)
-        # Should have date_utc and delay calculated
-        if result[0].get("date_utc"):
-            self.assertIn("date_utc", result[0])
-            self.assertIn("delay", result[1])
+        self.assertIn("date_utc", result[0])
+        self.assertIn("delay", result[1])
 
     def test_receiveds_format_with_invalid_date(self):
         """Test receiveds_format handles invalid dates"""
@@ -744,3 +733,69 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertIsInstance(result, dict)
         # envelope_from must NOT be set
         self.assertNotIn("envelope_from", result)
+
+    def test_get_addresses_non_str_non_header(self):
+        """get_addresses coerces unexpected types via str() (utils.py:135)"""
+        result = get_addresses(42)  # type: ignore[arg-type]
+        self.assertIsInstance(result, list)
+
+    def test_get_addresses_fallback_regex_bare_email(self):
+        """fallback regex matches bare email (utils.py:149-150)"""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses("user@example.com")
+        self.assertEqual(result, [("", "user@example.com")])
+
+    def test_get_addresses_fallback_regex_quoted_name(self):
+        """fallback regex matches quoted-name format (utils.py:145-146)"""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses('"Quoted Name" <user@example.com>')
+        self.assertEqual(result, [("Quoted Name", "user@example.com")])
+
+    def test_get_addresses_fallback_regex_any_name(self):
+        """fallback regex matches any-name format (utils.py:147-148)"""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses("Any Name <user@example.com>")
+        self.assertEqual(result, [("Any Name", "user@example.com")])
+
+    def test_get_addresses_fallback_regex_no_matches(self):
+        """fallback regex finds no addresses, falls through to return parsed"""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses("not an email address at all")
+        self.assertEqual(result, [("", "")])
+
+    def test_parse_received_sendgrid_date(self):
+        """parse_received extracts SendGrid non-standard date (utils.py:389-390)"""
+        received = (
+            "from sendgrid.net by mx.example.com with SMTP"
+            " 2024-01-15 10:30:45.123456789 +0000 UTC m=+1234.567890123"
+        )
+        result = parse_received(received)
+        self.assertIn("date", result)
+        self.assertIn("2024-01-15", result["date"])
+
+    def test_parse_received_for_clause(self):
+        """parse_received captures 'for' clause (utils.py:411)"""
+        received = (
+            "from mail.example.com by mx.example.com"
+            " for <user@example.com>; Mon, 15 Jan 2024 10:30:45 +0000"
+        )
+        result = parse_received(received)
+        self.assertIn("for", result)
+        self.assertIn("user@example.com", result["for"])
+
+    def test_parse_received_envelope_from_embedded_in_clause(self):
+        """parse_received extracts envelope-from embedded in clause value"""
+        received = (
+            "from mail.example.com (envelope-from <sender@example.com>)"
+            " by mx.example.com; Mon, 15 Jan 2024 10:30:45 +0000"
+        )
+        result = parse_received(received)
+        self.assertEqual(result.get("envelope_from"), "sender@example.com")

@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from __future__ import annotations
+
 import base64
 import datetime
 import email
@@ -144,7 +146,7 @@ def get_addresses(
                 results.append((m.group(1).strip(), m.group(2).strip()))
             elif m.group(4):  # Any Name <email>  (incl. email-as-display-name)
                 results.append((m.group(3).strip(), m.group(4).strip()))
-            elif m.group(5):  # bare email
+            elif m.group(5):  # bare email  # pragma: no branch
                 results.append(("", m.group(5).strip()))
         if results:
             log.debug(
@@ -472,7 +474,7 @@ def receiveds_parsing(receiveds):
 
     log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
 
-    if len(receiveds) != len(parsed):
+    if len(receiveds) != len(parsed):  # pragma: no cover
         # something really bad happened,
         # so just return raw receiveds with hop indices
         log.error(
