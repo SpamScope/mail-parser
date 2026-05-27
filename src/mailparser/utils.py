@@ -16,6 +16,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+from __future__ import annotations
+
 import base64
 import datetime
 import email
@@ -75,7 +77,9 @@ _ADDR_FALLBACK_RE = re.compile(
 )
 
 
-def get_addresses(raw_header):
+def get_addresses(
+    raw_header: str | email.header.Header | None,
+) -> list[tuple[str, str]]:
     """
     Parse email addresses from a raw address header with a fallback for
     RFC-non-compliant but real-world-common formats.
@@ -100,13 +104,36 @@ def get_addresses(raw_header):
     that was actually present in the header.
 
     Args:
-        raw_header (str): raw value of an address header
-            (e.g. ``From``, ``To``, ``CC`` …)
+        raw_header (str | email.header.Header | None): raw value of an
+            address header (e.g. ``From``, ``To``, ``CC`` …). Accepts a
+            plain ``str``, an ``email.header.Header`` instance (returned
+            by ``email.message.Message.get`` for headers containing
+            RFC 2047 encoded-words such as non-ASCII display names), or
+            ``None``.
 
     Returns:
         list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples.
             ``display_name`` is an empty string when absent.
     """
+    # ``Message.get(name)`` returns an ``email.header.Header`` for any header
+    # whose value contains RFC 2047 encoded-words (typical for non-ASCII
+    # display names like ``=?utf-8?q?=C3=81rp=C3=A1d?=``). ``Header`` does
+    # not implement string methods such as ``.strip()`` and is not a valid
+    # input to ``email.utils.getaddresses``.
+    #
+    # Important: decode ``Header`` values into a plain parseable string first.
+    # In practice, strict address parsing can treat raw encoded-word tokens like
+    # ``=?unknown-8bit?...?=`` as the *address* itself, producing output such as
+    # ``To: =?unknown-8bit?...?=``.  Decoding first gives
+    # ``Álpám Longsom <recipient@example.com>`` so getaddresses() can split
+    # name/address correctly.
+    if raw_header is None:
+        return []
+    if isinstance(raw_header, email.header.Header):
+        raw_header = decode_header_part(raw_header.encode())
+    elif not isinstance(raw_header, str):
+        raw_header = str(raw_header)
+
     parsed = email.utils.getaddresses([raw_header], strict=True)
 
     # If every result from the strict parser has an empty address — while the
@@ -119,7 +146,7 @@ def get_addresses(raw_header):
                 results.append((m.group(1).strip(), m.group(2).strip()))
             elif m.group(4):  # Any Name <email>  (incl. email-as-display-name)
                 results.append((m.group(3).strip(), m.group(4).strip()))
-            elif m.group(5):  # bare email
+            elif m.group(5):  # bare email  # pragma: no branch
                 results.append(("", m.group(5).strip()))
         if results:
             log.debug(
@@ -447,7 +474,7 @@ def receiveds_parsing(receiveds):
 
     log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
 
-    if len(receiveds) != len(parsed):
+    if len(receiveds) != len(parsed):  # pragma: no cover
         # something really bad happened,
         # so just return raw receiveds with hop indices
         log.error(
