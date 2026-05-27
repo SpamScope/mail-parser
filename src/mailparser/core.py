@@ -429,22 +429,29 @@ class MailParser:
                 else:
                     log.debug(f"Email part {i!r} is not an attachment")
 
-                    # Get the payload using get_payload method with decode=True
-                    # As Python truly decodes only 'base64',
-                    # 'quoted-printable', 'x-uuencode',
-                    # 'uuencode', 'uue', 'x-uue'
-                    # And for other encodings it breaks the characters so
-                    # we need to decode them with encoding python is appying
-                    # To maintain the characters
                     payload = p.get_payload(decode=True)
                     cte = p.get("Content-Transfer-Encoding")
                     if cte:
                         cte = cte.lower()
 
                     if not cte or cte in ["7bit", "8bit"]:
-                        try:
-                            payload = payload.decode("raw-unicode-escape")
-                        except UnicodeDecodeError:
+                        # message_from_bytes stores non-ASCII body bytes via
+                        # ascii+surrogateescape, producing surrogates in the
+                        # payload string.  message_from_string stores a proper
+                        # Unicode str (no surrogates).  Detect which case we
+                        # have via get_payload(decode=False) and decode
+                        # accordingly so the declared charset is honoured.
+                        raw_str = p.get_payload(decode=False)
+                        if isinstance(raw_str, str):
+                            try:
+                                # Raises if surrogates present (from_bytes path)
+                                raw_str.encode("utf-8")
+                                payload = raw_str
+                            except UnicodeEncodeError:
+                                # Recover original bytes then decode with charset
+                                orig_bytes = raw_str.encode("ascii", "surrogateescape")
+                                payload = ported_string(orig_bytes, encoding=charset)
+                        else:
                             payload = ported_string(payload, encoding=charset)
                     else:
                         payload = ported_string(payload, encoding=charset)

@@ -1087,6 +1087,62 @@ This is plain text with 8bit encoding."""
         # Should have parsed successfully and body contains the text
         self.assertIn("hello", mail.body)
 
+    def _make_utf8_raw(self, cte_header=""):
+        """Return a minimal raw email bytes with UTF-8 body (em-dash U+2014)."""
+        cte_line = f"Content-Transfer-Encoding: {cte_header}\n" if cte_header else ""
+        raw = (
+            "From: a@example.com\n"
+            "To: b@example.com\n"
+            "Subject: probe\n"
+            f"Content-Type: text/plain; charset=utf-8\n"
+            "MIME-Version: 1.0\n"
+            f"{cte_line}"
+            "\n"
+            "Hello — world\n"
+        )
+        return raw.encode("utf-8")
+
+    def test_utf8_body_from_bytes_no_cte(self):
+        """parse_from_bytes must not mojibake UTF-8 body with no CTE (issue #152)."""
+        raw = self._make_utf8_raw()
+        mail = mailparser.parse_from_bytes(raw)
+        self.assertEqual(mail.text_plain[0], "Hello — world\n")
+
+    def test_utf8_body_from_bytes_cte_8bit(self):
+        """parse_from_bytes must not mojibake UTF-8 body with CTE: 8bit (issue #152)."""
+        raw = self._make_utf8_raw("8bit")
+        mail = mailparser.parse_from_bytes(raw)
+        self.assertEqual(mail.text_plain[0], "Hello — world\n")
+
+    def test_utf8_body_from_bytes_cte_7bit(self):
+        """parse_from_bytes must not mojibake ASCII body with CTE: 7bit (issue #152)."""
+        raw = (
+            b"From: a@example.com\n"
+            b"To: b@example.com\n"
+            b"Content-Type: text/plain; charset=utf-8\n"
+            b"Content-Transfer-Encoding: 7bit\n"
+            b"\n"
+            b"Hello world\n"
+        )
+        mail = mailparser.parse_from_bytes(raw)
+        self.assertEqual(mail.text_plain[0], "Hello world\n")
+
+    def test_utf8_body_from_bytes_matches_from_string(self):
+        """parse_from_bytes and parse_from_string: identical text_plain (issue #152)."""
+        raw_bytes = self._make_utf8_raw()
+        raw_str = raw_bytes.decode("utf-8")
+        mail_b = mailparser.parse_from_bytes(raw_bytes)
+        mail_s = mailparser.parse_from_string(raw_str)
+        self.assertEqual(mail_b.text_plain[0], mail_s.text_plain[0])
+
+    def test_utf8_body_from_bytes_8bit_matches_from_string(self):
+        """parse_from_bytes (8bit CTE) matches parse_from_string (issue #152)."""
+        raw_bytes = self._make_utf8_raw("8bit")
+        raw_str = raw_bytes.decode("utf-8")
+        mail_b = mailparser.parse_from_bytes(raw_bytes)
+        mail_s = mailparser.parse_from_string(raw_str)
+        self.assertEqual(mail_b.text_plain[0], mail_s.text_plain[0])
+
 
 class TestEmailAsDisplayName(unittest.TestCase):
     """
