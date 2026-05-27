@@ -75,7 +75,9 @@ _ADDR_FALLBACK_RE = re.compile(
 )
 
 
-def get_addresses(raw_header):
+def get_addresses(
+    raw_header: str | email.header.Header | None,
+) -> list[tuple[str, str]]:
     """
     Parse email addresses from a raw address header with a fallback for
     RFC-non-compliant but real-world-common formats.
