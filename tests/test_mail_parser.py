@@ -38,7 +38,6 @@ from mailparser.utils import (
     get_header,
     get_mail_keys,
     get_to_domains,
-    msgconvert,
     parse_received,
     ported_open,
     ported_string,
@@ -1376,17 +1375,14 @@ def test_outlook_backend_parity():
     body is intentionally not compared: msgconvert and extract-msg differ
     in line endings, MIME structure and RTF/HTML reconstruction.
     """
-    pytest.importorskip("extract_msg")
-    if shutil.which("msgconvert") is None:
-        pytest.skip("msgconvert tool not installed")
 
     # Force each backend explicitly via its util. from_file(..., True)
     # removes the temporary converted .eml after parsing.
     f_extract, _ = extract_msg_convert(mail_outlook_1)
     parsed_extract = mailparser.MailParser.from_file(f_extract, True)
 
-    f_msgconv, _ = msgconvert(mail_outlook_1)
-    parsed_msgconv = mailparser.MailParser.from_file(f_msgconv, True)
+    # Parsing from the original .msg Outlook file
+    parsed_msgconv = mailparser.MailParser.from_file_msg(mail_outlook_1)
 
     for key in ("from", "to", "subject"):
         assert parsed_extract.mail.get(key) == parsed_msgconv.mail.get(key)
