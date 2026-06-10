@@ -18,6 +18,7 @@ limitations under the License.
 
 import datetime
 import hashlib
+import logging
 import os
 import shutil
 import sys
@@ -25,14 +26,19 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 import mailparser
+from mailparser.exceptions import MailParserOSError
 from mailparser.utils import (
     convert_mail_date,
+    extract_msg_convert,
     fingerprints,
     get_addresses,
     get_header,
     get_mail_keys,
     get_to_domains,
+    msgconvert,
     parse_received,
     ported_open,
     ported_string,
@@ -433,9 +439,10 @@ class TestMailParser(unittest.TestCase):
         self.assertIsInstance(m.mail, dict)
         self.assertIsInstance(m.mail_json, str)
 
+    @patch("mailparser.core.importlib.util.find_spec", return_value=None)
     @patch("mailparser.core.os.remove")
     @patch("mailparser.core.msgconvert")
-    def test_parse_from_file_msg(self, mock_msgconvert, mock_remove):
+    def test_parse_from_file_msg(self, mock_msgconvert, mock_remove, mock_find_spec):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
 
@@ -1301,3 +1308,91 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0], ("alice@example.com", "bob@example.com"))
         self.assertEqual(result[1], ("eve@example.com", "frank@example.com"))
+
+
+# ---------------------------------------------------------------------------
+# Outlook .msg conversion backends (extract-msg vs deprecated msgconvert)
+# ---------------------------------------------------------------------------
+
+
+def test_from_file_msg_prefers_extract_msg(mocker):
+    """extract-msg is preferred and msgconvert is NOT called when available."""
+    mocker.patch("importlib.util.find_spec", return_value=object())
+    extract = mocker.patch(
+        "mailparser.core.extract_msg_convert",
+        return_value=(mail_test_2, "info"),
+    )
+    msgconv = mocker.patch("mailparser.core.msgconvert")
+    remove = mocker.patch("mailparser.core.os.remove")
+
+    mailparser.parse_from_file_msg(mail_outlook_1)
+
+    extract.assert_called_once_with(mail_outlook_1)
+    msgconv.assert_not_called()
+    remove.assert_called_once_with(mail_test_2)
+
+
+def test_from_file_msg_fallback_warns(mocker, caplog):
+    """When extract-msg is absent, msgconvert runs and a deprecation warns."""
+    mocker.patch("importlib.util.find_spec", return_value=None)
+    msgconv = mocker.patch(
+        "mailparser.core.msgconvert",
+        return_value=(mail_test_2, None),
+    )
+    mocker.patch("mailparser.core.os.remove")
+
+    with caplog.at_level(logging.WARNING, logger="mailparser.core"):
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    msgconv.assert_called_once_with(mail_outlook_1)
+    messages = [r.message for r in caplog.records]
+    assert any("deprecated" in m for m in messages)
+    assert any("mail-parser[outlook]" in m for m in messages)
+
+
+def test_from_file_msg_no_backend_raises(mocker):
+    """No backend at all → MailParserOSError mentioning both install paths."""
+    mocker.patch("importlib.util.find_spec", return_value=None)
+    mocker.patch(
+        "mailparser.utils.subprocess.Popen",
+        side_effect=OSError("no msgconvert"),
+    )
+
+    with pytest.raises(MailParserOSError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert "mail-parser[outlook]" in str(exc.value)
+    assert "msgconvert" in str(exc.value)
+
+
+@pytest.mark.integration
+def test_outlook_backend_parity():
+    """mail_outlook_1 parses to the same result under both backends.
+
+    Requires both the optional ``extract-msg`` dependency and the
+    ``msgconvert`` Perl tool; skips otherwise. The two converters do not
+    emit byte-identical ``.eml`` files, so only the meaningful parsed
+    result is compared (key headers, attachment names/count). The raw
+    body is intentionally not compared: msgconvert and extract-msg differ
+    in line endings, MIME structure and RTF/HTML reconstruction.
+    """
+    pytest.importorskip("extract_msg")
+    if shutil.which("msgconvert") is None:
+        pytest.skip("msgconvert tool not installed")
+
+    # Force each backend explicitly via its util. from_file(..., True)
+    # removes the temporary converted .eml after parsing.
+    f_extract, _ = extract_msg_convert(mail_outlook_1)
+    parsed_extract = mailparser.MailParser.from_file(f_extract, True)
+
+    f_msgconv, _ = msgconvert(mail_outlook_1)
+    parsed_msgconv = mailparser.MailParser.from_file(f_msgconv, True)
+
+    for key in ("from", "to", "subject"):
+        assert parsed_extract.mail.get(key) == parsed_msgconv.mail.get(key)
+
+    assert parsed_extract.date == parsed_msgconv.date
+
+    extract_names = sorted(a["filename"] for a in parsed_extract.attachments)
+    msgconv_names = sorted(a["filename"] for a in parsed_msgconv.attachments)
+    assert extract_names == msgconv_names
