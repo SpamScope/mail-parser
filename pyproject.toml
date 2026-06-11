@@ -28,6 +28,9 @@ maintainers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+outlook = ["extract-msg>=0.54"]
+
 [dependency-groups]
 dev = [
     "build>=1.2.2.post1",

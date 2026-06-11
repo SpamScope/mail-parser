@@ -318,6 +318,66 @@ def fingerprints(data):
     return hashes(md5, sha1, sha256, sha512)
 
 
+def _new_outlook_tempfile():
+    """
+    Create an empty temporary file to hold a converted Outlook email.
+
+    The OS-level file handle is closed immediately; callers write to the
+    returned path with their own handle (a subprocess ``--outfile`` for
+    ``msgconvert`` or a plain ``open`` for the pure-Python backend).
+
+    Returns:
+        str: path of the new temporary ``.eml`` file
+    """
+    handle, path = tempfile.mkstemp(prefix="outlook_")
+    os.close(handle)
+    return path
+
+
+def extract_msg_convert(fp):
+    """
+    Convert an Outlook ``.msg`` file to ``.eml`` using the pure-Python
+    ``extract-msg`` library (no external Perl tool required).
+
+    The ``extract_msg`` import is performed lazily inside this function so
+    that the package keeps importing with zero runtime dependencies when
+    the optional ``outlook`` extra is not installed.
+
+    Args:
+        fp (string): file path of the Outlook ``.msg`` mail
+
+    Returns:
+        tuple: ``(eml_path, info)`` where ``eml_path`` is the path of the
+        converted ``.eml`` file and ``info`` is a short descriptive string
+
+    Raises:
+        ImportError: if the ``extract-msg`` library is not installed
+        MailParserOSError: if the ``.msg`` is not a convertible email
+            message (e.g. a contact or calendar item)
+    """
+    import extract_msg  # lazy: keep package import stdlib-only
+
+    log.debug("Started converting Outlook email with extract-msg")
+    msg = extract_msg.openMsg(fp)
+    try:
+        # openMsg() may return a non-email MSGFile (contact, calendar,
+        # task...) which cannot be rendered as an email message.
+        as_email_message = getattr(msg, "asEmailMessage", None)
+        if as_email_message is None:
+            raise MailParserOSError(
+                f"Outlook file {fp!r} is not a convertible email "
+                f"message (type {type(msg).__name__})"
+            )
+        eml = as_email_message()
+        info = f"{eml.get('From', '')} | {eml.get('Subject', '')}".strip()
+        temp = _new_outlook_tempfile()
+        with open(temp, "wb") as f:
+            f.write(eml.as_bytes())
+        return temp, info
+    finally:
+        msg.close()
+
+
 def msgconvert(email):
     """
     Exec msgconvert tool, to convert msg Outlook
@@ -329,9 +389,12 @@ def msgconvert(email):
     Returns:
         tuple with file path of mail converted and
         standard output data (str)
+
+    Raises:
+        MailParserOSError: if the ``msgconvert`` tool is not installed
     """
     log.debug("Started converting Outlook email")
-    temph, temp = tempfile.mkstemp(prefix="outlook_")
+    temp = _new_outlook_tempfile()
     command = ["msgconvert", "--outfile", temp, email]
 
     try:
@@ -343,16 +406,19 @@ def msgconvert(email):
         )
 
     except OSError as e:
-        message = f"Check if 'msgconvert' tool is installed / {e!r}"
+        message = (
+            "Cannot convert Outlook .msg: no conversion backend "
+            "available. Install pure-Python support with "
+            "'pip install mail-parser[outlook]', or install the "
+            "'msgconvert' Perl tool "
+            f"(libemail-outlook-message-perl). {e!r}"
+        )
         log.exception(message)
         raise MailParserOSError(message)
 
     else:
         stdoutdata, _ = out.communicate()
         return temp, stdoutdata.decode("utf-8").strip()
-
-    finally:
-        os.close(temph)
 
 
 def parse_received(received):

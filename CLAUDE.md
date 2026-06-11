@@ -95,9 +95,3 @@ After every change:
 1. Update README.md if the change affects usage, API, or setup.
 1. Stage changes and run pre-commit; fix all reported issues before proceeding.
 1. Run full test suite; fix all failures before reporting done.
-
-### Test fixtures
-
-Raw email files in `tests/mails/` are the fixtures. `mail_malformed_*` files exercise defect
-detection; `mail_outlook_*` require `msgconvert` installed. Tests that need the Outlook tool should
-be marked `@pytest.mark.integration`.

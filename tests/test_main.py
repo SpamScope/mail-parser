@@ -245,10 +245,17 @@ class TestMain:
         non_existent_file = str(tmp_path / "non_existent.msg")
         args = parser.parse_args(["--file", non_existent_file, "--outlook"])
 
-        # Mock msgconvert to raise OSError (simulating msgconvert unavailable)
-        with patch(
-            "mailparser.utils.subprocess.Popen",
-            side_effect=OSError("msgconvert not found"),
+        # Force the deprecated msgconvert fallback (extract-msg absent) and
+        # mock msgconvert to raise OSError (simulating msgconvert unavailable)
+        with (
+            patch(
+                "mailparser.core.importlib.util.find_spec",
+                return_value=None,
+            ),
+            patch(
+                "mailparser.utils.subprocess.Popen",
+                side_effect=OSError("msgconvert not found"),
+            ),
         ):
             with pytest.raises(MailParserOSError, match="msgconvert"):
                 parse_file(args)
