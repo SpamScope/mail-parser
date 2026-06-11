@@ -29,7 +29,7 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           sudo apt-get -qq update
           sudo apt-get install -y libemail-outlook-message-perl
-          uv sync
+          uv sync --all-extras
           export PERL_MM_USE_DEFAULT=1
           sudo cpan -f -i Email::Outlook::Message
 
@@ -41,6 +41,7 @@ jobs:
           uv run mail-parser -v
           uv run mail-parser -h
           uv run mail-parser -f tests/mails/mail_malformed_3 -j
+          uv run mail-parser -f tests/mails/mail_outlook_1 -o -j
           cat tests/mails/mail_malformed_3 | uv run mail-parser -k -j
 
       - name: Run pre-commit

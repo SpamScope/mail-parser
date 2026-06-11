@@ -18,6 +18,7 @@ limitations under the License.
 
 import base64
 import email
+import importlib.util
 import ipaddress
 import json
 import logging
@@ -27,6 +28,7 @@ from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP
 from mailparser.utils import (
     convert_mail_date,
     decode_header_part,
+    extract_msg_convert,
     find_between,
     get_addresses,
     get_header,
@@ -186,14 +188,32 @@ class MailParser:
         Init a new object from a Outlook message file,
         mime type: application/vnd.ms-outlook
 
+        Conversion backend precedence:
+          1. ``extract-msg`` (pure Python, optional ``outlook`` extra).
+          2. ``msgconvert`` external Perl tool — **deprecated** fallback,
+             used only when ``extract-msg`` is not installed.
+
         Args:
             fp (string): file path of raw Outlook email
 
         Returns:
             Instance of MailParser
+
+        Raises:
+            MailParserOSError: if no conversion backend is available
         """
         log.debug("Parsing email from file Outlook")
-        f, _ = msgconvert(fp)
+
+        if importlib.util.find_spec("extract_msg") is not None:
+            f, _ = extract_msg_convert(fp)
+        else:
+            log.warning(
+                "msgconvert backend is deprecated and will be removed "
+                "in a future release. Install the pure-Python Outlook "
+                "support with 'pip install mail-parser[outlook]'."
+            )
+            f, _ = msgconvert(fp)
+
         return cls.from_file(f, True)
 
     @classmethod

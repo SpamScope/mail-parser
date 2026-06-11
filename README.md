@@ -36,20 +36,44 @@ formats, making it versatile for diverse email ecosystems.
 **⚡ Production-Ready**: Trusted by security professionals and developers worldwide, with extensive
 test coverage and proven reliability in high-stakes environments.
 
-Additionally, mail-parser provides full support for parsing Outlook email formats (.msg). To enable
-this functionality on Debian-based systems, simply install the required system package:
-
-```bash
-apt-get install libemail-outlook-message-perl
-```
-
-For further details about the package, you can run:
-
-```bash
-apt-cache show libemail-outlook-message-perl
-```
-
 mail-parser is fully compatible with Python 3, ensuring modern performance and reliability.
+
+## Parsing Outlook `.msg` files
+
+mail-parser converts Outlook `.msg` files to standard `.eml` before parsing.
+Two conversion backends are supported:
+
+1. **`extract-msg` (recommended, pure Python).** No external tools required.
+   Install the optional extra:
+
+   ```bash
+   pip install mail-parser[outlook]
+   ```
+
+1. **`msgconvert` (deprecated, external Perl tool).** Requires the
+   `libemail-outlook-message-perl` system package:
+
+   ```bash
+   apt-get install libemail-outlook-message-perl   # Debian-based systems
+   apt-cache show libemail-outlook-message-perl     # package details
+   ```
+
+**Backend precedence:** when `extract-msg` is installed it is used first.
+Only when it is *not* available does mail-parser fall back to the `msgconvert`
+external tool, logging a deprecation warning. If neither backend is available,
+`parse_from_file_msg()` raises `MailParserOSError` telling you to install
+either path.
+
+> **⚠️ Deprecated:** the `msgconvert` external-tool backend is deprecated and
+> will be removed in a future release. Migrate to the pure-Python backend with
+> `pip install mail-parser[outlook]`.
+
+**💥 BREAKING CHANGE:** the default `.msg` conversion backend changed.
+When `extract-msg` is installed it is now preferred over `msgconvert`. The two
+converters produce different intermediate `.eml` output, so some parsed fields
+(header ordering, encoding edge cases, attachment naming) can differ from the
+previous `msgconvert`-only behavior. Downstream code asserting on exact
+`.msg`-derived output may need updating.
 
 # Apache 2 Open Source License
 
