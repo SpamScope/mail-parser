@@ -771,6 +771,43 @@ class TestUtilsEdgeCases(unittest.TestCase):
             result = get_addresses("not an email address at all")
         self.assertEqual(result, [("", "")])
 
+    def test_get_addresses_without_strict_parameter(self):
+        """
+        Regression for parsedmarc #808: get_addresses must not pass the
+        ``strict`` keyword unconditionally to email.utils.getaddresses.
+
+        The ``strict`` parameter was added to ``email.utils.getaddresses`` in
+        Python 3.13 (and backported only to later security patch releases of
+        3.9-3.12). mail-parser targets ``requires-python >=3.9,<3.15``, so on
+        an earlier patch release (e.g. CPython 3.11.3) the call raised::
+
+            TypeError: getaddresses() got an unexpected keyword argument 'strict'
+
+        Here we simulate a pre-3.13 ``getaddresses`` (no ``strict`` parameter)
+        and assert that get_addresses parses the address instead of crashing.
+        """
+
+        import email.utils
+
+        real_getaddresses = email.utils.getaddresses
+
+        def legacy_getaddresses(fieldvalues):
+            """Mimic the pre-3.13 signature that lacks ``strict``.
+
+            Patched in as a real function (not a Mock) so that the feature
+            detection in get_addresses observes a signature without
+            ``strict`` and does not attempt to pass the keyword.
+            """
+            return real_getaddresses(fieldvalues)
+
+        with patch(
+            "mailparser.utils.email.utils.getaddresses",
+            new=legacy_getaddresses,
+        ):
+            result = get_addresses("Plain Name <plain@example.com>")
+
+        self.assertEqual(result, [("Plain Name", "plain@example.com")])
+
     def test_parse_received_sendgrid_date(self):
         """parse_received extracts SendGrid non-standard date (utils.py:389-390)"""
         received = (
