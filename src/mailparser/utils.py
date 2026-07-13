@@ -134,7 +134,18 @@ def get_addresses(
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
 
-    parsed = email.utils.getaddresses([raw_header], strict=True)
+    # ``strict`` was only added to ``getaddresses()`` as part of the
+    # CVE-2023-27043 hardening, and was backported to patch releases
+    # >=3.10.15, >=3.11.10, >=3.12.6 rather than to every 3.10-3.12
+    # release. On an older patch release within one of those minor
+    # versions, passing ``strict=True`` raises ``TypeError: getaddresses()
+    # got an unexpected keyword argument 'strict'``.
+    # ``email.utils.supports_strict_parsing`` is the stdlib's own
+    # capability flag for this, so use it instead of a version check.
+    if getattr(email.utils, "supports_strict_parsing", False):
+        parsed = email.utils.getaddresses([raw_header], strict=True)
+    else:
+        parsed = email.utils.getaddresses([raw_header])
 
     # If every result from the strict parser has an empty address — while the
     # raw header is non-empty — fall back to regex extraction so that the

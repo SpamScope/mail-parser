@@ -647,6 +647,51 @@ class TestUtilsEdgeCases(unittest.TestCase):
         result = get_addresses("Plain Name <plain@example.com>")
         self.assertEqual(result, [("Plain Name", "plain@example.com")])
 
+    def test_get_addresses_omits_strict_kwarg_when_unsupported(self):
+        """
+        Regression for TypeError on Python patch releases that predate
+        the CVE-2023-27043 backport (< 3.10.15, < 3.11.10, < 3.12.6):
+        ``email.utils.getaddresses()`` doesn't accept ``strict=`` there,
+        and previously get_addresses() passed it unconditionally, raising
+
+            TypeError: getaddresses() got an unexpected keyword
+            argument 'strict'
+
+        on every affected interpreter. get_addresses() should now check
+        ``email.utils.supports_strict_parsing`` and omit ``strict=``
+        when it's not set, instead of assuming every supported Python
+        version has it.
+        """
+        with patch("mailparser.utils.email.utils.supports_strict_parsing", False):
+            with patch(
+                "mailparser.utils.email.utils.getaddresses",
+                return_value=[("Plain Name", "plain@example.com")],
+            ) as mock_getaddresses:
+                result = get_addresses("Plain Name <plain@example.com>")
+
+        mock_getaddresses.assert_called_once_with(["Plain Name <plain@example.com>"])
+        self.assertEqual(result, [("Plain Name", "plain@example.com")])
+
+    def test_get_addresses_uses_strict_kwarg_when_supported(self):
+        """
+        On interpreters that do support it (the common case in CI and
+        in production), get_addresses() should still pass
+        ``strict=True`` as before, so the CVE-2023-27043 hardening and
+        the existing regex fallback for non-compliant display names
+        keep working unchanged.
+        """
+        with patch("mailparser.utils.email.utils.supports_strict_parsing", True):
+            with patch(
+                "mailparser.utils.email.utils.getaddresses",
+                return_value=[("Plain Name", "plain@example.com")],
+            ) as mock_getaddresses:
+                result = get_addresses("Plain Name <plain@example.com>")
+
+        mock_getaddresses.assert_called_once_with(
+            ["Plain Name <plain@example.com>"], strict=True
+        )
+        self.assertEqual(result, [("Plain Name", "plain@example.com")])
+
     def test_mailparser_from_bytes_preserves_unicode_display_name(self):
         """
         Regression: Header objects from Message.get(name) must round-trip
