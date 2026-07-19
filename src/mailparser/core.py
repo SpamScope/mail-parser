@@ -407,9 +407,7 @@ class MailParser:
                         binary = False
                         log.debug(f"Filename {filename!r} part {i!r} is multipart")
                     elif transfer_encoding == "base64" or (
-                        transfer_encoding
-                        == "quoted-\
-                       printable"
+                        transfer_encoding == "quoted-printable"
                         and "application" in mail_content_type
                     ):
                         payload = p.get_payload(decode=False)

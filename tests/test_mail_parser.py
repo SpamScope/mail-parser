@@ -399,6 +399,31 @@ class TestMailParser(unittest.TestCase):
         result = len(mail.attachments)
         self.assertEqual(1, result)
 
+    def test_quoted_printable_application_attachment(self):
+        # A quoted-printable application/* attachment must be kept as binary
+        # (raw QP text), not decoded as UTF-8, which drops the non-UTF8 bytes.
+        import quopri
+
+        original = b"\xff\xfe\x00\x01PDFdata\x80\x81\x82\xc0\xc1"
+        qp = quopri.encodestring(original).decode("ascii")
+        raw = (
+            "From: a@b.com\r\nTo: c@d.com\r\nSubject: t\r\n"
+            "MIME-Version: 1.0\r\n"
+            'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+            "--B\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+            '--B\r\nContent-Type: application/octet-stream; name="f.bin"\r\n'
+            "Content-Transfer-Encoding: quoted-printable\r\n"
+            'Content-Disposition: attachment; filename="f.bin"\r\n\r\n'
+            + qp
+            + "\r\n--B--\r\n"
+        )
+        attachment = mailparser.parse_from_string(raw).attachments[0]
+        self.assertTrue(attachment["binary"])
+        self.assertEqual(attachment["content_transfer_encoding"], "quoted-printable")
+        self.assertEqual(
+            quopri.decodestring(attachment["payload"].encode("ascii")), original
+        )
+
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
 
