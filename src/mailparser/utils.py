@@ -54,25 +54,30 @@ from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingEr
 log = logging.getLogger(__name__)
 
 
+# The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
+# 3.13 (and backported only to later security patch releases of 3.9-3.12,
+# e.g. 3.11.10).  mail-parser supports ``requires-python >=3.9,<3.15``, so on
+# an earlier patch release the keyword is absent and passing it raises
+# ``TypeError: getaddresses() got an unexpected keyword argument 'strict'``
+# (parsedmarc #808).  The signature is fixed for the running interpreter, so
+# detect support once at import time.
+_GETADDRESSES_SUPPORTS_STRICT = (
+    "strict" in inspect.signature(email.utils.getaddresses).parameters
+)
+
+
 def _getaddresses(fieldvalues: list[str]) -> list[tuple[str, str]]:
-    """Call ``email.utils.getaddresses`` with strict parsing when available.
-
-    The ``strict`` keyword was added to ``email.utils.getaddresses`` in
-    Python 3.13 (and backported only to later security patch releases of
-    3.9-3.12, e.g. 3.11.10).  mail-parser supports ``requires-python
-    >=3.9,<3.15``, so on an earlier patch release the keyword is absent and
-    passing it raises ``TypeError: getaddresses() got an unexpected keyword
-    argument 'strict'``.  Feature-detect it before passing ``strict=True`` so
-    older interpreters keep working (parsedmarc #808).
     """
-    try:
-        supports_strict = (
-            "strict" in inspect.signature(email.utils.getaddresses).parameters
-        )
-    except (TypeError, ValueError):  # pragma: no cover - defensive
-        supports_strict = False
+    Call ``email.utils.getaddresses`` with strict parsing when available.
 
-    if supports_strict:
+    Args:
+        fieldvalues (list[str]): raw address header values to parse.
+
+    Returns:
+        list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples,
+            as returned by ``email.utils.getaddresses``.
+    """
+    if _GETADDRESSES_SUPPORTS_STRICT:
         return email.utils.getaddresses(fieldvalues, strict=True)
     return email.utils.getaddresses(fieldvalues)
 
