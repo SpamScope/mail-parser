@@ -17,6 +17,8 @@ limitations under the License.
 """
 
 import base64
+import email.utils
+import inspect
 import os
 import tempfile
 import unittest
@@ -24,6 +26,7 @@ from unittest.mock import Mock, patch
 
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 from mailparser.utils import (
+    _GETADDRESSES_SUPPORTS_STRICT,
     decode_header_part,
     find_between,
     get_addresses,
@@ -770,6 +773,50 @@ class TestUtilsEdgeCases(unittest.TestCase):
         ):
             result = get_addresses("not an email address at all")
         self.assertEqual(result, [("", "")])
+
+    def test_get_addresses_without_strict_parameter(self):
+        """
+        Regression for parsedmarc #808: get_addresses must not pass the
+        ``strict`` keyword unconditionally to email.utils.getaddresses.
+
+        The ``strict`` parameter was added to ``email.utils.getaddresses`` in
+        Python 3.13 (and backported only to later security patch releases of
+        3.9-3.12). mail-parser targets ``requires-python >=3.9,<3.15``, so on
+        an earlier patch release (e.g. CPython 3.11.3) the call raised::
+
+            TypeError: getaddresses() got an unexpected keyword argument 'strict'
+
+        Here we simulate a pre-3.13 interpreter: the feature-detection flag
+        is forced off and ``getaddresses`` is replaced by a function whose
+        signature lacks ``strict``, so passing the keyword would raise the
+        reported TypeError. The address must still be parsed.
+        """
+        real_getaddresses = email.utils.getaddresses
+
+        def legacy_getaddresses(fieldvalues):
+            """Mimic the pre-3.13 signature that lacks ``strict``."""
+            return real_getaddresses(fieldvalues)
+
+        with (
+            patch("mailparser.utils._GETADDRESSES_SUPPORTS_STRICT", False),
+            patch(
+                "mailparser.utils.email.utils.getaddresses",
+                new=legacy_getaddresses,
+            ),
+        ):
+            result = get_addresses("Plain Name <plain@example.com>")
+
+        self.assertEqual(result, [("Plain Name", "plain@example.com")])
+
+    def test_get_addresses_strict_detection_matches_interpreter(self):
+        """
+        The feature-detection flag must reflect the running interpreter, so
+        that ``strict=True`` is still used wherever it is available.
+        """
+        self.assertEqual(
+            _GETADDRESSES_SUPPORTS_STRICT,
+            "strict" in inspect.signature(email.utils.getaddresses).parameters,
+        )
 
     def test_parse_received_sendgrid_date(self):
         """parse_received extracts SendGrid non-standard date (utils.py:389-390)"""
