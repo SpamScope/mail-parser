@@ -25,6 +25,7 @@ import email.header
 import email.utils
 import functools
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -51,6 +52,35 @@ from mailparser.const import (
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 log = logging.getLogger(__name__)
+
+
+# The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
+# 3.13 (and backported only to later security patch releases of 3.9-3.12,
+# e.g. 3.11.10).  mail-parser supports ``requires-python >=3.9,<3.15``, so on
+# an earlier patch release the keyword is absent and passing it raises
+# ``TypeError: getaddresses() got an unexpected keyword argument 'strict'``
+# (parsedmarc #808).  The signature is fixed for the running interpreter, so
+# detect support once at import time.
+_GETADDRESSES_SUPPORTS_STRICT = (
+    "strict" in inspect.signature(email.utils.getaddresses).parameters
+)
+
+
+def _getaddresses(fieldvalues: list[str]) -> list[tuple[str, str]]:
+    """
+    Call ``email.utils.getaddresses`` with strict parsing when available.
+
+    Args:
+        fieldvalues (list[str]): raw address header values to parse.
+
+    Returns:
+        list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples,
+            as returned by ``email.utils.getaddresses``.
+    """
+    if _GETADDRESSES_SUPPORTS_STRICT:
+        return email.utils.getaddresses(fieldvalues, strict=True)
+    return email.utils.getaddresses(fieldvalues)
+
 
 # ---------------------------------------------------------------------------
 # RFC 5322 address parsing — fallback for non-compliant display names
@@ -134,7 +164,7 @@ def get_addresses(
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
 
-    parsed = email.utils.getaddresses([raw_header], strict=True)
+    parsed = _getaddresses([raw_header])
 
     # If every result from the strict parser has an empty address — while the
     # raw header is non-empty — fall back to regex extraction so that the
