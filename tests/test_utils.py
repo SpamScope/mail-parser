@@ -514,6 +514,67 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
             shutil.rmtree(temp_dir)
 
+    def test_write_sample_strips_untrusted_path_components(self):
+        """Attachment filenames cannot escape the requested output directory."""
+        from mailparser.utils import write_sample
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            write_sample(
+                binary=False,
+                payload="relative",
+                path=output_dir,
+                filename="../relative.txt",
+            )
+            write_sample(
+                binary=False,
+                payload="absolute",
+                path=output_dir,
+                filename=os.path.join(temp_dir, "absolute.txt"),
+            )
+            write_sample(
+                binary=False,
+                payload="windows",
+                path=output_dir,
+                filename=r"..\windows.txt",
+            )
+
+            self.assertEqual(
+                sorted(os.listdir(output_dir)),
+                ["absolute.txt", "relative.txt", "windows.txt"],
+            )
+            self.assertFalse(os.path.exists(os.path.join(temp_dir, "relative.txt")))
+            self.assertFalse(os.path.exists(os.path.join(temp_dir, "absolute.txt")))
+            self.assertFalse(os.path.exists(os.path.join(temp_dir, "windows.txt")))
+
+    def test_write_sample_rejects_invalid_filenames(self):
+        """Empty, dot-only, and NUL-containing filenames are rejected."""
+        from mailparser.utils import write_sample
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for filename in ("", ".", "..", "/", "bad\x00name"):
+                with self.subTest(filename=filename):
+                    with self.assertRaises(ValueError):
+                        write_sample(False, "payload", temp_dir, filename)
+
+    def test_write_sample_rejects_symlink_destination(self):
+        """A pre-existing symlink cannot redirect an attachment write."""
+        from mailparser.utils import write_sample
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            os.makedirs(output_dir)
+            target = os.path.join(temp_dir, "outside.txt")
+            link = os.path.join(output_dir, "attachment.txt")
+            try:
+                os.symlink(target, link)
+            except (NotImplementedError, OSError):
+                self.skipTest("symlinks are not supported")
+
+            with self.assertRaises(ValueError):
+                write_sample(False, "payload", output_dir, "attachment.txt")
+            self.assertFalse(os.path.exists(target))
+
     def test_random_string(self):
         """Test random_string function"""
         from mailparser.utils import random_string

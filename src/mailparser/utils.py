@@ -781,13 +781,44 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
 
 def write_attachments(attachments, base_path):  # pragma: no cover
+    used_filenames = set()
+
     for a in attachments:
+        filename = _safe_attachment_filename(a["filename"])
+        filename = _deduplicate_filename(filename, used_filenames)
         write_sample(
             binary=a["binary"],
             payload=a["payload"],
             path=base_path,
-            filename=a["filename"],
+            filename=filename,
         )
+
+
+def _safe_attachment_filename(filename):
+    """Return an attachment filename without any directory components."""
+    if not isinstance(filename, str) or "\x00" in filename:
+        raise ValueError("Invalid attachment filename")
+
+    # Treat both POSIX and Windows separators as directory separators on every OS.
+    filename = os.path.basename(filename.replace("\\", "/"))
+    if filename in ("", ".", ".."):
+        raise ValueError("Invalid attachment filename")
+
+    return filename
+
+
+def _deduplicate_filename(filename, used_filenames):
+    """Return a unique filename for one write_attachments() operation."""
+    root, extension = os.path.splitext(filename)
+    candidate = filename
+    suffix = 1
+
+    while os.path.normcase(candidate) in used_filenames:
+        candidate = f"{root}_{suffix}{extension}"
+        suffix += 1
+
+    used_filenames.add(os.path.normcase(candidate))
+    return candidate
 
 
 def write_sample(binary, payload, path, filename):  # pragma: no cover
@@ -801,9 +832,20 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
         filename (string): name of file
         hash_ (string): file hash
     """
-    if not os.path.exists(path):
-        os.makedirs(path)
-    sample = os.path.join(path, filename)
+    filename = _safe_attachment_filename(filename)
+    os.makedirs(path, exist_ok=True)
+
+    base_path = os.path.realpath(path)
+    sample = os.path.join(base_path, filename)
+    resolved_sample = os.path.realpath(sample)
+
+    try:
+        contained = os.path.commonpath((base_path, resolved_sample)) == base_path
+    except ValueError:
+        contained = False
+
+    if not contained or os.path.islink(sample):
+        raise ValueError("Attachment path escapes the output directory")
 
     if binary:
         with open(sample, "wb") as f:
