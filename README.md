@@ -194,7 +194,11 @@ The `attachments` property returns a list of dictionaries, each containing compr
 - `content_transfer_encoding` - Transfer encoding method (e.g., base64, quoted-printable)
 - `content-disposition` - Disposition type (attachment, inline, etc.)
 - `content-id` - Content identifier for referencing within HTML bodies
-- `filename` - Original filename of the attachment
+- `filename` - Original decoded filename from the email. This is untrusted input; never use it
+  directly to construct a filesystem path.
+- `safe_filename` - Filename with directory components removed, or `None` when the original has
+  no usable basename. When saving attachments, prefer `write_attachments()` for full validation
+  and collision handling.
 - `mail_content_type` - MIME content type
 - `payload` - Base64-encoded attachment data, ready for decoding or storage
 
@@ -376,6 +380,13 @@ Write all attachments to a specified directory:
 ```python
 mail.write_attachments(base_path)
 ```
+
+Attachment filenames are supplied by the email sender. The `filename` value in
+`mail.attachments` intentionally preserves that untrusted metadata for analysis and display. Do
+not pass it directly to `open()` or join it to a directory. The `safe_filename` field provides a
+sanitized basename when one exists, but applications saving files should prefer
+`write_attachments()`, which also validates containment, rejects symlink destinations, and
+deduplicates names within the attachment batch.
 
 # Usage from Command Line
 

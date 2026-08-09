@@ -111,6 +111,74 @@ class TestMailParser(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(random_path, i)))
         shutil.rmtree(random_path)
 
+    def test_write_attachments_sanitizes_and_deduplicates_filenames(self):
+        raw_mail = """MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=boundary
+
+--boundary
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename=../marker.txt
+
+Zmlyc3Q=
+--boundary
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename*=utf-8''..%2Fmarker.txt
+
+c2Vjb25k
+--boundary
+Content-Type: image/png
+Content-Transfer-Encoding: base64
+Content-ID: ../content-id.txt
+
+dGhpcmQ=
+--boundary--
+"""
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail = mailparser.parse_from_string(raw_mail)
+
+            self.assertEqual(
+                [attachment["filename"] for attachment in mail.attachments],
+                ["../marker.txt", "../marker.txt", "../content-id.txt"],
+            )
+            self.assertEqual(
+                [attachment["safe_filename"] for attachment in mail.attachments],
+                ["marker.txt", "marker.txt", "content-id.txt"],
+            )
+
+            mail.write_attachments(output_dir)
+
+            self.assertEqual(
+                sorted(os.listdir(output_dir)),
+                ["content-id.txt", "marker.txt", "marker_1.txt"],
+            )
+            with open(os.path.join(output_dir, "marker.txt"), "rb") as attachment:
+                self.assertEqual(attachment.read(), b"first")
+            with open(os.path.join(output_dir, "marker_1.txt"), "rb") as attachment:
+                self.assertEqual(attachment.read(), b"second")
+            with open(os.path.join(output_dir, "content-id.txt"), "rb") as attachment:
+                self.assertEqual(attachment.read(), b"third")
+
+            self.assertFalse(os.path.exists(os.path.join(temp_dir, "marker.txt")))
+            self.assertFalse(os.path.exists(os.path.join(temp_dir, "content-id.txt")))
+
+    def test_attachment_with_unusable_filename_remains_parseable(self):
+        raw_mail = """MIME-Version: 1.0
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename=/
+Content-Transfer-Encoding: base64
+
+Y29udGVudA==
+"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        self.assertEqual(mail.attachments[0]["filename"], "/")
+        self.assertIsNone(mail.attachments[0]["safe_filename"])
+
     def test_issue62(self):
         mail = mailparser.parse_from_file(mail_test_14)
         received_spf = mail.Received_SPF

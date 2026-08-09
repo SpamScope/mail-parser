@@ -26,6 +26,7 @@ import os
 
 from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
 from mailparser.utils import (
+    _safe_attachment_filename,
     convert_mail_date,
     decode_header_part,
     extract_msg_convert,
@@ -430,9 +431,15 @@ class MailParser:
                         )
                         log.debug(f"Filename {filename!r} part {i!r} is not binary")
 
+                    try:
+                        safe_filename = _safe_attachment_filename(filename)
+                    except ValueError:
+                        safe_filename = None
+
                     self._attachments.append(
                         {
                             "filename": filename,
+                            "safe_filename": safe_filename,
                             "payload": payload,
                             "binary": binary,
                             "mail_content_type": mail_content_type,
@@ -625,7 +632,12 @@ class MailParser:
     @property
     def attachments(self):
         """
-        Return a list of all attachments in the mail
+        Return a list of all attachments in the mail.
+
+        The ``filename`` value is decoded from untrusted email metadata and
+        must not be used directly to construct filesystem paths. Use
+        ``write_attachments()`` when saving attachments. ``safe_filename``
+        contains a sanitized basename, or ``None`` if no usable basename exists.
         """
         return self._attachments
 
