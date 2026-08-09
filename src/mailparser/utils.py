@@ -781,6 +781,7 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
 
 def write_attachments(attachments, base_path):  # pragma: no cover
+    """Write attachments with unique filenames for this attachment batch."""
     used_filenames = set()
 
     for a in attachments:
@@ -807,9 +808,29 @@ def _safe_attachment_filename(filename):
     return filename
 
 
+_COMPOUND_ATTACHMENT_EXTENSIONS = (
+    ".tar.bz2",
+    ".tar.gz",
+    ".tar.lz",
+    ".tar.lzma",
+    ".tar.xz",
+    ".tar.z",
+    ".tar.zst",
+)
+
+
+def _split_attachment_extension(filename):
+    """Split a filename while preserving common compressed-tar extensions."""
+    lower_filename = filename.lower()
+    for extension in _COMPOUND_ATTACHMENT_EXTENSIONS:
+        if lower_filename.endswith(extension) and len(filename) > len(extension):
+            return filename[: -len(extension)], filename[-len(extension) :]
+    return os.path.splitext(filename)
+
+
 def _deduplicate_filename(filename, used_filenames):
-    """Return a unique filename for one write_attachments() operation."""
-    root, extension = os.path.splitext(filename)
+    """Return a unique filename within one write_attachments() operation."""
+    root, extension = _split_attachment_extension(filename)
     candidate = filename
     suffix = 1
 

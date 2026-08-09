@@ -139,6 +139,16 @@ dGhpcmQ=
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = os.path.join(temp_dir, "attachments")
             mail = mailparser.parse_from_string(raw_mail)
+
+            self.assertEqual(
+                [attachment["filename"] for attachment in mail.attachments],
+                ["../marker.txt", "../marker.txt", "../content-id.txt"],
+            )
+            self.assertEqual(
+                [attachment["safe_filename"] for attachment in mail.attachments],
+                ["marker.txt", "marker.txt", "content-id.txt"],
+            )
+
             mail.write_attachments(output_dir)
 
             self.assertEqual(
@@ -154,6 +164,20 @@ dGhpcmQ=
 
             self.assertFalse(os.path.exists(os.path.join(temp_dir, "marker.txt")))
             self.assertFalse(os.path.exists(os.path.join(temp_dir, "content-id.txt")))
+
+    def test_attachment_with_unusable_filename_remains_parseable(self):
+        raw_mail = """MIME-Version: 1.0
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename=/
+Content-Transfer-Encoding: base64
+
+Y29udGVudA==
+"""
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        self.assertEqual(mail.attachments[0]["filename"], "/")
+        self.assertIsNone(mail.attachments[0]["safe_filename"])
 
     def test_issue62(self):
         mail = mailparser.parse_from_file(mail_test_14)

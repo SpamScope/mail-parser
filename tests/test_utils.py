@@ -575,6 +575,36 @@ class TestUtilsEdgeCases(unittest.TestCase):
                 write_sample(False, "payload", output_dir, "attachment.txt")
             self.assertFalse(os.path.exists(target))
 
+    def test_deduplicate_attachment_filenames(self):
+        """Deduplication preserves extensions and handles existing suffixes."""
+        from mailparser.utils import _deduplicate_filename
+
+        used_filenames = set()
+        filenames = (
+            "report.tar.gz",
+            "report.tar.gz",
+            "report_1.tar.gz",
+            "report.tar.gz",
+            ".env",
+            ".env",
+            "README",
+            "README",
+        )
+
+        self.assertEqual(
+            [_deduplicate_filename(filename, used_filenames) for filename in filenames],
+            [
+                "report.tar.gz",
+                "report_1.tar.gz",
+                "report_1_1.tar.gz",
+                "report_2.tar.gz",
+                ".env",
+                ".env_1",
+                "README",
+                "README_1",
+            ],
+        )
+
     def test_random_string(self):
         """Test random_string function"""
         from mailparser.utils import random_string
