@@ -100,11 +100,80 @@ def _getaddresses(fieldvalues: list[str]) -> list[tuple[str, str]]:
 # purpose of the tool — analysts *need* to see those values.  We therefore
 # bypass strict compliance with a regex fallback whenever strict parsing yields
 # an empty address, always surfacing the value that is actually in the header.
-_ADDR_FALLBACK_RE = re.compile(
-    r'"([^"]*?)"\s*<([^>]+)>'  # "Quoted Name" <email@addr>
-    r"|([^<,]*?)\s*<([^>]+)>"  # Any Name <email@addr>  (incl. email-as-name)
-    r"|([^\s,<>]+@[^\s,<>]+)"  # bare email@addr
-)
+# Linear-time building blocks for the fallback below.  The previous
+# implementation used a single combined pattern whose ``[^<,]*?`` sub-pattern
+# overlapped an adjacent ``\s*`` quantifier (a space matched both).  Driven by
+# ``finditer`` over a padded header this backtracked quadratically ('<'
+# padding) to cubically (whitespace padding), turning an ordinary parse into a
+# denial of service (CWE-1333).  Each pattern here has a single, non-nested
+# quantifier over a negated character class, so every character is examined a
+# bounded number of times and matching stays linear in the header length.
+_ANGLE_ADDR_RE = re.compile(r"<([^<>\s]+)>")  # <email@addr>
+_BARE_ADDR_RE = re.compile(r"[^\s,<>]+@[^\s,<>]+")  # bare email@addr
+
+
+def _split_address_list(raw: str) -> list[str]:
+    """
+    Split a raw address header into its comma-separated items in linear time,
+    ignoring commas inside a double-quoted display name.
+
+    RFC 5322 address lists are comma-separated, but a quoted display name may
+    itself contain a comma (``"Last, First" <a@b.com>``).  A single pass tracks
+    quote state so those commas do not split the item.
+
+    Args:
+        raw (str): raw address-header value.
+
+    Returns:
+        list[str]: individual address items, in header order.
+    """
+    items: list[str] = []
+    buf: list[str] = []
+    in_quotes = False
+    for ch in raw:
+        if ch == '"':
+            in_quotes = not in_quotes
+            buf.append(ch)
+        elif ch == "," and not in_quotes:
+            items.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    items.append("".join(buf))
+    return items
+
+
+def _fallback_addresses(raw: str) -> list[tuple[str, str]]:
+    """
+    Recover ``(display_name, email_addr)`` pairs from an address header that
+    the strict RFC 5322 parser rejected, using a linear-time scan.
+
+    For each comma-separated item the display name is derived in Python from
+    the text preceding the angle-bracket address; items without angle brackets
+    fall back to a bare-email match.  This replaces the previous single
+    backtracking regex — vulnerable to polynomial ReDoS on padded headers
+    (CWE-1333) — while preserving its output on the RFC-non-compliant but
+    real-world-common shapes mail-parser must surface (e.g. an e-mail address
+    used as the display name).
+
+    Args:
+        raw (str): raw address-header value (already decoded to ``str``).
+
+    Returns:
+        list[tuple[str, str]]: recovered ``(display_name, email_addr)`` pairs;
+            ``display_name`` is an empty string when absent.
+    """
+    results: list[tuple[str, str]] = []
+    for item in _split_address_list(raw):
+        angle = _ANGLE_ADDR_RE.search(item)
+        if angle:
+            name = item[: angle.start()].strip().strip('"').strip()
+            results.append((name, angle.group(1)))
+        else:
+            bare = _BARE_ADDR_RE.search(item)
+            if bare:
+                results.append(("", bare.group(0)))
+    return results
 
 
 def get_addresses(
@@ -170,14 +239,7 @@ def get_addresses(
     # raw header is non-empty — fall back to regex extraction so that the
     # actual address values are not silently lost.
     if raw_header.strip() and all(not addr for _, addr in parsed):
-        results = []
-        for m in _ADDR_FALLBACK_RE.finditer(raw_header):
-            if m.group(2):  # "Quoted Name" <email>
-                results.append((m.group(1).strip(), m.group(2).strip()))
-            elif m.group(4):  # Any Name <email>  (incl. email-as-display-name)
-                results.append((m.group(3).strip(), m.group(4).strip()))
-            elif m.group(5):  # bare email  # pragma: no branch
-                results.append(("", m.group(5).strip()))
+        results = _fallback_addresses(raw_header)
         if results:
             log.debug(
                 "Strict address parsing yielded empty results for %r; "

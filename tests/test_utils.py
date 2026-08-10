@@ -21,6 +21,7 @@ import email.utils
 import inspect
 import os
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -864,6 +865,50 @@ class TestUtilsEdgeCases(unittest.TestCase):
         ):
             result = get_addresses("not an email address at all")
         self.assertEqual(result, [("", "")])
+
+    def test_get_addresses_fallback_quoted_name_with_comma(self):
+        """Fallback keeps a comma that lives inside a quoted display name."""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses('"Last, First" <user@example.com>')
+        self.assertEqual(result, [("Last, First", "user@example.com")])
+
+    def test_get_addresses_fallback_email_as_name_space_padding_is_linear(self):
+        """
+        Regression for the fallback ReDoS (CWE-1333).
+
+        ``From: alice@example.com <bob@example.com>`` forces the regex
+        fallback (the display name is an unquoted e-mail address, which the
+        strict parser rejects). The old combined pattern backtracked
+        cubically on trailing whitespace, so a few thousand padding spaces
+        took seconds and a real-world header (~100 KB) took hours. The
+        linear scan must recover the address and finish effectively
+        instantly; the generous bound keeps the assertion robust on slow CI
+        while still failing hard on any reintroduced super-linear blowup
+        (2000 spaces measured at ~3.5 s before the fix, <0.01 s after).
+        """
+        header = "alice@example.com <bob@example.com>" + " " * 2000
+        start = time.perf_counter()
+        result = get_addresses(header)
+        elapsed = time.perf_counter() - start
+        self.assertEqual(result, [("alice@example.com", "bob@example.com")])
+        self.assertLess(elapsed, 2.0)
+
+    def test_get_addresses_fallback_angle_padding_is_linear(self):
+        """
+        Regression for the fallback ReDoS (CWE-1333), quadratic variant.
+
+        A run of ``<`` characters yields no parseable address, forcing the
+        fallback. The old pattern backtracked quadratically over the
+        padding; the linear scan must return no addresses (falling through
+        to the strict parser's result) without a super-linear slowdown.
+        """
+        start = time.perf_counter()
+        result = get_addresses("<" * 40000)
+        elapsed = time.perf_counter() - start
+        self.assertTrue(all(not addr for _, addr in result))
+        self.assertLess(elapsed, 2.0)
 
     def test_get_addresses_without_strict_parameter(self):
         """
