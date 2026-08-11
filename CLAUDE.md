@@ -95,3 +95,8 @@ After every change:
 1. Update README.md if the change affects usage, API, or setup.
 1. Stage changes and run pre-commit; fix all reported issues before proceeding.
 1. Run full test suite; fix all failures before reporting done.
+1. Run a security review of the change with the `security-reviewer` sub-agent
+   (`.claude/agents/security-reviewer.md`). All parsed input is
+   attacker-controlled, so any change to parsing, regexes, subprocess, temp
+   files, or attachment handling must be reviewed. Reproduce and fix every
+   High/Medium finding (with a regression test) before reporting done.
