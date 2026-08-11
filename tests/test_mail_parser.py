@@ -29,7 +29,7 @@ from unittest.mock import patch
 import pytest
 
 import mailparser
-from mailparser.exceptions import MailParserOSError
+from mailparser.exceptions import MailParserOSError, MailParserRecursionError
 from mailparser.utils import (
     convert_mail_date,
     extract_msg_convert,
@@ -1485,3 +1485,28 @@ def test_outlook_backend_parity():
     extract_names = sorted(a["filename"] for a in parsed_extract.attachments)
     msgconv_names = sorted(a["filename"] for a in parsed_msgconv.attachments)
     assert extract_names == msgconv_names
+
+
+def test_deeply_nested_multipart_raises_controlled_error():
+    """
+    Regression: a deeply nested multipart 'bomb' must raise the library's own
+    MailParserRecursionError (a MailParserError), not a bare RecursionError.
+
+    Python's email parser recurses per nesting level; without the guard an
+    attacker-supplied ~55 KB message would crash the parsing worker with an
+    exception outside the documented MailParser* hierarchy (crash-DoS,
+    CWE-674).
+    """
+    raw = (
+        "From: a@b.c\r\n"
+        + "".join(
+            f"Content-Type: multipart/mixed; boundary=B{i}\r\n\r\n--B{i}\r\n"
+            for i in range(3000)
+        )
+        + "text\r\n"
+    )
+    with pytest.raises(MailParserRecursionError):
+        mailparser.parse_from_string(raw)
+    # And the bytes entry point is guarded identically.
+    with pytest.raises(MailParserRecursionError):
+        mailparser.parse_from_bytes(raw.encode())
