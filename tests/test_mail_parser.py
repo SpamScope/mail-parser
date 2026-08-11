@@ -532,7 +532,7 @@ Y29udGVudA==
         self.assertIsInstance(m.mail_json, str)
 
     @patch("mailparser.core.importlib.util.find_spec", return_value=None)
-    @patch("mailparser.core.os.remove")
+    @patch("mailparser.core._safe_remove")
     @patch("mailparser.core.msgconvert")
     def test_parse_from_file_msg(self, mock_msgconvert, mock_remove, mock_find_spec):
         """
@@ -1415,7 +1415,7 @@ def test_from_file_msg_prefers_extract_msg(mocker):
         return_value=(mail_test_2, "info"),
     )
     msgconv = mocker.patch("mailparser.core.msgconvert")
-    remove = mocker.patch("mailparser.core.os.remove")
+    remove = mocker.patch("mailparser.core._safe_remove")
 
     mailparser.parse_from_file_msg(mail_outlook_1)
 
@@ -1431,7 +1431,7 @@ def test_from_file_msg_fallback_warns(mocker, caplog):
         "mailparser.core.msgconvert",
         return_value=(mail_test_2, None),
     )
-    mocker.patch("mailparser.core.os.remove")
+    mocker.patch("mailparser.core._safe_remove")
 
     with caplog.at_level(logging.WARNING, logger="mailparser.core"):
         mailparser.parse_from_file_msg(mail_outlook_1)

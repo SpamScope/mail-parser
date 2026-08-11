@@ -20,6 +20,7 @@ import base64
 import email.utils
 import inspect
 import os
+import subprocess
 import tempfile
 import time
 import unittest
@@ -111,6 +112,49 @@ class TestUtils(unittest.TestCase):
         finally:
             if os.path.exists(tmp_name):
                 os.unlink(tmp_name)
+
+    def test_msgconvert_timeout(self):
+        """msgconvert aborts and cleans up if the helper exceeds the timeout."""
+        with tempfile.NamedTemporaryFile(suffix=".msg", delete=False) as tmp:
+            tmp_name = tmp.name
+
+        mock_process = Mock()
+        # First communicate() (with timeout) raises; the second, after kill(),
+        # reaps the process and returns normally.
+        mock_process.communicate.side_effect = [
+            subprocess.TimeoutExpired(cmd="msgconvert", timeout=1),
+            (b"", b""),
+        ]
+
+        try:
+            with patch("subprocess.Popen", return_value=mock_process):
+                with self.assertRaises(MailParserOSError) as context:
+                    msgconvert(tmp_name)
+            self.assertIn("did not finish", str(context.exception))
+            mock_process.kill.assert_called_once()
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
+
+    def test_parse_received_space_padding_is_linear(self):
+        """
+        Regression for the Received-header ReDoS (CWE-1333).
+
+        A long run of spaces that is not followed by a clause keyword must not
+        drive ``_CLAUSE_SPLITTER`` into quadratic backtracking. Before the fix
+        (whitespace collapsed before the split) 20 000 padding spaces took
+        several seconds and a header-size-limit-sized run took minutes; after
+        the fix parsing is linear and effectively instant. The generous bound
+        stays robust on slow CI while still failing hard on any reintroduced
+        super-linear blowup.
+        """
+        received = "from host " + " " * 20000 + "nope; Mon, 10 Aug 2026 09:00:00 +0000"
+        start = time.perf_counter()
+        result = parse_received(received)
+        elapsed = time.perf_counter() - start
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["date"], "Mon, 10 Aug 2026 09:00:00 +0000")
+        self.assertLess(elapsed, 2.0)
 
     def test_parse_received_no_matches(self):
         """Test parse_received with header that matches nothing"""

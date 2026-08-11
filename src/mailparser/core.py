@@ -22,11 +22,11 @@ import importlib.util
 import ipaddress
 import json
 import logging
-import os
 
 from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
 from mailparser.utils import (
     _safe_attachment_filename,
+    _safe_remove,
     convert_mail_date,
     decode_header_part,
     extract_msg_convert,
@@ -174,12 +174,15 @@ class MailParser:
         """
         log.debug(f"Parsing email from file {fp!r}")
 
-        with ported_open(fp) as f:
-            message = email.message_from_file(f)
-
-        if is_outlook:
-            log.debug(f"Removing temp converted Outlook email {fp!r}")
-            os.remove(fp)
+        try:
+            with ported_open(fp) as f:
+                message = email.message_from_file(f)
+        finally:
+            # ``fp`` is a temp file produced by the Outlook conversion; remove
+            # it even if parsing raises, so failures do not leak temp files.
+            if is_outlook:
+                log.debug(f"Removing temp converted Outlook email {fp!r}")
+                _safe_remove(fp)
 
         return cls(message)
 

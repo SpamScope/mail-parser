@@ -45,6 +45,7 @@ from mailparser.const import (
     _DATE_RE,
     _ENVELOPE_FROM_RE,
     _SENDGRID_DATE_RE,
+    _WS_RUN_RE,
     ADDRESSES_HEADERS,
     JUNK_PATTERN,
     OTHERS_PARTS,
@@ -52,6 +53,10 @@ from mailparser.const import (
 from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
 
 log = logging.getLogger(__name__)
+
+# Upper bound (seconds) for the external ``msgconvert`` conversion.  Without it
+# a hung or malicious helper would block the calling worker indefinitely.
+_MSGCONVERT_TIMEOUT = 60
 
 
 # The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
@@ -410,6 +415,23 @@ def fingerprints(data):
     return hashes(md5, sha1, sha256, sha512)
 
 
+def _safe_remove(path):
+    """
+    Remove a file, ignoring the error if it is already gone.
+
+    Used to clean up a temporary conversion file on failure paths so a
+    malformed or unconvertible Outlook message cannot slowly fill the
+    filesystem with orphaned temp files.
+
+    Args:
+        path (str): filesystem path to remove
+    """
+    try:
+        os.remove(path)
+    except OSError:
+        log.debug("Could not remove temp file %r", path)
+
+
 def _new_outlook_tempfile():
     """
     Create an empty temporary file to hold a converted Outlook email.
@@ -498,6 +520,7 @@ def msgconvert(email):
         )
 
     except OSError as e:
+        _safe_remove(temp)
         message = (
             "Cannot convert Outlook .msg: no conversion backend "
             "available. Install pure-Python support with "
@@ -509,8 +532,19 @@ def msgconvert(email):
         raise MailParserOSError(message)
 
     else:
-        stdoutdata, _ = out.communicate()
-        return temp, stdoutdata.decode("utf-8").strip()
+        try:
+            stdoutdata, _ = out.communicate(timeout=_MSGCONVERT_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            out.kill()
+            out.communicate()
+            _safe_remove(temp)
+            message = (
+                f"msgconvert did not finish within {_MSGCONVERT_TIMEOUT}s; "
+                "aborting Outlook conversion"
+            )
+            log.error(message)
+            raise MailParserOSError(message)
+        return temp, stdoutdata.decode("utf-8", errors="replace").strip()
 
 
 def parse_received(received):
@@ -550,6 +584,12 @@ def parse_received(received):
             header_body = received
 
     # --- Step 2: Tokenize on clause keywords ---
+    # Collapse whitespace runs first so ``_CLAUSE_SPLITTER`` stays linear: a
+    # header padded with a long run of spaces that is not followed by a clause
+    # keyword otherwise backtracks quadratically — a denial of service on
+    # attacker-supplied Received headers (CWE-1333).  The date has already been
+    # extracted from the raw header above, so collapsing here does not affect it.
+    header_body = _WS_RUN_RE.sub(" ", header_body)
     # _CLAUSE_SPLITTER.split gives: [preamble, kw1, val1, kw2, val2, ...]
     parts = _CLAUSE_SPLITTER.split(header_body)
 
