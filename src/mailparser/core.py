@@ -22,11 +22,12 @@ import importlib.util
 import ipaddress
 import json
 import logging
-import os
 
 from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
+from mailparser.exceptions import MailParserRecursionError
 from mailparser.utils import (
     _safe_attachment_filename,
+    _safe_remove,
     convert_mail_date,
     decode_header_part,
     extract_msg_convert,
@@ -137,6 +138,37 @@ class MailParser:
             return str()
 
     @classmethod
+    def _parse_guarded(cls, build_message):
+        """
+        Build the email message and parse it, converting a ``RecursionError``
+        into ``MailParserRecursionError``.
+
+        Python's ``email`` parser recurses once per ``multipart/*`` nesting
+        level, so a crafted deeply nested message would otherwise raise a bare
+        ``RecursionError`` that escapes the ``MailParser*`` hierarchy and can
+        crash the calling worker (an availability DoS on attacker-supplied
+        input).
+
+        Args:
+            build_message (callable): zero-argument callable returning the
+                ``email.message.Message`` to parse.
+
+        Returns:
+            Instance of MailParser.
+
+        Raises:
+            MailParserRecursionError: if the message is nested too deeply.
+        """
+        try:
+            message = build_message()
+            return cls(message)
+        except RecursionError as exc:
+            raise MailParserRecursionError(
+                "Message nesting too deep to parse "
+                "(possible malicious multipart structure)"
+            ) from exc
+
+    @classmethod
     def from_file_obj(cls, fp):
         """
         Init a new object from a file-like object.
@@ -174,14 +206,19 @@ class MailParser:
         """
         log.debug(f"Parsing email from file {fp!r}")
 
-        with ported_open(fp) as f:
-            message = email.message_from_file(f)
+        def _build():
+            try:
+                with ported_open(fp) as f:
+                    return email.message_from_file(f)
+            finally:
+                # ``fp`` is a temp file produced by the Outlook conversion;
+                # remove it even if parsing raises, so failures do not leak
+                # temp files.
+                if is_outlook:
+                    log.debug(f"Removing temp converted Outlook email {fp!r}")
+                    _safe_remove(fp)
 
-        if is_outlook:
-            log.debug(f"Removing temp converted Outlook email {fp!r}")
-            os.remove(fp)
-
-        return cls(message)
+        return cls._parse_guarded(_build)
 
     @classmethod
     def from_file_msg(cls, fp):
@@ -230,8 +267,7 @@ class MailParser:
         """
 
         log.debug("Parsing email from string")
-        message = email.message_from_string(s)
-        return cls(message)
+        return cls._parse_guarded(lambda: email.message_from_string(s))
 
     @classmethod
     def from_bytes(cls, bt):
@@ -245,8 +281,7 @@ class MailParser:
             Instance of MailParser
         """
         log.debug("Parsing email from bytes")
-        message = email.message_from_bytes(bt)
-        return cls(message)
+        return cls._parse_guarded(lambda: email.message_from_bytes(bt))
 
     def _reset(self):
         """

@@ -66,6 +66,15 @@ _CLAUSE_SPLITTER = re.compile(
     re.I,
 )
 
+# Collapses any run of whitespace to a single space.  Applied to a received
+# header before ``_CLAUSE_SPLITTER`` so the splitter's ``\s+`` sub-patterns
+# only ever match a single character.  Without it a long run of spaces with no
+# following clause keyword drives the split into quadratic backtracking — an
+# ordinary parse of an attacker-supplied Received header becomes a denial of
+# service (CWE-1333).  Note the ``[\t\n]``-only normalization elsewhere does
+# not collapse spaces, so this guard must live at the point of use.
+_WS_RUN_RE = re.compile(r"\s+")
+
 # Extracts envelope-from email: envelope-from <addr>
 _ENVELOPE_FROM_RE = re.compile(r"<([^>]+)>")
 
