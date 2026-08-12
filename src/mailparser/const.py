@@ -25,16 +25,21 @@ REGXIP = re.compile(
 )
 
 # IPv6 pattern - matches standard and common compressed forms per RFC 5952
+# Alternation order matters: Python's ``re`` takes the first alternative
+# that matches, not the longest.  The "trailing ::" branch therefore has to
+# come *after* every branch that continues past the ``::`` — with it listed
+# early, ``2a00:1450:4864:20::32`` matched only as ``2a00:1450:4864:20::``,
+# reporting a different, valid, routable address as the sender.
 REGXIP6 = re.compile(
     r"(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}"  # full form
-    r"|(?:[0-9a-fA-F]{1,4}:){1,7}:"  # trailing ::
-    r"|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}"  # :: with 1 group after
-    r"|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}"
-    r"|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}"
-    r"|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}"
+    r"|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}"  # 6 groups after ::
     r"|(?:[0-9a-fA-F]{1,4}:){1,2}(?::[0-9a-fA-F]{1,4}){1,5}"
-    r"|[0-9a-fA-F]{1,4}:(?::[0-9a-fA-F]{1,4}){1,6}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,3}(?::[0-9a-fA-F]{1,4}){1,4}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,4}(?::[0-9a-fA-F]{1,4}){1,3}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,5}(?::[0-9a-fA-F]{1,4}){1,2}"
+    r"|(?:[0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}"  # 1 group after ::
     r"|:(?::[0-9a-fA-F]{1,4}){1,7}"  # ::x:x...
+    r"|(?:[0-9a-fA-F]{1,4}:){1,7}:"  # trailing ::
     r"|::)"  # just ::
 )
 
@@ -75,6 +80,35 @@ _CLAUSE_SPLITTER = re.compile(
 # not collapse spaces, so this guard must live at the point of use.
 _WS_RUN_RE = re.compile(r"\s+")
 
+# Matches the HELO/EHLO name an MTA records inside the ``from`` clause,
+# in the two shapes seen in the wild:
+#   from evil.example ([203.0.113.9]:45321 helo=[8.8.8.8]) by ...   (Exim)
+#   from [203.0.113.9] (account x@y HELO 8.8.8.8) by ...      (CommuniGate)
+# The HELO argument is chosen by the sender and may be an RFC 5321 address
+# literal, so it must be removed before scanning the clause for the sender
+# IP — otherwise the sender simply appends the IP they want reported.
+# Used to locate the span, never to delete it: the trailing \S+ would
+# otherwise swallow whatever follows, and a sender whose rDNS or HELO is
+# literally ``helo`` can place that word right before the MTA-written IP.
+# Two guards keep the span off MTA-written text.  The lookbehind: the
+# clause value *starts* with the HELO name, so at offset 0 the word is the
+# name itself, not a label introducing one.  The ``(?![\[(])`` on the
+# space-separated form: an MTA writes its own address inside brackets or
+# parentheses, so a following group is never part of the HELO argument.
+# Exim's ``helo=[8.8.8.8]`` is a genuine bracketed HELO argument and keeps
+# no such guard.
+_HELO_RE = re.compile(
+    r"(?<=[(\s])e?helo\s*=\S*"  # Exim "helo=value": after "(" or space
+    r"|(?<=\s)e?helo\s+\S+",  # space form: only after whitespace
+    re.I,
+)
+
+# RFC 5321 §4.1.3 tags an IPv6 literal as ``[IPv6:2a00:...]``.  REGXIP6
+# happily starts matching at the ``6`` of the tag and yields
+# ``6:2a00:1450:4864:20::`` — a different, valid, routable address that an
+# analyst would then act on.  Blank the tag before scanning.
+_IPV6_TAG_RE = re.compile(r"IPv6:", re.I)
+
 # Extracts envelope-from email: envelope-from <addr>
 _ENVELOPE_FROM_RE = re.compile(r"<([^>]+)>")
 
@@ -106,5 +140,28 @@ OTHERS_PARTS = set(
         "user-agent",
         "x-mailer",
         "x-original-to",
+    ]
+)
+
+# Subset of OTHERS_PARTS that MailParser computes itself: each maps to a
+# property, not to a header read off the wire.  ``_make_mail()`` resolves
+# only these names through attribute access; every other key it handles is
+# a header name chosen by the sender and goes through
+# ``MailParser._header_value()``, which never touches an attribute.  Keep
+# this set in sync with OTHERS_PARTS and with the properties in core.py.
+#
+# These names shadow a header of the same name in ``mail`` / ``mail_json``:
+# a message carrying a literal ``Body:`` header reports the computed body
+# there, not the header value.  The wire value is never lost — it is in
+# ``headers`` / ``headers_json`` under its own name — but a consumer
+# reading only ``mail_json`` will not see it.
+COMPUTED_PARTS = set(
+    [
+        "attachments",
+        "body",
+        "date",
+        "received",
+        "timezone",
+        "to_domains",
     ]
 )

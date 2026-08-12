@@ -179,9 +179,16 @@ pipelines.
 - `body` - Complete message body
 - `text_html` - HTML body parts (list)
 - `text_plain` - Plain text body parts (list)
-- `headers` - All headers as a structured object
+- `headers` - All headers as a structured object. Keys are the header names exactly as they
+  appear in the message, and every header is reported — including names that match a
+  `MailParser` method or property (`Parse`, `Message`, `Headers_json`) and names containing
+  underscores (`X_Spam_Flag`). Such names are always resolved as headers, never as attributes,
+  and are never rewritten.
 - `attachments` - Complete attachment metadata and payloads
-- `get_server_ipaddress()` - Reliable sender IP extraction with trust levels
+- `get_server_ipaddress()` - Reliable sender IP extraction with trust levels. Only the `from`
+  clause of the first trusted `Received` header is searched, with the sender-supplied HELO name
+  removed, and the result is `None` when that hop names no public IP. Attribution never falls
+  back to older `Received` headers, which the sender is free to forge.
 - `to_domains` - Extracted recipient domains for analysis
 - `timezone` - Detected timezone information
 - `defects` - RFC compliance issues for security analysis
@@ -208,6 +215,12 @@ access the `X-MSMail-Priority` header:
 ```python
 mail.X_MSMail_Priority
 ```
+
+This underscore-for-hyphen convenience, and the `_json` / `_raw` suffixes, apply only to
+attribute access written by you. Names read out of a message — the keys of `mail` and `headers` —
+are looked up literally, so a header genuinely named `X_Spam_Flag` or `Subject_json` keeps its own
+name and its own value. Attribute names beginning with an underscore are not headers and raise
+`AttributeError`.
 
 The `received` header is intelligently parsed into individual hops, revealing the complete email
 routing path. Each hop contains structured fields:

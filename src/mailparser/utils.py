@@ -547,6 +547,104 @@ def msgconvert(email):
         return temp, stdoutdata.decode("utf-8", errors="replace").strip()
 
 
+def get_from_clause(received):
+    """
+    Return the value of the ``from`` clause of a Received header.
+
+    The sender address lives in the ``from`` clause; the ``by`` clause
+    names the *receiving* server and must never be mistaken for it.
+    Clause boundaries are located with the anchored RFC 5321 tokenizer
+    ``_CLAUSE_SPLITTER`` rather than a substring search, because a plain
+    ``received.find("by")`` also matches inside a hostname — ``derby``,
+    ``nearby`` — and the hostname comes from the sender's HELO. A false
+    match truncates the clause, extraction fails on the genuine hop, and
+    the caller falls through to older attacker-forged Received headers
+    (CWE-345). A word-boundary ``\\bby\\b`` is not enough either: ``.``
+    is a non-word character, so it still matches in ``host.by.example``.
+
+    Args:
+        received (string): raw Received header value
+
+    Returns:
+        string with the ``from`` clause value, or an empty string when the
+        header has no ``from`` clause
+    """
+    # Collapse whitespace runs before splitting, so the splitter stays
+    # linear — see the note on _WS_RUN_RE in const.py.
+    header = _WS_RUN_RE.sub(" ", received)
+
+    # split() yields [preamble, keyword, value, keyword, value, ...]
+    parts = _CLAUSE_SPLITTER.split(header)
+    keywords = [(i, parts[i].lower()) for i in range(1, len(parts) - 1, 2)]
+
+    start = next((i for i, kw in keywords if kw == "from"), None)
+    if start is None:
+        # No ``from`` clause: attribution fails closed.  Returning the whole
+        # header instead would surface an IP taken from the ``by``, ``for``,
+        # ``with`` or ``id`` clause as the sender's — and the ``for`` clause
+        # holds the envelope recipient, which the sender picks at RCPT TO
+        # (``victim+8.8.8.8@example.com``).
+        return str()
+
+    # The clause ends at the next keyword, full stop.  Extending it to a
+    # later ``by`` to survive a multi-word HELO drags the ``by``, ``for``
+    # and ``envelope-from`` values into the result, and the last two are
+    # sender-chosen: a quoted local part supplies the whitespace, so
+    # ``MAIL FROM:<"x 8.8.8.8 by q"@evil.example>`` puts an attacker IP
+    # into the sender-attribution scan (CWE-345).  A multi-word HELO does
+    # truncate this clause, but that only costs the candidates — the caller
+    # then fails closed rather than reporting an attacker-chosen address.
+    return parts[start + 1].strip()
+
+
+def group_spans(text):
+    """
+    Return the spans of ``text`` enclosed in a ``(`` or ``[`` group.
+
+    A single left-to-right pass, so the caller can classify many positions
+    without re-scanning the prefix for each one. Nesting is tracked with a
+    depth counter and an unclosed group runs to the end of the string.
+
+    Args:
+        text (string): text to scan
+
+    Returns:
+        list of (start, end) tuples, in order, excluding the delimiters
+    """
+    spans = []
+    depth = 0
+    start = 0
+
+    for i, char in enumerate(text):
+        if char in "([":
+            if depth == 0:
+                start = i + 1
+            depth += 1
+        elif char in ")]" and depth:
+            depth -= 1
+            if depth == 0:
+                spans.append((start, i))
+
+    if depth:
+        spans.append((start, len(text)))
+
+    return spans
+
+
+def in_spans(position, spans):
+    """
+    Return True when ``position`` falls inside one of ``spans``.
+
+    Args:
+        position (int): offset to test
+        spans (list): (start, end) tuples
+
+    Returns:
+        bool
+    """
+    return any(start <= position < end for start, end in spans)
+
+
 def parse_received(received):
     """
     Parse a single received header by tokenizing on RFC 5321 §4.4 keywords.
@@ -803,6 +901,30 @@ def get_to_domains(to=[], reply_to=[]):
     return list(domains)
 
 
+def decode_headers(headers):
+    """
+    Decode the raw values of a single header name with the correct charset.
+
+    Args:
+        headers (list): raw values of one header name, or None if absent
+
+    Returns:
+        str if there is one value
+        list if there are more than one
+        empty str if the header is absent
+    """
+
+    if not headers:
+        return str()
+
+    decoded = [decode_header_part(i) for i in headers]
+    if len(decoded) == 1:
+        # in this case return a string
+        return decoded[0].strip()
+    # in this case return a list
+    return decoded
+
+
 def get_header(message, name):
     """
     Gets an email.message.Message and a header name and returns
@@ -819,14 +941,7 @@ def get_header(message, name):
 
     headers = message.get_all(name)
     log.debug(f"Getting header {name!r}: {headers!r}")
-    if headers:
-        headers = [decode_header_part(i) for i in headers]
-        if len(headers) == 1:
-            # in this case return a string
-            return headers[0].strip()
-        # in this case return a list
-        return headers
-    return str()
+    return decode_headers(headers)
 
 
 def get_mail_keys(message, complete=True):
