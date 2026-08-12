@@ -86,7 +86,7 @@ class TestUtils(unittest.TestCase):
                     msgconvert(tmp_name)
                 self.assertIn("msgconvert", str(context.exception))
         finally:
-            if os.path.exists(tmp_name):
+            if os.path.exists(tmp_name):  # pragma: no cover
                 os.unlink(tmp_name)
 
     def test_msgconvert_success(self):
@@ -107,11 +107,37 @@ class TestUtils(unittest.TestCase):
                 self.assertIsInstance(temp_file, str)
                 self.assertEqual(stdout, "Conversion successful")
                 # Clean up the temp file
-                if os.path.exists(temp_file):
+                if os.path.exists(temp_file):  # pragma: no cover
                     os.unlink(temp_file)
         finally:
-            if os.path.exists(tmp_name):
+            if os.path.exists(tmp_name):  # pragma: no cover
                 os.unlink(tmp_name)
+
+    def test_safe_remove_missing_path_ignored(self):
+        """_safe_remove swallows OSError when the file is already gone."""
+        from mailparser.utils import _safe_remove
+
+        missing = os.path.join(tempfile.gettempdir(), "mailparser-nonexistent-xyz")
+        if os.path.exists(missing):  # pragma: no cover
+            os.unlink(missing)
+        # Must not raise even though the path does not exist.
+        _safe_remove(missing)
+
+    def test_extract_msg_convert_non_email(self):
+        """extract_msg_convert raises MailParserOSError for a non-email .msg."""
+        from mailparser.utils import extract_msg_convert
+
+        # A MSGFile that is not an email (contact/calendar) has no
+        # asEmailMessage attribute; spec=["close"] makes getattr return None.
+        fake_msg = Mock(spec=["close"])
+        fake_extract_msg = Mock()
+        fake_extract_msg.openMsg.return_value = fake_msg
+
+        with patch.dict("sys.modules", {"extract_msg": fake_extract_msg}):
+            with self.assertRaises(MailParserOSError) as context:
+                extract_msg_convert("dummy.msg")
+        self.assertIn("not a convertible email", str(context.exception))
+        fake_msg.close.assert_called_once()
 
     def test_msgconvert_timeout(self):
         """msgconvert aborts and cleans up if the helper exceeds the timeout."""
@@ -133,7 +159,7 @@ class TestUtils(unittest.TestCase):
             self.assertIn("did not finish", str(context.exception))
             mock_process.kill.assert_called_once()
         finally:
-            if os.path.exists(tmp_name):
+            if os.path.exists(tmp_name):  # pragma: no cover
                 os.unlink(tmp_name)
 
     def test_parse_received_space_padding_is_linear(self):
@@ -613,7 +639,7 @@ class TestUtilsEdgeCases(unittest.TestCase):
             link = os.path.join(output_dir, "attachment.txt")
             try:
                 os.symlink(target, link)
-            except (NotImplementedError, OSError):
+            except (NotImplementedError, OSError):  # pragma: no cover
                 self.skipTest("symlinks are not supported")
 
             with self.assertRaises(ValueError):

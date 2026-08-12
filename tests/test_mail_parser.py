@@ -1510,3 +1510,51 @@ def test_deeply_nested_multipart_raises_controlled_error():
     # And the bytes entry point is guarded identically.
     with pytest.raises(MailParserRecursionError):
         mailparser.parse_from_bytes(raw.encode())
+
+
+def _text_message_returning(undecoded_payload):
+    """
+    A text/plain iso-8859-1 message whose ``get_payload(decode=False)`` returns
+    a fixed value.
+
+    ``email.message.Message`` re-decodes non-ASCII payloads on read, so it
+    cannot present the surrogate-escaped str (or raw bytes) form that the
+    from_bytes parse path produces. This subclass reproduces exactly that form
+    to exercise core.py's payload-recovery branch.
+    """
+    import email.message
+
+    class _Message(email.message.Message):
+        def get_payload(self, i=None, decode=False):  # type: ignore[override]
+            if not decode:
+                return undecoded_payload
+            return super().get_payload(i, decode)
+
+    msg = _Message()
+    msg["Content-Type"] = "text/plain; charset=iso-8859-1"
+    msg["Content-Transfer-Encoding"] = "8bit"
+    msg.set_payload(b"caf\xe9")  # backs the decode=True path
+    return msg
+
+
+def test_body_surrogate_str_payload_decoded_with_charset():
+    """
+    A text body whose undecoded payload is a surrogate-escaped str (the
+    from_bytes case) is recovered to its original bytes and decoded with the
+    declared charset.
+
+    Encoding such a payload to UTF-8 raises UnicodeEncodeError; the parser must
+    fall back to ascii+surrogateescape then the part charset (core.py
+    surrogate-recovery branch).
+    """
+    m = mailparser.MailParser(_text_message_returning("caf\udce9"))
+    assert m.text_plain == ["café"]
+
+
+def test_body_bytes_payload_decoded_with_charset():
+    """
+    A text body whose undecoded payload is raw bytes (non-str) is decoded with
+    the declared charset (core.py non-str payload branch).
+    """
+    m = mailparser.MailParser(_text_message_returning(b"caf\xe9"))
+    assert m.text_plain == ["café"]
