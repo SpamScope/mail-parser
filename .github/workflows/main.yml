@@ -69,7 +69,7 @@ jobs:
 
       - name: Publish to PyPI
         if: matrix.python-version == '3.10' && startsWith(github.ref, 'refs/tags/')
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
           user: ${{ secrets.PYPI_USERNAME }}
           password: ${{ secrets.PYPI_PASSWORD }}
