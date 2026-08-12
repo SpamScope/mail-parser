@@ -29,7 +29,7 @@ from unittest.mock import patch
 import pytest
 
 import mailparser
-from mailparser.exceptions import MailParserOSError
+from mailparser.exceptions import MailParserOSError, MailParserRecursionError
 from mailparser.utils import (
     convert_mail_date,
     extract_msg_convert,
@@ -532,7 +532,7 @@ Y29udGVudA==
         self.assertIsInstance(m.mail_json, str)
 
     @patch("mailparser.core.importlib.util.find_spec", return_value=None)
-    @patch("mailparser.core.os.remove")
+    @patch("mailparser.core._safe_remove")
     @patch("mailparser.core.msgconvert")
     def test_parse_from_file_msg(self, mock_msgconvert, mock_remove, mock_find_spec):
         """
@@ -1415,7 +1415,7 @@ def test_from_file_msg_prefers_extract_msg(mocker):
         return_value=(mail_test_2, "info"),
     )
     msgconv = mocker.patch("mailparser.core.msgconvert")
-    remove = mocker.patch("mailparser.core.os.remove")
+    remove = mocker.patch("mailparser.core._safe_remove")
 
     mailparser.parse_from_file_msg(mail_outlook_1)
 
@@ -1431,7 +1431,7 @@ def test_from_file_msg_fallback_warns(mocker, caplog):
         "mailparser.core.msgconvert",
         return_value=(mail_test_2, None),
     )
-    mocker.patch("mailparser.core.os.remove")
+    mocker.patch("mailparser.core._safe_remove")
 
     with caplog.at_level(logging.WARNING, logger="mailparser.core"):
         mailparser.parse_from_file_msg(mail_outlook_1)
@@ -1485,3 +1485,76 @@ def test_outlook_backend_parity():
     extract_names = sorted(a["filename"] for a in parsed_extract.attachments)
     msgconv_names = sorted(a["filename"] for a in parsed_msgconv.attachments)
     assert extract_names == msgconv_names
+
+
+def test_deeply_nested_multipart_raises_controlled_error():
+    """
+    Regression: a deeply nested multipart 'bomb' must raise the library's own
+    MailParserRecursionError (a MailParserError), not a bare RecursionError.
+
+    Python's email parser recurses per nesting level; without the guard an
+    attacker-supplied ~55 KB message would crash the parsing worker with an
+    exception outside the documented MailParser* hierarchy (crash-DoS,
+    CWE-674).
+    """
+    raw = (
+        "From: a@b.c\r\n"
+        + "".join(
+            f"Content-Type: multipart/mixed; boundary=B{i}\r\n\r\n--B{i}\r\n"
+            for i in range(3000)
+        )
+        + "text\r\n"
+    )
+    with pytest.raises(MailParserRecursionError):
+        mailparser.parse_from_string(raw)
+    # And the bytes entry point is guarded identically.
+    with pytest.raises(MailParserRecursionError):
+        mailparser.parse_from_bytes(raw.encode())
+
+
+def _text_message_returning(undecoded_payload):
+    """
+    A text/plain iso-8859-1 message whose ``get_payload(decode=False)`` returns
+    a fixed value.
+
+    ``email.message.Message`` re-decodes non-ASCII payloads on read, so it
+    cannot present the surrogate-escaped str (or raw bytes) form that the
+    from_bytes parse path produces. This subclass reproduces exactly that form
+    to exercise core.py's payload-recovery branch.
+    """
+    import email.message
+
+    class _Message(email.message.Message):
+        def get_payload(self, i=None, decode=False):  # type: ignore[override]
+            if not decode:
+                return undecoded_payload
+            return super().get_payload(i, decode)
+
+    msg = _Message()
+    msg["Content-Type"] = "text/plain; charset=iso-8859-1"
+    msg["Content-Transfer-Encoding"] = "8bit"
+    msg.set_payload(b"caf\xe9")  # backs the decode=True path
+    return msg
+
+
+def test_body_surrogate_str_payload_decoded_with_charset():
+    """
+    A text body whose undecoded payload is a surrogate-escaped str (the
+    from_bytes case) is recovered to its original bytes and decoded with the
+    declared charset.
+
+    Encoding such a payload to UTF-8 raises UnicodeEncodeError; the parser must
+    fall back to ascii+surrogateescape then the part charset (core.py
+    surrogate-recovery branch).
+    """
+    m = mailparser.MailParser(_text_message_returning("caf\udce9"))
+    assert m.text_plain == ["café"]
+
+
+def test_body_bytes_payload_decoded_with_charset():
+    """
+    A text body whose undecoded payload is raw bytes (non-str) is decoded with
+    the declared charset (core.py non-str payload branch).
+    """
+    m = mailparser.MailParser(_text_message_returning(b"caf\xe9"))
+    assert m.text_plain == ["café"]

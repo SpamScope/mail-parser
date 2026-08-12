@@ -20,7 +20,9 @@ import base64
 import email.utils
 import inspect
 import os
+import subprocess
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -84,7 +86,7 @@ class TestUtils(unittest.TestCase):
                     msgconvert(tmp_name)
                 self.assertIn("msgconvert", str(context.exception))
         finally:
-            if os.path.exists(tmp_name):
+            if os.path.exists(tmp_name):  # pragma: no cover
                 os.unlink(tmp_name)
 
     def test_msgconvert_success(self):
@@ -105,11 +107,80 @@ class TestUtils(unittest.TestCase):
                 self.assertIsInstance(temp_file, str)
                 self.assertEqual(stdout, "Conversion successful")
                 # Clean up the temp file
-                if os.path.exists(temp_file):
+                if os.path.exists(temp_file):  # pragma: no cover
                     os.unlink(temp_file)
         finally:
-            if os.path.exists(tmp_name):
+            if os.path.exists(tmp_name):  # pragma: no cover
                 os.unlink(tmp_name)
+
+    def test_safe_remove_missing_path_ignored(self):
+        """_safe_remove swallows OSError when the file is already gone."""
+        from mailparser.utils import _safe_remove
+
+        missing = os.path.join(tempfile.gettempdir(), "mailparser-nonexistent-xyz")
+        if os.path.exists(missing):  # pragma: no cover
+            os.unlink(missing)
+        # Must not raise even though the path does not exist.
+        _safe_remove(missing)
+
+    def test_extract_msg_convert_non_email(self):
+        """extract_msg_convert raises MailParserOSError for a non-email .msg."""
+        from mailparser.utils import extract_msg_convert
+
+        # A MSGFile that is not an email (contact/calendar) has no
+        # asEmailMessage attribute; spec=["close"] makes getattr return None.
+        fake_msg = Mock(spec=["close"])
+        fake_extract_msg = Mock()
+        fake_extract_msg.openMsg.return_value = fake_msg
+
+        with patch.dict("sys.modules", {"extract_msg": fake_extract_msg}):
+            with self.assertRaises(MailParserOSError) as context:
+                extract_msg_convert("dummy.msg")
+        self.assertIn("not a convertible email", str(context.exception))
+        fake_msg.close.assert_called_once()
+
+    def test_msgconvert_timeout(self):
+        """msgconvert aborts and cleans up if the helper exceeds the timeout."""
+        with tempfile.NamedTemporaryFile(suffix=".msg", delete=False) as tmp:
+            tmp_name = tmp.name
+
+        mock_process = Mock()
+        # First communicate() (with timeout) raises; the second, after kill(),
+        # reaps the process and returns normally.
+        mock_process.communicate.side_effect = [
+            subprocess.TimeoutExpired(cmd="msgconvert", timeout=1),
+            (b"", b""),
+        ]
+
+        try:
+            with patch("subprocess.Popen", return_value=mock_process):
+                with self.assertRaises(MailParserOSError) as context:
+                    msgconvert(tmp_name)
+            self.assertIn("did not finish", str(context.exception))
+            mock_process.kill.assert_called_once()
+        finally:
+            if os.path.exists(tmp_name):  # pragma: no cover
+                os.unlink(tmp_name)
+
+    def test_parse_received_space_padding_is_linear(self):
+        """
+        Regression for the Received-header ReDoS (CWE-1333).
+
+        A long run of spaces that is not followed by a clause keyword must not
+        drive ``_CLAUSE_SPLITTER`` into quadratic backtracking. Before the fix
+        (whitespace collapsed before the split) 20 000 padding spaces took
+        several seconds and a header-size-limit-sized run took minutes; after
+        the fix parsing is linear and effectively instant. The generous bound
+        stays robust on slow CI while still failing hard on any reintroduced
+        super-linear blowup.
+        """
+        received = "from host " + " " * 20000 + "nope; Mon, 10 Aug 2026 09:00:00 +0000"
+        start = time.perf_counter()
+        result = parse_received(received)
+        elapsed = time.perf_counter() - start
+        self.assertIsInstance(result, dict)
+        self.assertEqual(result["date"], "Mon, 10 Aug 2026 09:00:00 +0000")
+        self.assertLess(elapsed, 2.0)
 
     def test_parse_received_no_matches(self):
         """Test parse_received with header that matches nothing"""
@@ -568,7 +639,7 @@ class TestUtilsEdgeCases(unittest.TestCase):
             link = os.path.join(output_dir, "attachment.txt")
             try:
                 os.symlink(target, link)
-            except (NotImplementedError, OSError):
+            except (NotImplementedError, OSError):  # pragma: no cover
                 self.skipTest("symlinks are not supported")
 
             with self.assertRaises(ValueError):
@@ -864,6 +935,50 @@ class TestUtilsEdgeCases(unittest.TestCase):
         ):
             result = get_addresses("not an email address at all")
         self.assertEqual(result, [("", "")])
+
+    def test_get_addresses_fallback_quoted_name_with_comma(self):
+        """Fallback keeps a comma that lives inside a quoted display name."""
+        with patch(
+            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+        ):
+            result = get_addresses('"Last, First" <user@example.com>')
+        self.assertEqual(result, [("Last, First", "user@example.com")])
+
+    def test_get_addresses_fallback_email_as_name_space_padding_is_linear(self):
+        """
+        Regression for the fallback ReDoS (CWE-1333).
+
+        ``From: alice@example.com <bob@example.com>`` forces the regex
+        fallback (the display name is an unquoted e-mail address, which the
+        strict parser rejects). The old combined pattern backtracked
+        cubically on trailing whitespace, so a few thousand padding spaces
+        took seconds and a real-world header (~100 KB) took hours. The
+        linear scan must recover the address and finish effectively
+        instantly; the generous bound keeps the assertion robust on slow CI
+        while still failing hard on any reintroduced super-linear blowup
+        (2000 spaces measured at ~3.5 s before the fix, <0.01 s after).
+        """
+        header = "alice@example.com <bob@example.com>" + " " * 2000
+        start = time.perf_counter()
+        result = get_addresses(header)
+        elapsed = time.perf_counter() - start
+        self.assertEqual(result, [("alice@example.com", "bob@example.com")])
+        self.assertLess(elapsed, 2.0)
+
+    def test_get_addresses_fallback_angle_padding_is_linear(self):
+        """
+        Regression for the fallback ReDoS (CWE-1333), quadratic variant.
+
+        A run of ``<`` characters yields no parseable address, forcing the
+        fallback. The old pattern backtracked quadratically over the
+        padding; the linear scan must return no addresses (falling through
+        to the strict parser's result) without a super-linear slowdown.
+        """
+        start = time.perf_counter()
+        result = get_addresses("<" * 40000)
+        elapsed = time.perf_counter() - start
+        self.assertTrue(all(not addr for _, addr in result))
+        self.assertLess(elapsed, 2.0)
 
     def test_get_addresses_without_strict_parameter(self):
         """
