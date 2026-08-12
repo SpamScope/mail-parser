@@ -32,6 +32,12 @@ A security finding you cannot demonstrate is a guess. Before you report:
   pattern can be quadratic in isolation yet unreachable because an earlier step
   normalizes the input. Guard each probe with `signal.setitimer` so a true
   blowup fails fast instead of hanging.
+  **Complexity is not only regexes.** The dominant blowups in this codebase are
+  plain Python: a loop over attacker-chosen keys where each iteration rescans
+  the whole collection (`for k in keys: message.get_all(k)`) is O(keys × total)
+  with no regex involved. Vary the two axes *independently* — many distinct
+  header names vs. many repeats of one name — because a probe that only grows
+  the total byte count keeps the ratio flat and hides the quadratic term.
 - **Injection / traversal / write-primitive** — construct the malicious input
   and show the resulting command, path, or file write. A `../` that
   `os.path.basename` strips is not a finding.
@@ -62,6 +68,69 @@ A security finding you cannot demonstrate is a guess. Before you report:
 | Outlook `.msg` path (`extract_msg`, `msgconvert`)     | Untrusted `.msg` flows into third-party OLE/CFB + Perl parsers with their own CVE history — flag the transitive attack surface and the temp/subprocess handling around it.     |
 | Logging (`log.debug` of headers/filenames)            | Raw headers and attachment names are logged verbatim (PII / indicators). Data-handling note, not code-exec — report as Info.                                                   |
 | `eval`/`exec`/`pickle`/`yaml.load`/`__import__`       | Should be absent. Any occurrence is a finding until proven inert.                                                                                                              |
+| `getattr(self, X)` where `X` is a header/part name    | Reflective dispatch on an attacker-chosen name. See "Reflective dispatch" below — collision, recursion, and non-serializable leakage are all reachable from a 12-byte email.   |
+| `json.dumps` over a dynamically built dict            | Values arriving from reflection are not guaranteed JSON-safe. A bound method or `Message` object in the dict is an uncaught `TypeError` on a public property.                  |
+| `find()` / `in` / `split()` locating a security token | Naive substring search for a delimiter (`"by"`, a trust string) that an attacker also controls the *neighbouring* text of. See "Trust-boundary string parsing" below.          |
+
+## Reflective dispatch on attacker-controlled names
+
+`MailParser.__getattr__` exposes every header as an attribute, and `_make_mail`
+/ `headers` iterate `message.keys()` calling `getattr(self, name)`. The header
+name is attacker-chosen, so **the attacker picks which Python attribute is
+read**. Python resolves real class attributes *before* `__getattr__`, so any
+name in `dir(cls)` shadows the header path. Always run this probe:
+
+```python
+for a in [x for x in dir(MailParser) if not x.startswith("_")]:
+    try:
+        mailparser.parse_from_string(f"{a}: x\r\n\r\n").mail_json
+    except Exception as e:
+        print(a, type(e).__name__, e)
+```
+
+Three distinct bug classes fall out, and you must check for all three — finding
+one does not rule out the others:
+
+- **Method/property collision** — the dict gets a bound method or a live object
+  instead of a string. Downstream `json.dumps` raises `TypeError`. Crash-DoS on
+  a public API from a minimal message.
+- **Recursion cycle** — a property that itself iterates `message.keys()` and
+  calls `getattr` can re-enter itself when a header is named after that property
+  or one of its `_json` / `_raw` aliases. Check the cycle guard covers **every**
+  alias and is **case-insensitive**: `set(message.keys()) - {"headers"}` does not
+  exclude `Headers_json`, and `message.keys()` preserves the sender's casing.
+  A recursion cycle nested inside a per-key rescan multiplies the two costs —
+  measure it, it is usually the worst finding on the page.
+- **Side-effecting property** — reflection can *invoke* a property the caller
+  never asked for. Confirm no property in the collision set writes files, spawns
+  a subprocess, or mutates state.
+
+The fix to argue for is structural, not a denylist: header values must resolve
+through a lookup that never touches Python attributes. Reject patches that just
+add another name to an exclusion set — that is how the `headers_json` cycle
+survived the `headers` fix.
+
+## Trust-boundary string parsing
+
+`get_server_ipaddress(trust)` decides *which IP the mail came from* — its output
+is used for attribution and blocklisting, so a wrong answer is a security
+failure, not a cosmetic bug. Anywhere a security decision depends on locating a
+delimiter, check the search is anchored:
+
+- `header.find("by")` matches inside `derby.example.com` or `nearby.example.org`.
+  Hostnames come from the sender's HELO (no DNS control needed) and land in the
+  trusted MTA's own `Received` header.
+- Truncating the clause makes extraction fail on the *genuine* top hop, and the
+  loop then falls through to older, fully attacker-forged `Received` headers —
+  so the failure mode is not "returns nothing", it is "returns the attacker's
+  value". Always test the fall-through, not just the single-header case.
+- Use the existing anchored `const._CLAUSE_SPLITTER` rather than a bare `\bby\b`
+  (`\b` still matches inside `host.by.example`, since `.` is a non-word char).
+
+Prove these with a control matrix, not a single PoC: benign hostname, malicious
+hostname alone, forged header alone, and both together. If a benign hostname
+also misattributes, say so — it makes the finding a correctness bug too and
+raises the priority.
 
 ## Invariants that must stay true (verify, don't assume)
 

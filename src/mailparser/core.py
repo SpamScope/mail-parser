@@ -23,19 +23,30 @@ import ipaddress
 import json
 import logging
 
-from mailparser.const import ADDRESSES_HEADERS, EPILOGUE_DEFECTS, REGXIP, REGXIP6
+from mailparser.const import (
+    _HELO_RE,
+    _IPV6_TAG_RE,
+    ADDRESSES_HEADERS,
+    COMPUTED_PARTS,
+    EPILOGUE_DEFECTS,
+    REGXIP,
+    REGXIP6,
+)
 from mailparser.exceptions import MailParserRecursionError
 from mailparser.utils import (
     _safe_attachment_filename,
     _safe_remove,
     convert_mail_date,
     decode_header_part,
+    decode_headers,
     extract_msg_convert,
     find_between,
     get_addresses,
-    get_header,
+    get_from_clause,
     get_mail_keys,
     get_to_domains,
+    group_spans,
+    in_spans,
     msgconvert,
     ported_open,
     ported_string,
@@ -45,6 +56,12 @@ from mailparser.utils import (
 )
 
 log = logging.getLogger(__name__)
+
+# Keys ``_make_mail()`` sets itself after walking the headers.  A sender can
+# name a header after any of them, so they are skipped while collecting
+# headers: otherwise ``mail["defects"]`` would hold a string from the wire
+# instead of the list of parsed defects.
+_RESERVED_MAIL_KEYS = frozenset({"defects", "defects_categories", "has_defects"})
 
 
 def parse_from_file_obj(fp):
@@ -127,6 +144,10 @@ class MailParser:
         Init a new object from a message object structure.
         """
         self._message = message
+        # Set before parse() so that __getattr__ is never reached for this
+        # attribute — it resolves unknown names as headers instead of
+        # raising AttributeError, which would recurse.
+        self._header_index = {}
         if message is not None:
             log.debug("All headers of emails: {}".format(", ".join(message.keys())))
         self.parse()
@@ -296,6 +317,96 @@ class MailParser:
         self._defects = []
         self._defects_categories = set()
         self._has_defects = False
+        self._mail = {}
+        self._mail_partial = {}
+        self._header_index = self._build_header_index()
+
+    def _build_header_index(self):
+        """
+        Build a lowercased name -> list of raw values map of every header.
+
+        ``Message.get_all()`` is a linear scan of the header list, so the
+        one call per distinct header name made by ``_make_mail()`` and
+        ``headers`` costs O(distinct x total).  Header names are chosen by
+        the sender and are free to generate, which turns that quadratic
+        term into a denial of service (CWE-407): before this index, 16,000
+        distinct names cost ~5.8 s of CPU against ~0.06 s for 32,000
+        repeats of a single name.  Indexing once makes every lookup O(1).
+
+        Returns:
+            dict mapping a lowercased header name to its list of raw values
+        """
+        index = {}
+        if self.message:
+            for name, value in self.message.items():
+                index.setdefault(name.lower(), []).append(value)
+        return index
+
+    def _header_value(self, name):
+        """
+        Return the value of a header named exactly ``name``.
+
+        This is the resolver for names that come off the wire.
+        ``_make_mail()`` and ``headers`` iterate the sender's header names,
+        so it does two things that ``__getattr__`` must not do here.
+
+        It performs **no attribute lookup**.  ``getattr(self, name)`` would
+        let the sender choose which attribute is read, because Python
+        resolves real class attributes before ``__getattr__``: a ``Parse:``
+        header stored a bound method in the parsed mail and ``mail_json``
+        raised ``TypeError`` (CWE-407), and a ``Headers_json:`` header
+        re-entered the ``headers`` property until the stack was exhausted.
+
+        It also performs **no name rewriting**: the name is looked up
+        literally, with no ``_``/``-`` folding and no ``_json`` / ``_raw``
+        suffix handling.  Those conveniences exist for the caller's benefit
+        and are actively harmful on a sender-chosen name — ``Subject_json:``
+        would report the value of ``Subject`` and drop its own (CWE-436),
+        and each ``_json`` suffix re-serialized the previous result, so
+        ``X_json_json...`` bought one doubling of the output per five input
+        bytes: a 148-byte header produced a 536 MB string (CWE-405).
+
+        Args:
+            name (string): header name exactly as it appears in the message
+
+        Returns:
+            list of (name, address) tuples for the address headers,
+            otherwise the decoded header value (str, or list when the
+            header repeats), or an empty str when the header is absent
+        """
+        name_header = name.lower()
+
+        # object headers
+        if name_header in ADDRESSES_HEADERS:
+            values = self._header_index.get(name_header)
+            # ``Message.get()`` semantics: only the first occurrence
+            raw_header = values[0] if values else ""
+            # Parse addresses. RFC 5322 §3.4 does not allow unquoted "@" in
+            # display names, so a strict parser correctly rejects headers like
+            #   From: alice@example.com <bob@example.com>
+            # and returns ('', '').  mail-parser is a security/forensics tool,
+            # not an MTA: hiding addresses from analysts is worse than accepting
+            # non-conforming input.  get_addresses() applies a regex fallback
+            # when strict parsing yields only empty results — see its docstring
+            # in utils.py for the full rationale.
+            parsed_addresses = get_addresses(raw_header)
+
+            # decoded addresses — skip entries with no address (absent header)
+            return [
+                (
+                    (
+                        ""
+                        if (decoded_name := decode_header_part(name)) == email_addr
+                        else decoded_name
+                    ),
+                    email_addr,
+                )
+                for name, email_addr in parsed_addresses
+                if email_addr
+            ]
+
+        # others headers
+        return decode_headers(self._header_index.get(name_header))
 
     def _append_defects(self, part, part_content_type):
         """
@@ -342,7 +453,15 @@ class MailParser:
 
         for i in keys:
             log.debug(f"Getting header or part {i!r}")
-            value = getattr(self, i)
+            if i in _RESERVED_MAIL_KEYS:
+                # A header of this name would shadow the defect metadata
+                # below with a value of a different type.  Still reachable
+                # by the caller as ``parser.<name>_raw``.
+                continue
+            # Only the computed parts are our own names and may be reached
+            # through attribute access; every other key is a header name
+            # chosen by the sender — see _header_value().
+            value = getattr(self, i) if i in COMPUTED_PARTS else self._header_value(i)
             if value:
                 mail[i] = value
 
@@ -362,11 +481,18 @@ class MailParser:
             Instance of MailParser with raw email parsed
         """
 
-        if not self.message:
+        # Reset first, so every attribute exists even when there is nothing
+        # to parse.  Otherwise a property reading an unset attribute raises
+        # AttributeError, which __getattr__ silently answers as an absent
+        # header, and the caller sees "" instead of a failure.
+        self._reset()
+
+        # ``Message.__len__`` is the header count, so a message with no
+        # headers at all is falsy: test against None, or a body-only
+        # message parses to nothing and reports no defect.
+        if self.message is None:
             return self
 
-        # reset and start parsing
-        self._reset()
         parts = []  # Normal parts plus defects
 
         # walk all mail parts to search defects
@@ -554,11 +680,19 @@ class MailParser:
 
         In our case we trust only our mail server with the trust string.
 
+        The walk continues only while a trusted hop names a *private* IP,
+        which marks an internal relay.  A trusted hop naming no IP at all
+        ends the search with ``None``: extraction failing there used to
+        drop the loop into older Received headers, which the sender wrote,
+        so every trick that defeats extraction on the genuine hop returned
+        an attacker-chosen IP instead of nothing (CWE-345).
+
         Args:
             trust (string): String that identify our mail server
 
         Returns:
-            string with the ip address
+            string with the ip address, or None when no trusted hop names
+            a public sender IP
         """
         log.debug(f"Trust string is {trust!r}")
 
@@ -572,35 +706,115 @@ class MailParser:
 
         for i in received:
             i = ported_string(i)
-            if trust in i:
-                log.debug(f"Trust string {trust!r} is in {i!r}")
-                ip_str = self._extract_ip(i)
-                if ip_str:
-                    return ip_str
+            if trust not in i:
+                continue
 
-    def _extract_ip(self, received_header):
+            log.debug(f"Trust string {trust!r} is in {i!r}")
+            candidates = self._sender_ip_candidates(i)
+            if not candidates:
+                # Nothing to read on an authoritative hop: stop, never fall
+                # through to a header the sender controls.
+                log.debug("Trusted hop names no sender IP, stopping")
+                return None
+
+            ip_str = self._public_ip(candidates)
+            if ip_str:
+                return ip_str
+            # Private IP: an internal relay, keep following the chain.
+
+    def _sender_ip_candidates(self, received_header):
         """
-        Extract the IP address from the received header if it is not private.
-        Supports both IPv4 (RFC 791) and IPv6 (RFC 5952) addresses.
+        Return the IP addresses named in the ``from`` clause of a header.
+
+        Only the ``from`` clause is searched: the ``by`` clause holds the
+        receiving server, whose IP must never be reported as the sender's.
+        The clause is isolated with ``get_from_clause()``, which anchors on
+        the RFC 5321 keywords — see its docstring for why a substring
+        search for ``"by"`` is spoofable (CWE-345).
+
+        Within the clause exactly two regions are sender-written, and both
+        are excluded rather than trusted to look harmless:
+
+        * **the first token** — the HELO name.  It may be an address
+          literal (``EHLO [8.8.8.8]``, the form RFC 5321 §4.1.3 requires of
+          a client with no FQDN), so it is never a candidate.
+        * **an explicit HELO argument** inside a comment — Exim's
+          ``(helo=x)``, CommuniGate's ``(account a@b HELO x)``.
+
+        Everything else was written by the receiving MTA, and a candidate
+        must additionally sit inside a ``(``/``[`` group, which is where an
+        MTA puts its own findings.  That last rule is what makes a
+        truncated clause fail closed: a multi-word HELO can end the clause
+        early, but whatever it leaves behind is bare and so is not a
+        candidate.
+
+        The one concession is the Exim/CommuniGate layout ``from [ip]
+        (helo=x)``, where the MTA writes the address as the first token
+        precisely because it recorded the HELO name separately.  It is
+        accepted only when no other candidate exists and the HELO marker
+        is itself inside a group — the residual is a sender who writes
+        comment syntax into their own HELO name *and* whose MTA records it
+        verbatim, on a hop naming no other address.
 
         Args:
             received_header (string): The received header string
 
         Returns:
+            list of IP address strings, in the order they appear
+        """
+        # Blank the "IPv6:" tag with a non-space filler of the same width:
+        # offsets stay aligned, and no new token boundary or _HELO_RE
+        # lookbehind position is created inside the sender's own token.
+        from_part = _IPV6_TAG_RE.sub("_____", get_from_clause(received_header))
+        if not from_part:
+            return []
+
+        groups = group_spans(from_part)
+        helo_spans = [
+            m.span()
+            for m in _HELO_RE.finditer(from_part)
+            if in_spans(m.start(), groups)
+        ]
+        first_token_end = len(from_part.split(" ", 1)[0])
+
+        # Merge both families positionally.  Choosing IPv4 over IPv6 by
+        # family let one private literal at EHLO suppress the IPv6 scan and
+        # hide the real sender.
+        matches = sorted(
+            list(REGXIP.finditer(from_part)) + list(REGXIP6.finditer(from_part)),
+            key=lambda m: m.start(),
+        )
+        matches = [m for m in matches if not in_spans(m.start(), helo_spans)]
+
+        candidates = [
+            m.group()
+            for m in matches
+            if m.start() >= first_token_end and in_spans(m.start(), groups)
+        ]
+        if candidates:
+            return candidates
+
+        if helo_spans:
+            # Exim/CommuniGate: the address is the first token because the
+            # HELO name was recorded in the comment instead.
+            return [m.group() for m in matches if m.start() < first_token_end]
+
+        return []
+
+    def _public_ip(self, check):
+        """
+        Return the last candidate address, if it parses and is public.
+
+        Args:
+            check (list): IP address strings from a ``from`` clause
+
+        Returns:
             string with the ip address or None
         """
-        by_idx = received_header.find("by")
-        from_part = received_header[:by_idx] if by_idx != -1 else received_header
-
-        # Try IPv4 first, then IPv6
-        check = REGXIP.findall(from_part)
-        if not check:
-            check = REGXIP6.findall(from_part)
-
         if check:
             try:
                 ip_str = str(check[-1])
-                log.debug(f"Found sender IP {ip_str!r} in {received_header!r}")
+                log.debug(f"Found sender IP {ip_str!r}")
                 ip = ipaddress.ip_address(ip_str)
             except ValueError:
                 return None
@@ -609,6 +823,19 @@ class MailParser:
                     log.debug(f"IP {ip_str!r} not private")
                     return ip_str
         return None
+
+    def _extract_ip(self, received_header):
+        """
+        Extract the sender IP from a received header if it is not private.
+        Supports both IPv4 (RFC 791) and IPv6 (RFC 5952) addresses.
+
+        Args:
+            received_header (string): The received header string
+
+        Returns:
+            string with the ip address or None
+        """
+        return self._public_ip(self._sender_ip_candidates(received_header))
 
     def write_attachments(self, base_path):
         """This method writes the attachments of mail on disk
@@ -619,50 +846,39 @@ class MailParser:
         write_attachments(attachments=self.attachments, base_path=base_path)
 
     def __getattr__(self, name):
-        name = name.strip("_").lower()
-        name_header = name.replace("_", "-")
+        """
+        Expose any header dynamically as ``X``, ``X_json`` or ``X_raw``.
 
-        # json headers
+        Underscores in ``name`` stand for dashes, so ``mail.X_MSMail_Priority``
+        reads the ``X-MSMail-Priority`` header.  Only reached for names the
+        *caller* asks for, so ``X_json`` may resolve through ``getattr`` and
+        reach the computed parts — ``attachments_json`` and friends.  Names
+        taken from a parsed message must never come through here;
+        ``_header_value()`` serves those, and its docstring explains why.
+
+        Raises:
+            AttributeError: for private names.  Without this, an unset
+                internal attribute is answered as an absent header and a
+                bug inside a property is silently reported as "".
+        """
+        if name.startswith("_"):
+            raise AttributeError(
+                f"{type(self).__name__!r} object has no attribute {name!r}"
+            )
+
+        name = name.rstrip("_").lower()
+
         if name.endswith("_json"):
-            name = name[:-5]
-            return json.dumps(getattr(self, name), ensure_ascii=False)
+            return json.dumps(getattr(self, name[:-5]), ensure_ascii=False)
 
-        # raw headers
-        elif name.endswith("_raw"):
-            name = name[:-4]
-            raw = self.message.get_all(name) if self.message else None
-            return json.dumps(raw, ensure_ascii=False)
+        if name.endswith("_raw"):
+            raw = self._header_index.get(name[:-4].replace("_", "-")) or []
+            # Values are ``email.header.Header`` when the header carries
+            # 8-bit bytes (the from_bytes path); dumping one raises
+            # TypeError and kills the parse, so coerce to str first.
+            return json.dumps([ported_string(i) for i in raw], ensure_ascii=False)
 
-        # object headers
-        elif name_header in ADDRESSES_HEADERS:
-            raw_header = self.message.get(name_header, "") if self.message else ""
-            # Parse addresses. RFC 5322 §3.4 does not allow unquoted "@" in
-            # display names, so a strict parser correctly rejects headers like
-            #   From: alice@example.com <bob@example.com>
-            # and returns ('', '').  mail-parser is a security/forensics tool,
-            # not an MTA: hiding addresses from analysts is worse than accepting
-            # non-conforming input.  get_addresses() applies a regex fallback
-            # when strict parsing yields only empty results — see its docstring
-            # in utils.py for the full rationale.
-            parsed_addresses = get_addresses(raw_header)
-
-            # decoded addresses — skip entries with no address (absent header)
-            return [
-                (
-                    (
-                        ""
-                        if (decoded_name := decode_header_part(name)) == email_addr
-                        else decoded_name
-                    ),
-                    email_addr,
-                )
-                for name, email_addr in parsed_addresses
-                if email_addr
-            ]
-
-        # others headers
-        else:
-            return get_header(self.message, name_header)
+        return self._header_value(name.replace("_", "-"))
 
     @property
     def attachments(self):
@@ -714,10 +930,25 @@ class MailParser:
     @property
     def headers(self) -> dict:
         """
-        Return only the headers as Python object
+        Return only the headers as Python object.
+
+        Values resolve through ``_header_value()``, never ``getattr``: the
+        keys come straight from the sender, so attribute lookup on them
+        returns bound methods (``Parse:``) or re-enters this very property
+        (``Headers_json:``).  Excluding single names from the key set is
+        not a fix — it is what let ``Headers_json`` through after
+        ``Headers`` was excluded.
         """
-        all_headers = set(self.message.keys() if self.message else []) - {"headers"}
-        return {i: getattr(self, i) for i in all_headers}
+        # Dedupe case-insensitively, keeping the first spelling seen as the
+        # key.  Header names are compared case-insensitively, so _header_value
+        # returns every occurrence for each of them: deduping on the exact
+        # spelling instead would emit one full value list per casing, and a
+        # sender repeating one 20-char name in n casings would get an n x n
+        # blowup (CWE-407) — 271 KB of headers cost 7.6 s and 540 MB of JSON.
+        names = {}
+        for i in self.message.keys() if self.message else []:
+            names.setdefault(i.lower(), i)
+        return {i: self._header_value(i) for i in names.values()}
 
     @property
     def headers_json(self):
