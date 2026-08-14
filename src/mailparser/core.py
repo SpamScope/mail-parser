@@ -637,6 +637,8 @@ class MailParser:
                                 # Recover original bytes then decode with charset
                                 orig_bytes = raw_str.encode("ascii", "surrogateescape")
                                 payload = ported_string(orig_bytes, encoding=charset)
+                            except AttributeError:
+                                payload = ""
                         else:
                             payload = ported_string(payload, encoding=charset)
                     else:
