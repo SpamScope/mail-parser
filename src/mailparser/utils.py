@@ -61,7 +61,7 @@ _MSGCONVERT_TIMEOUT = 60
 
 # The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
 # 3.13 (and backported only to later security patch releases of 3.9-3.12,
-# e.g. 3.11.10).  mail-parser supports ``requires-python >=3.9,<3.15``, so on
+# e.g. 3.11.10).  mail-parser supports ``requires-python >=3.9,<3.16``, so on
 # an earlier patch release the keyword is absent and passing it raises
 # ``TypeError: getaddresses() got an unexpected keyword argument 'strict'``
 # (parsedmarc #808).  The signature is fixed for the running interpreter, so
