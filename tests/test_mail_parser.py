@@ -237,6 +237,45 @@ Y29udGVudA==
             self.assertIn("date_utc", i)
             self.assertIsNotNone(i["date_utc"])
 
+    def test_received_date_out_of_range(self):
+        # A year whose epoch seconds overflow int64 makes calendar.timegm()
+        # raise OverflowError, which used to escape receiveds_format() and
+        # abort the parse of the whole message.
+        raw_mail = (
+            "Received: from x ([1.2.3.4]) by mx.victim.com; "
+            "Tue, 7 Mar 292277026596 14:29:24 +0000\r\n\r\nbody\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        self.assertIsNone(mail.received[0]["date_utc"])
+        self.assertIsInstance(mail.mail_json, str)
+
+    def test_received_date_magnitude_sweep(self):
+        # Every year magnitude must fail closed, whatever the stdlib raises.
+        for exponent in range(4, 20):
+            raw_mail = (
+                "Received: from x ([1.2.3.4]) by mx; "
+                f"Tue, 7 Mar {10**exponent} 14:29:24 +0000\r\n\r\nbody\r\n"
+            )
+
+            mail = mailparser.parse_from_string(raw_mail)
+            self.assertIsNone(mail.received[0]["date_utc"])
+
+    def test_received_date_offset_magnitude_sweep(self):
+        # A huge timezone offset pushes the timestamp into the band where
+        # datetime.fromtimestamp() reports EOVERFLOW as OSError, which is
+        # neither ValueError nor OverflowError.
+        for digits in range(4, 26):
+            for sign in "+-":
+                raw_mail = (
+                    "Received: from a by b; 7 Mar 1970 14:29:24 "
+                    f"{sign}{'9' * digits}\r\n\r\nbody\r\n"
+                )
+
+                mail = mailparser.parse_from_string(raw_mail)
+                self.assertIsInstance(mail.mail_json, str)
+
     def test_get_header(self):
         mail = mailparser.parse_from_file(mail_test_1)
         h1 = get_header(mail.message, "from")

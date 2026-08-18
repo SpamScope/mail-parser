@@ -862,7 +862,12 @@ def receiveds_format(receiveds):
             i["date"] = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", i["date"])
             try:
                 j["date_utc"], _ = convert_mail_date(i["date"])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError, OSError):
+                # Out-of-range dates fail in three different ways: a huge
+                # year overflows int64 inside calendar.timegm()
+                # (OverflowError), and a huge timezone offset pushes the
+                # timestamp into the band where datetime.fromtimestamp()
+                # reports EOVERFLOW (OSError).
                 j["date_utc"] = None
 
         # Add delay
