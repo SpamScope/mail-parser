@@ -324,10 +324,11 @@ def ported_string(raw_data, encoding="utf-8", errors="ignore"):
     if isinstance(raw_data, str):
         return raw_data
 
-    # raw_data is bytes, decode it
+    # raw_data is bytes, decode it. The "undefined" codec raises a bare
+    # UnicodeError rather than UnicodeDecodeError, so catch the base class.
     try:
         return str(raw_data, encoding)
-    except (LookupError, UnicodeDecodeError):
+    except (LookupError, UnicodeError):
         return str(raw_data, "utf-8", errors)
 
 
@@ -990,6 +991,73 @@ def print_mail_fingerprints(data):  # pragma: no cover
     print(f"sha1:\t{sha1}")
     print(f"sha256:\t{sha256}")
     print(f"sha512:\t{sha512}")
+
+
+def raw_payload(part):
+    """
+    Return a part's payload without decoding its transfer encoding.
+
+    ``Message.get_payload(decode=False)`` applies the charset the sender
+    declared. The email package guards that decode against an unknown
+    charset name, but not against a codec that refuses the operation
+    outright: ``charset="undefined"`` raises a bare ``UnicodeError``, which
+    would abort the parse of the whole message.
+
+    Args:
+        part (email.message.Message): part to read
+
+    Returns:
+        the payload as the email package returns it, or the undecoded bytes
+        when the declared charset cannot be applied
+    """
+    try:
+        return part.get_payload(decode=False)
+    except (LookupError, UnicodeError):
+        log.warning("Cannot apply the declared charset, reading raw bytes")
+        return part.get_payload(decode=True)
+
+
+def as_string_safe(part):
+    """
+    Flatten a part back to its textual form.
+
+    ``Message.as_string()`` re-encodes an 8-bit body with the charset the
+    sender declared, so a charset that cannot represent those bytes —
+    ``utf-16``, ``idna``, or a non-text codec such as ``base64`` — raises
+    out of the parse. Fall back to the raw bytes, which every codec
+    survives, rather than losing the whole message.
+
+    Args:
+        part (email.message.Message): part to flatten
+
+    Returns:
+        the flattened part as a string
+    """
+    try:
+        return part.as_string()
+    except (LookupError, UnicodeError):
+        log.warning("Cannot flatten part with the declared charset")
+
+    try:
+        return part.as_bytes().decode("utf-8", "surrogateescape")
+    except (LookupError, UnicodeError):
+        # BytesGenerator bypasses the charset only for text parts. A part
+        # whose type is multipart but which carries no boundary is routed
+        # to the generic multipart handler, which decodes with the
+        # declared charset just like as_string() did.
+        log.warning("Cannot flatten part, using its raw headers and body")
+
+    headers = "".join(f"{k}: {v}\n" for k, v in part.items())
+    body = raw_payload(part)
+    if isinstance(body, list):
+        # A conforming multipart: flatten each sub-part the same way, since
+        # the one that refused its charset may be nested any depth down.
+        body = "".join(as_string_safe(sub) for sub in body)
+    else:
+        # The charset was refused above, so raw_payload() fell back to the
+        # undecoded bytes.
+        body = body.decode("utf-8", "surrogateescape")
+    return f"{headers}\n{body}"
 
 
 def decode_base64_payload(payload):

@@ -207,7 +207,11 @@ The `attachments` property returns a list of dictionaries, each containing compr
   filesystem name limit, or `None` when the original has no usable basename. When saving
   attachments, prefer `write_attachments()` for full validation and collision handling.
 - `mail_content_type` - MIME content type
-- `payload` - Base64-encoded attachment data, ready for decoding or storage
+- `payload` - Base64-encoded attachment data, ready for decoding or storage. An attachment is
+  kept as bytes: whatever encoding it was sent with, it is re-encoded to base64 and reports
+  `base64` as its `content_transfer_encoding`, so the payload always matches the encoding it
+  declares and hashes like the file the recipient received. Only `base64` parts keep their
+  original wire text, which is already lossless
 
 To access custom or vendor-specific headers, replace hyphens with underscores. For example, to
 access the `X-MSMail-Priority` header:
