@@ -50,7 +50,11 @@ from mailparser.const import (
     JUNK_PATTERN,
     OTHERS_PARTS,
 )
-from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import (
+    MailParserOSError,
+    MailParserPathError,
+    MailParserReceivedParsingError,
+)
 
 log = logging.getLogger(__name__)
 
@@ -988,11 +992,40 @@ def print_mail_fingerprints(data):  # pragma: no cover
     print(f"sha512:\t{sha512}")
 
 
+def decode_base64_payload(payload):
+    """
+    Decode a base64 attachment payload the way a mail client would.
+
+    ``base64.b64decode()`` rejects padding and alphabet errors that every
+    MUA silently repairs, so a sender can strip one padding character to
+    make an attachment undecodable here while it still reaches the
+    recipient intact.
+
+    Args:
+        payload (string): base64 payload of an attachment
+
+    Returns:
+        the decoded bytes
+    """
+    data = re.sub(rb"[^A-Za-z0-9+/=]", b"", payload.encode("ascii", "ignore"))
+    # Padding ends the stream, as RFC 2045 requires and every client does.
+    # Splicing what follows onto the payload let a sender append bytes that
+    # only this tool sees, changing the hash it reports for the attachment.
+    data = data.split(b"=", 1)[0]
+    if len(data) % 4 == 1:
+        # A lone trailing character carries no complete byte. Padding it is
+        # impossible, so drop it as every lenient decoder does: otherwise
+        # adding one character is enough to make an attachment vanish from
+        # the extraction directory while it still reaches the recipient.
+        data = data[:-1]
+    return base64.b64decode(data + b"=" * (-len(data) % 4))
+
+
 def print_attachments(attachments, flag_hash):  # pragma: no cover
     if flag_hash:
         for i in attachments:
             if i.get("content_transfer_encoding") == "base64":
-                payload = base64.b64decode(i["payload"])
+                payload = decode_base64_payload(i["payload"])
             else:
                 payload = i["payload"]
 
@@ -1003,18 +1036,41 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
 
 
 def write_attachments(attachments, base_path):  # pragma: no cover
-    """Write attachments with unique filenames for this attachment batch."""
-    used_filenames = set()
+    """
+    Write attachments with unique filenames for this attachment batch.
+
+    A single hostile attachment must not cost the rest of the batch, so an
+    unusable filename, an undecodable payload and a failing write are all
+    logged and skipped. ``MailParserPathError`` is deliberately not caught:
+    a containment failure is not a per-attachment problem.
+
+    Args:
+        attachments (list): attachments as returned by MailParser
+        base_path (string): directory the attachments are written to
+
+    Raises:
+        MailParserPathError: if an attachment escapes ``base_path``
+    """
+    used_filenames = {}
 
     for a in attachments:
-        filename = _safe_attachment_filename(a["filename"])
+        try:
+            filename = _safe_attachment_filename(a["filename"])
+        except ValueError:
+            log.warning(f"Skipped attachment with invalid filename: {a['filename']!r}")
+            continue
+
         filename = _deduplicate_filename(filename, used_filenames)
-        write_sample(
-            binary=a["binary"],
-            payload=a["payload"],
-            path=base_path,
-            filename=filename,
-        )
+
+        try:
+            write_sample(
+                binary=a["binary"],
+                payload=a["payload"],
+                path=base_path,
+                filename=filename,
+            )
+        except (OSError, ValueError):
+            log.warning(f"Skipped attachment {filename!r}", exc_info=True)
 
 
 def _safe_attachment_filename(filename):
@@ -1027,7 +1083,7 @@ def _safe_attachment_filename(filename):
     if filename in ("", ".", ".."):
         raise ValueError("Invalid attachment filename")
 
-    return filename
+    return _truncate_filename(filename)
 
 
 _COMPOUND_ATTACHMENT_EXTENSIONS = (
@@ -1050,17 +1106,113 @@ def _split_attachment_extension(filename):
     return os.path.splitext(filename)
 
 
-def _deduplicate_filename(filename, used_filenames):
-    """Return a unique filename within one write_attachments() operation."""
+# NAME_MAX is 255 bytes on Linux and macOS. Leave room for the "_1", "_2"
+# suffixes _deduplicate_filename() appends after this truncation.
+_MAX_FILENAME_BYTES = 240
+
+# Room reserved inside the budget for the "_1", "_2" deduplication marker.
+# Eight bytes would under-reserve from suffix 10**7 on, letting the marker
+# push the name past the limit again.
+_MAX_MARKER_BYTES = 11
+
+
+def _split_within_budget(filename):
+    """
+    Split a basename into root and extension, both short enough to keep.
+
+    An extension long enough to eat the whole budget is not an extension:
+    keeping it would leave no room for the root, and a negative budget
+    would slice the root from the wrong end.
+
+    Args:
+        filename (str): sanitized basename
+
+    Returns:
+        a (root, extension) tuple whose extension is at most half the budget
+    """
     root, extension = _split_attachment_extension(filename)
+    if len(extension.encode("utf-8")) > _MAX_FILENAME_BYTES // 2:
+        return filename, ""
+    return root, extension
+
+
+def _clamp_to_budget(text, budget):
+    """
+    Cut a string to at most ``budget`` UTF-8 bytes.
+
+    A partial multi-byte character left by the cut is dropped.
+
+    Args:
+        text (str): string to shorten
+        budget (int): maximum length in UTF-8 bytes
+
+    Returns:
+        the string, at most ``budget`` bytes long
+    """
+    return text.encode("utf-8")[: max(0, budget)].decode("utf-8", "ignore")
+
+
+def _truncate_filename(filename):
+    """
+    Shorten a basename so it fits NAME_MAX, keeping its extension.
+
+    The limit is measured in UTF-8 bytes, not characters, because that is
+    what the filesystem enforces.
+
+    Args:
+        filename (str): sanitized basename
+
+    Returns:
+        the basename, at most _MAX_FILENAME_BYTES bytes long
+    """
+    if len(filename.encode("utf-8")) <= _MAX_FILENAME_BYTES:
+        return filename
+
+    root, extension = _split_within_budget(filename)
+    budget = _MAX_FILENAME_BYTES - len(extension.encode("utf-8"))
+    return _clamp_to_budget(root, budget) + extension
+
+
+def _deduplicate_filename(filename, used_filenames):
+    """
+    Return a unique filename within one write_attachments() operation.
+
+    Names are compared case-insensitively. ``os.path.normcase()`` is the
+    identity on POSIX, so two attachments differing only in case were
+    treated as distinct while APFS, exFAT and SMB collapse them onto one
+    file: the second attachment silently overwrote the first. Folding
+    always costs at most a ``_1`` suffix; not folding costs evidence.
+
+    Args:
+        filename (str): sanitized basename
+        used_filenames (dict): folded name -> last suffix already handed
+            out for it, updated in place
+
+    Returns:
+        a basename not yet used in this batch
+    """
+    root, extension = _split_within_budget(filename)
+
+    # Reserve room for the marker instead of appending past the limit:
+    # write_sample() sanitizes again, and the clamp there would cut the
+    # marker back off, collapsing distinct attachments onto one file.
+    budget = _MAX_FILENAME_BYTES - len(extension.encode("utf-8")) - _MAX_MARKER_BYTES
+    stem = _clamp_to_budget(root, budget)
+
+    # Key on the stem the candidates are built from, not on the name as
+    # sent. Long names differing only past the clamp share one candidate
+    # namespace, so keying on the full name made each of them rescan the
+    # whole occupied range: quadratic in the number of attachments.
+    key = (stem + extension).casefold()
+    suffix = used_filenames.get(key, 0)
     candidate = filename
-    suffix = 1
 
-    while os.path.normcase(candidate) in used_filenames:
-        candidate = f"{root}_{suffix}{extension}"
+    while candidate.casefold() in used_filenames:
         suffix += 1
+        candidate = f"{stem}_{suffix}{extension}"
 
-    used_filenames.add(os.path.normcase(candidate))
+    used_filenames[key] = suffix
+    used_filenames.setdefault(candidate.casefold(), 0)
     return candidate
 
 
@@ -1073,8 +1225,20 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
         payload: payload of sample, in base64 if it's a binary
         path (string): path of file
         filename (string): name of file
-        hash_ (string): file hash
+
+    Raises:
+        ValueError: if a binary payload is not valid base64
+        MailParserPathError: if the file would land outside ``path``
     """
+    # Resolve the bytes before creating the file, so a payload that cannot
+    # be decoded or encoded leaves no truncated stub behind. Surrogates
+    # produced by decoding the part are mapped back to the bytes they came
+    # from rather than dropped.
+    if binary:
+        content = decode_base64_payload(payload)
+    else:
+        content = payload.encode("utf-8", "surrogateescape")
+
     filename = _safe_attachment_filename(filename)
     os.makedirs(path, exist_ok=True)
 
@@ -1088,14 +1252,10 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
         contained = False
 
     if not contained or os.path.islink(sample):
-        raise ValueError("Attachment path escapes the output directory")
+        raise MailParserPathError("Attachment path escapes the output directory")
 
-    if binary:
-        with open(sample, "wb") as f:
-            f.write(base64.b64decode(payload))
-    else:
-        with open(sample, "w") as f:
-            f.write(payload)
+    with open(sample, "wb") as f:
+        f.write(content)
 
 
 def random_string(string_length=10):

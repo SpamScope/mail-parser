@@ -203,9 +203,9 @@ The `attachments` property returns a list of dictionaries, each containing compr
 - `content-id` - Content identifier for referencing within HTML bodies
 - `filename` - Original decoded filename from the email. This is untrusted input; never use it
   directly to construct a filesystem path.
-- `safe_filename` - Filename with directory components removed, or `None` when the original has
-  no usable basename. When saving attachments, prefer `write_attachments()` for full validation
-  and collision handling.
+- `safe_filename` - Filename with directory components removed and truncated to fit the
+  filesystem name limit, or `None` when the original has no usable basename. When saving
+  attachments, prefer `write_attachments()` for full validation and collision handling.
 - `mail_content_type` - MIME content type
 - `payload` - Base64-encoded attachment data, ready for decoding or storage
 
@@ -399,7 +399,13 @@ Attachment filenames are supplied by the email sender. The `filename` value in
 not pass it directly to `open()` or join it to a directory. The `safe_filename` field provides a
 sanitized basename when one exists, but applications saving files should prefer
 `write_attachments()`, which also validates containment, rejects symlink destinations, and
-deduplicates names within the attachment batch.
+deduplicates names within the attachment batch. Deduplication is case-insensitive, because
+APFS, exFAT and SMB collapse `Invoice.pdf` and `invoice.pdf` onto a single file.
+
+A single unusable attachment never costs the rest of the batch: `write_attachments()` logs a
+warning and moves on when a filename cannot be sanitized, a payload cannot be decoded, or the
+write itself fails, so the remaining attachments are still saved. A containment failure is not
+treated this way: it raises `MailParserPathError` and stops the batch.
 
 # Usage from Command Line
 
@@ -493,7 +499,11 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserOSError: Raised when there is an OS error
 |
+\── MailParserPathError: Raised when an attachment escapes the output directory
+|
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
+|
+\── MailParserRecursionError: Raised when a message is nested too deeply to parse
 ```
 
 # Docker Deployment
