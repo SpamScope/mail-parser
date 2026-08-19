@@ -987,7 +987,7 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         The ``strict`` parameter was added to ``email.utils.getaddresses`` in
         Python 3.13 (and backported only to later security patch releases of
-        3.9-3.12). mail-parser targets ``requires-python >=3.9,<3.16``, so on
+        3.9-3.12). mail-parser targets Python 3.9 and later, so on
         an earlier patch release (e.g. CPython 3.11.3) the call raised::
 
             TypeError: getaddresses() got an unexpected keyword argument 'strict'
