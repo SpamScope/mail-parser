@@ -36,6 +36,7 @@ from mailparser.exceptions import MailParserRecursionError
 from mailparser.utils import (
     _safe_attachment_filename,
     _safe_remove,
+    as_string_safe,
     convert_mail_date,
     decode_header_part,
     decode_headers,
@@ -51,6 +52,7 @@ from mailparser.utils import (
     ported_open,
     ported_string,
     random_string,
+    raw_payload,
     receiveds_parsing,
     write_attachments,
 )
@@ -555,42 +557,52 @@ class MailParser:
                     binary = False
                     mail_content_type = ported_string(p.get_content_type())
                     log.debug(f"Mail content type {mail_content_type!r} part {i!r}")
-                    transfer_encoding = ported_string(
-                        p.get("content-transfer-encoding", "")
-                    ).lower()
+                    # Strip before comparing, exactly as email's own
+                    # get_payload() does: a trailing space made every
+                    # encoding branch below miss and the raw bytes fall
+                    # through the text path, which drops the non-UTF-8 ones.
+                    transfer_encoding = (
+                        ported_string(p.get("content-transfer-encoding", ""))
+                        .strip()
+                        .lower()
+                    )
                     log.debug(f"Transfer encoding {transfer_encoding!r} part {i!r}")
                     content_disposition = ported_string(p.get("content-disposition"))
                     log.debug(f"content-disposition {content_disposition!r} part {i!r}")
 
                     if p.is_multipart():
                         payload = "".join(
-                            [m.as_string() for m in p.get_payload(decode=False)]
+                            [as_string_safe(m) for m in p.get_payload(decode=False)]
                         )
                         binary = False
                         log.debug(f"Filename {filename!r} part {i!r} is multipart")
-                    elif transfer_encoding == "base64" or (
-                        transfer_encoding == "quoted-printable"
-                        and "application" in mail_content_type
-                    ):
-                        payload = p.get_payload(decode=False)
+                    elif transfer_encoding == "base64":
+                        payload = raw_payload(p)
+                        if not isinstance(payload, str):
+                            # The declared charset could not be applied, so
+                            # the wire text is not recoverable: re-encode the
+                            # decoded bytes to keep the payload base64.
+                            payload = base64.b64encode(payload).decode("ascii")
                         binary = True
                         log.debug(f"Filename {filename!r} part {i!r} is binary")
-                    elif "uuencode" in transfer_encoding:
-                        # Re-encode in base64
+                    else:
+                        # Every other encoding — uuencode, quoted-printable,
+                        # 7bit, 8bit, binary — is re-encoded to base64 from
+                        # the decoded bytes.  An attachment is a file, not
+                        # text: reading it back through a charset dropped
+                        # every byte that charset cannot represent (half of a
+                        # binary payload), so the extracted file was neither
+                        # the attachment nor the bytes on the wire, and its
+                        # hash never matched what the recipient received.
                         payload = base64.b64encode(p.get_payload(decode=True)).decode(
                             "ascii"
                         )
                         binary = True
-                        transfer_encoding = "base64"
                         log.debug(
-                            f"Filename {filename!r} part {i!r} is binary (uuencode"
-                            " re-encoded to base64)"
+                            f"Filename {filename!r} part {i!r} is binary"
+                            f" ({transfer_encoding!r} re-encoded to base64)"
                         )
-                    else:
-                        payload = ported_string(
-                            p.get_payload(decode=True), encoding=charset
-                        )
-                        log.debug(f"Filename {filename!r} part {i!r} is not binary")
+                        transfer_encoding = "base64"
 
                     try:
                         safe_filename = _safe_attachment_filename(filename)
@@ -616,9 +628,15 @@ class MailParser:
                     log.debug(f"Email part {i!r} is not an attachment")
 
                     payload = p.get_payload(decode=True)
-                    cte = p.get("Content-Transfer-Encoding")
-                    if cte:
-                        cte = cte.lower()
+                    # Strip as well, for the same reason as the attachment
+                    # branch above: a trailing space sent the part down the
+                    # else branch, which re-reads the text through
+                    # raw-unicode-escape and turns it into literal escapes.
+                    cte = (
+                        ported_string(p.get("Content-Transfer-Encoding", ""))
+                        .strip()
+                        .lower()
+                    )
 
                     if not cte or cte in ["7bit", "8bit"]:
                         # message_from_bytes stores non-ASCII body bytes via
@@ -627,16 +645,17 @@ class MailParser:
                         # Unicode str (no surrogates).  Detect which case we
                         # have via get_payload(decode=False) and decode
                         # accordingly so the declared charset is honoured.
-                        raw_str = p.get_payload(decode=False)
+                        raw_str = raw_payload(p)
                         if isinstance(raw_str, str):
                             try:
                                 # Raises if surrogates present (from_bytes path)
                                 raw_str.encode("utf-8")
                                 payload = raw_str
                             except UnicodeEncodeError:
-                                # Recover original bytes then decode with charset
-                                orig_bytes = raw_str.encode("ascii", "surrogateescape")
-                                payload = ported_string(orig_bytes, encoding=charset)
+                                # These encodings are not transformed by
+                                # get_payload(decode=True), so ``payload``
+                                # already holds the original bytes.
+                                payload = ported_string(payload, encoding=charset)
                         else:
                             payload = ported_string(payload, encoding=charset)
                     else:
@@ -1081,7 +1100,7 @@ class MailParser:
         """
         Return the entire message flattened as a string.
         """
-        return self.message.as_string() if self.message else ""
+        return as_string_safe(self.message) if self.message else ""
 
     @property
     def to_domains(self):

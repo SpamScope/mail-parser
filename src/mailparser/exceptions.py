@@ -21,6 +21,7 @@ __all__ = (
     "MailParserOutlookError",
     "MailParserEnvironmentError",
     "MailParserOSError",
+    "MailParserPathError",
     "MailParserReceivedParsingError",
     "MailParserRecursionError",
 )
@@ -53,6 +54,18 @@ class MailParserEnvironmentError(MailParserError):
 class MailParserOSError(MailParserError):
     """
     Raised when there is an OS error
+    """
+
+    pass
+
+
+class MailParserPathError(MailParserError):
+    """
+    Raised when an attachment would be written outside the output directory.
+
+    This is a containment failure, not a per-attachment problem, so it keeps
+    its own type: ``write_attachments()`` skips individual attachments that
+    cannot be decoded or written, but must never swallow this one.
     """
 
     pass

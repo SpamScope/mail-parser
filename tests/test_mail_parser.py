@@ -16,6 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import base64
 import datetime
 import hashlib
 import json
@@ -32,8 +33,15 @@ import pytest
 
 import mailparser
 from mailparser.const import REGXIP6
-from mailparser.exceptions import MailParserOSError, MailParserRecursionError
+from mailparser.exceptions import (
+    MailParserOSError,
+    MailParserPathError,
+    MailParserRecursionError,
+)
 from mailparser.utils import (
+    _deduplicate_filename,
+    _safe_attachment_filename,
+    _truncate_filename,
     convert_mail_date,
     extract_msg_convert,
     fingerprints,
@@ -171,6 +179,304 @@ dGhpcmQ=
             self.assertFalse(os.path.exists(os.path.join(temp_dir, "marker.txt")))
             self.assertFalse(os.path.exists(os.path.join(temp_dir, "content-id.txt")))
 
+    def test_write_attachments_skips_invalid_filename(self):
+        # A NUL byte smuggled in through RFC 2231 percent-encoding used to
+        # raise ValueError out of write_attachments(), so every attachment
+        # after the hostile one was silently never written.
+        raw_mail = (
+            "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Disposition: attachment; "
+            "filename*=us-ascii''evil%00.bin\r\n\r\nxx\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Disposition: attachment; filename=good.bin\r\n\r\nyy\r\n"
+            "--b--\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+        self.assertEqual(mail.attachments[0]["filename"], "evil\x00.bin")
+        self.assertIsNone(mail.attachments[0]["safe_filename"])
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail.write_attachments(output_dir)
+            self.assertEqual(os.listdir(output_dir), ["good.bin"])
+
+    def test_write_attachments_truncates_long_filename(self):
+        # A basename longer than NAME_MAX used to raise OSError out of
+        # write_sample() and abort the rest of the batch.
+        long_name = "a" * 300 + ".bin"
+        raw_mail = (
+            "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            f"Content-Disposition: attachment; filename={long_name}\r\n\r\nxx\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Disposition: attachment; filename=good.bin\r\n\r\nyy\r\n"
+            "--b--\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail.write_attachments(output_dir)
+            written = sorted(os.listdir(output_dir))
+
+        self.assertEqual(len(written), 2)
+        self.assertIn("good.bin", written)
+        truncated = next(i for i in written if i != "good.bin")
+        self.assertTrue(truncated.endswith(".bin"))
+        self.assertLessEqual(len(truncated.encode("utf-8")), 240)
+
+    def test_write_attachments_repairs_malformed_payload(self):
+        # base64.b64decode() raises binascii.Error, a ValueError subclass,
+        # so a payload with a length no padding can fix used to abort the
+        # batch and leave a zero-byte stub behind. Every MUA repairs it, so
+        # neither attachment may be lost.
+        raw_mail = (
+            "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Transfer-Encoding: base64\r\n"
+            "Content-Disposition: attachment; filename=evil.bin\r\n\r\nAAAAA\r\n"
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Disposition: attachment; filename=good.bin\r\n\r\nyy\r\n"
+            "--b--\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail.write_attachments(output_dir)
+            self.assertEqual(sorted(os.listdir(output_dir)), ["evil.bin", "good.bin"])
+            with open(os.path.join(output_dir, "evil.bin"), "rb") as attachment:
+                # The orphan character carries no complete byte and is
+                # dropped, exactly as a mail client would.
+                self.assertEqual(attachment.read(), b"\x00\x00\x00")
+
+    def test_base64_attachment_with_orphan_character(self):
+        # Adding one character makes the length 1 more than a multiple of
+        # four, which no padding can repair. Rejecting it deleted the
+        # attachment from the extraction directory while the recipient's
+        # client still saved it intact.
+        original = b"MZ\x90\x00PAYLOAD-EXE"
+        poisoned = base64.b64encode(original).decode("ascii") + "A"
+        raw_mail = (
+            "From: a@b.c\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Transfer-Encoding: base64\r\n"
+            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n{poisoned}'
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            self.assertEqual(os.listdir(temp_dir), ["x.bin"])
+            with open(os.path.join(temp_dir, "x.bin"), "rb") as attachment:
+                self.assertEqual(attachment.read(), original)
+
+    def test_base64_data_after_padding_is_ignored(self):
+        # RFC 2045 ends the stream at the padding and every client stops
+        # there. Splicing what follows onto the payload let a sender append
+        # bytes only this tool sees, changing the hash it reports.
+        original = b"MZ\x90\x00EICAR-MARKER"
+        poisoned = base64.b64encode(original).decode("ascii") + "QUJD"
+        raw_mail = (
+            "From: a@b.c\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Transfer-Encoding: base64\r\n"
+            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n{poisoned}'
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            with open(os.path.join(temp_dir, "x.bin"), "rb") as attachment:
+                self.assertEqual(attachment.read(), original)
+
+    def test_multipart_subpart_with_unencodable_charset(self):
+        # BytesGenerator bypasses the charset only for text parts, so a
+        # part typed multipart but carrying no boundary made the as_bytes()
+        # fallback raise exactly like as_string() had.
+        for charset in (b"undefined", b"idna"):
+            raw_mail = (
+                b'Content-Type: multipart/mixed; boundary="B1"\r\n\r\n--B1\r\n'
+                b'Content-Type: multipart/mixed; boundary="B2"\r\n'
+                b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n--B2\r\n'
+                b"Content-Type: multipart/report; charset=" + charset + b"\r\n"
+                b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe\x80 body\r\n"
+                b"--B1--\r\n"
+            )
+
+            mail = mailparser.parse_from_bytes(raw_mail)
+
+            self.assertEqual(len(mail.attachments), 1)
+            self.assertIsInstance(mail.mail_json, str)
+
+    def test_nested_multipart_with_unencodable_charset(self):
+        # The refusing part can be nested any depth down, so the fallback
+        # must walk a conforming multipart's sub-parts instead of trying to
+        # decode the list of them.
+        raw_mail = (
+            b'Content-Type: multipart/mixed; boundary="B1"\r\n\r\n--B1\r\n'
+            b'Content-Type: multipart/mixed; boundary="B2"\r\n'
+            b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n--B2\r\n'
+            b'Content-Type: multipart/mixed; boundary="B3"\r\n\r\n--B3\r\n'
+            b'Content-Type: multipart/report; charset="undefined"\r\n'
+            b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe\x80 body\r\n"
+            b"--B3--\r\n--B2--\r\n--B1--\r\n"
+        )
+
+        mail = mailparser.parse_from_bytes(raw_mail)
+
+        self.assertEqual(len(mail.attachments), 1)
+        self.assertIsInstance(mail.mail_json, str)
+
+    def test_message_as_string_with_unencodable_charset(self):
+        raw_mail = (
+            b'Content-Type: multipart/report; charset="undefined"\r\n'
+            b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe\x80 body\r\n"
+        )
+
+        mail = mailparser.parse_from_bytes(raw_mail)
+
+        self.assertIsInstance(mail.message_as_string, str)
+
+    def test_multipart_attachment_with_unencodable_charset(self):
+        # as_string() re-encodes an 8-bit body with the charset the sender
+        # declared, and utf-16 (like idna, or a non-text codec) cannot
+        # represent the surrogates that carry those bytes.
+        for charset in (b"utf-16", b"utf-32", b"idna", b"undefined", b"base64"):
+            raw_mail = (
+                b"From: a@b.c\r\nContent-Type: multipart/mixed; boundary=BB\r\n\r\n"
+                b"--BB\r\nContent-Type: message/rfc822\r\n"
+                b'Content-Disposition: attachment; filename="fwd.eml"\r\n\r\n'
+                b"Content-Type: text/plain; charset=" + charset + b"\r\n"
+                b"\r\n\xff\xfeA\x00\r\n--BB--\r\n"
+            )
+
+            mail = mailparser.parse_from_bytes(raw_mail)
+
+            self.assertEqual(len(mail.attachments), 1)
+            self.assertIsInstance(mail.mail_json, str)
+
+    def test_write_attachments_keeps_truncated_names_distinct(self):
+        # Truncation makes distinct long names collide.  Appending "_1" past
+        # the length limit did not help: write_sample() sanitizes again and
+        # the clamp cut the suffix back off, so every colliding attachment
+        # landed on one file and only the last payload survived.
+        prefix = "a" * 236
+        names = (
+            prefix + "A" * 60 + ".bin",
+            prefix + "B" * 60 + ".bin",
+            prefix + "A" * 60 + ".bin",
+        )
+        payloads = ("one", "two", "three")
+        parts = "".join(
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
+            for name, payload in zip(names, payloads)
+        )
+        raw_mail = f"Content-Type: multipart/mixed; boundary=b\r\n\r\n{parts}--b--\r\n"
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail.write_attachments(output_dir)
+            written = os.listdir(output_dir)
+
+            self.assertEqual(len(written), 3)
+            for name in written:
+                self.assertLessEqual(len(name.encode("utf-8")), 240)
+
+            contents = []
+            for name in written:
+                with open(os.path.join(output_dir, name)) as attachment:
+                    contents.append(attachment.read())
+            self.assertEqual(sorted(contents), ["one", "three", "two"])
+
+    def test_write_attachments_long_extension_collision(self):
+        # An extension longer than half the budget left no room for the
+        # dedup marker, so the reserved budget went negative and sliced the
+        # root from the wrong end. The name then no longer survived the
+        # clamp inside write_sample(), and a third attachment named like
+        # the re-clamped result could overwrite it.
+        names = ("a." + "b" * 238, "a." + "b" * 238, "_1." + "b" * 237)
+        payloads = ("first", "second", "third")
+        parts = "".join(
+            "--b\r\nContent-Type: application/octet-stream\r\n"
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
+            for name, payload in zip(names, payloads)
+        )
+        raw_mail = f"Content-Type: multipart/mixed; boundary=b\r\n\r\n{parts}--b--\r\n"
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            mail.write_attachments(output_dir)
+            written = os.listdir(output_dir)
+
+            self.assertEqual(len(written), 3)
+            contents = []
+            for name in written:
+                self.assertLessEqual(len(name.encode("utf-8")), 240)
+                with open(os.path.join(output_dir, name)) as attachment:
+                    contents.append(attachment.read())
+            self.assertEqual(sorted(contents), ["first", "second", "third"])
+
+    def test_deduplicated_names_survive_resanitization(self):
+        # write_sample() sanitizes again, so every name dedup hands out must
+        # already be a fixed point of _truncate_filename().
+        used_filenames = {}
+        base = _safe_attachment_filename("a." + "b" * 238)
+
+        for _ in range(150):
+            candidate = _deduplicate_filename(base, used_filenames)
+            self.assertEqual(_truncate_filename(candidate), candidate)
+
+    def test_write_attachments_reports_path_escape(self):
+        # The per-attachment guard must not swallow a containment failure.
+        raw_mail = (
+            "Content-Type: application/octet-stream\r\n"
+            "Content-Disposition: attachment; filename=attachment.txt\r\n\r\nxx\r\n"
+        )
+        mail = mailparser.parse_from_string(raw_mail)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = os.path.join(temp_dir, "attachments")
+            os.makedirs(output_dir)
+            target = os.path.join(temp_dir, "outside.txt")
+            try:
+                os.symlink(target, os.path.join(output_dir, "attachment.txt"))
+            except (NotImplementedError, OSError):  # pragma: no cover
+                self.skipTest("symlinks are not supported")
+
+            with self.assertRaises(MailParserPathError):
+                mail.write_attachments(output_dir)
+            self.assertFalse(os.path.exists(target))
+
+    def test_truncate_filename(self):
+        self.assertEqual(_truncate_filename("short.bin"), "short.bin")
+
+        # Extension is preserved, including compound tar extensions.
+        truncated = _truncate_filename("a" * 300 + ".tar.gz")
+        self.assertTrue(truncated.endswith(".tar.gz"))
+        self.assertEqual(len(truncated.encode("utf-8")), 240)
+
+        # The limit is measured in bytes, not characters, and a multi-byte
+        # character cut in half by the budget is dropped, not mangled.
+        truncated = _truncate_filename("è" * 300 + ".bin")
+        self.assertTrue(truncated.endswith(".bin"))
+        self.assertLessEqual(len(truncated.encode("utf-8")), 240)
+        self.assertEqual(truncated, truncated.encode("utf-8").decode("utf-8"))
+
+        # An extension big enough to eat the whole budget is not honoured
+        # as an extension, and the result still fits.
+        truncated = _truncate_filename("a." + "b" * 300)
+        self.assertEqual(len(truncated.encode("utf-8")), 240)
+
     def test_attachment_with_unusable_filename_remains_parseable(self):
         raw_mail = """MIME-Version: 1.0
 Content-Type: application/octet-stream
@@ -236,6 +542,45 @@ Y29udGVudA==
         for i in mail.received:
             self.assertIn("date_utc", i)
             self.assertIsNotNone(i["date_utc"])
+
+    def test_received_date_out_of_range(self):
+        # A year whose epoch seconds overflow int64 makes calendar.timegm()
+        # raise OverflowError, which used to escape receiveds_format() and
+        # abort the parse of the whole message.
+        raw_mail = (
+            "Received: from x ([1.2.3.4]) by mx.victim.com; "
+            "Tue, 7 Mar 292277026596 14:29:24 +0000\r\n\r\nbody\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw_mail)
+
+        self.assertIsNone(mail.received[0]["date_utc"])
+        self.assertIsInstance(mail.mail_json, str)
+
+    def test_received_date_magnitude_sweep(self):
+        # Every year magnitude must fail closed, whatever the stdlib raises.
+        for exponent in range(4, 20):
+            raw_mail = (
+                "Received: from x ([1.2.3.4]) by mx; "
+                f"Tue, 7 Mar {10**exponent} 14:29:24 +0000\r\n\r\nbody\r\n"
+            )
+
+            mail = mailparser.parse_from_string(raw_mail)
+            self.assertIsNone(mail.received[0]["date_utc"])
+
+    def test_received_date_offset_magnitude_sweep(self):
+        # A huge timezone offset pushes the timestamp into the band where
+        # datetime.fromtimestamp() reports EOVERFLOW as OSError, which is
+        # neither ValueError nor OverflowError.
+        for digits in range(4, 26):
+            for sign in "+-":
+                raw_mail = (
+                    "Received: from a by b; 7 Mar 1970 14:29:24 "
+                    f"{sign}{'9' * digits}\r\n\r\nbody\r\n"
+                )
+
+                mail = mailparser.parse_from_string(raw_mail)
+                self.assertIsInstance(mail.mail_json, str)
 
     def test_get_header(self):
         mail = mailparser.parse_from_file(mail_test_1)
@@ -474,8 +819,12 @@ Y29udGVudA==
         self.assertEqual(1, result)
 
     def test_quoted_printable_application_attachment(self):
-        # A quoted-printable application/* attachment must be kept as binary
-        # (raw QP text), not decoded as UTF-8, which drops the non-UTF8 bytes.
+        # A quoted-printable application/* attachment must keep its exact
+        # bytes, not be decoded as UTF-8, which drops the non-UTF8 ones.
+        # It is re-encoded to base64 so that the reported payload matches
+        # the declared transfer encoding: reporting raw QP text as a binary
+        # payload made write_attachments() base64-decode it, saving bytes
+        # that are neither the attachment nor what was on the wire.
         import quopri
 
         original = b"\xff\xfe\x00\x01PDFdata\x80\x81\x82\xc0\xc1"
@@ -491,12 +840,192 @@ Y29udGVudA==
             + qp
             + "\r\n--B--\r\n"
         )
-        attachment = mailparser.parse_from_string(raw).attachments[0]
+        mail = mailparser.parse_from_string(raw)
+        attachment = mail.attachments[0]
         self.assertTrue(attachment["binary"])
-        self.assertEqual(attachment["content_transfer_encoding"], "quoted-printable")
-        self.assertEqual(
-            quopri.decodestring(attachment["payload"].encode("ascii")), original
+        self.assertEqual(attachment["content_transfer_encoding"], "base64")
+        self.assertEqual(base64.b64decode(attachment["payload"]), original)
+
+        # The bytes written to disk are the attachment, not a re-reading of
+        # the wire text under a different encoding.
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            with open(os.path.join(temp_dir, "f.bin"), "rb") as written:
+                self.assertEqual(written.read(), original)
+
+    def test_transfer_encoding_is_stripped(self):
+        # email's own get_payload() strips the header before comparing it.
+        # Without the same normalisation a trailing space missed every
+        # encoding branch, and the raw bytes fell through the text path,
+        # which silently drops every non-UTF-8 byte.
+        original = b"MZ\x90\x00\x03\xff\xfeEICAR-TEST"
+        encoded = base64.b64encode(original).decode("ascii")
+
+        for transfer_encoding in ("base64", "base64 ", " base64", "base64\t"):
+            raw = (
+                'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+                "--B\r\nContent-Type: application/octet-stream\r\n"
+                f"Content-Transfer-Encoding: {transfer_encoding}\r\n"
+                'Content-Disposition: attachment; filename="f.bin"\r\n\r\n'
+                f"{encoded}\r\n--B--\r\n"
+            )
+
+            mail = mailparser.parse_from_string(raw)
+            self.assertTrue(mail.attachments[0]["binary"])
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                mail.write_attachments(temp_dir)
+                with open(os.path.join(temp_dir, "f.bin"), "rb") as written:
+                    self.assertEqual(written.read(), original)
+
+    def test_undefined_charset(self):
+        # The "undefined" codec raises a bare UnicodeError, which is not a
+        # UnicodeDecodeError and used to escape parse() entirely.
+        raw = (
+            "From: a@b.c\r\nSubject: s\r\nMIME-Version: 1.0\r\n"
+            'Content-Type: text/plain; charset="undefined"\r\n'
+            "Content-Transfer-Encoding: base64\r\n\r\nQUJD\r\n"
         )
+
+        mail = mailparser.parse_from_string(raw)
+
+        self.assertEqual(mail.text_plain, ["ABC"])
+
+    def test_hostile_charset_does_not_escape_parse(self):
+        # get_payload(decode=False) applies the declared charset, and the
+        # email package guards that only against an unknown charset name,
+        # not against a codec that refuses outright.
+        cases = (
+            b'Content-Type: application/octet-stream; charset="undefined"\r\n'
+            b"Content-Transfer-Encoding: base64\r\n"
+            b"Content-Disposition: attachment; filename=x.bin\r\n\r\nQUJD\xff\r\n",
+            b'Content-Type: text/plain; charset="undefined"\r\n'
+            b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe body\r\n",
+            b'Content-Type: text/plain; charset="idna"\r\n'
+            b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff body\r\n",
+            b'Content-Type: text/plain; charset="unicode_escape"\r\n'
+            b"Content-Transfer-Encoding: 8bit\r\n\r\n\\udc80\xff\r\n",
+        )
+
+        for raw in cases:
+            mail = mailparser.parse_from_bytes(raw)
+            self.assertIsInstance(mail.mail_json, str)
+
+    def test_body_transfer_encoding_is_stripped(self):
+        # A trailing space sent the body down the branch that re-reads the
+        # text through raw-unicode-escape, turning it into literal escapes
+        # and hiding every non-ASCII indicator from a content scanner.
+        body = "Ваш пароль истёк"
+
+        for transfer_encoding in ("8bit", "8bit ", "8bit\t", "8BIT"):
+            raw = (
+                "From: a@b.c\r\nMIME-Version: 1.0\r\n"
+                'Content-Type: text/plain; charset="utf-8"\r\n'
+                f"Content-Transfer-Encoding: {transfer_encoding}\r\n\r\n{body}\r\n"
+            )
+
+            mail = mailparser.parse_from_string(raw)
+            self.assertIn(body, mail.text_plain[0])
+
+    def test_write_attachments_repairs_base64_padding(self):
+        # base64.b64decode() rejects padding errors every MUA repairs, so a
+        # sender could strip one character to drop the attachment from the
+        # extraction directory while it still reached the recipient.
+        original = b"MZ\x90\x00EICAR-STANDARD"
+        unpadded = base64.b64encode(original).decode("ascii").rstrip("=")
+        raw = (
+            'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+            "--B\r\nContent-Type: application/octet-stream\r\n"
+            "Content-Transfer-Encoding: base64\r\n"
+            'Content-Disposition: attachment; filename="f.bin"\r\n\r\n'
+            f"{unpadded}\r\n--B--\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            with open(os.path.join(temp_dir, "f.bin"), "rb") as written:
+                self.assertEqual(written.read(), original)
+
+    def test_write_attachments_leaves_no_empty_stub(self):
+        # A hostile charset used to reach the write through the text path,
+        # where the payload was encoded only after open() had created the
+        # file, leaving a zero-byte stub behind. Attachments now stay bytes,
+        # so the charset never touches them.
+        body = "AAAA" + r"\udcff" + "BBBB"
+        raw = (
+            'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+            "--B\r\nContent-Type: application/octet-stream; "
+            'charset="raw-unicode-escape"\r\n'
+            "Content-Transfer-Encoding: 7bit\r\n"
+            'Content-Disposition: attachment; filename="f.bin"\r\n\r\n'
+            f"{body}\r\n--B--\r\n"
+        )
+
+        mail = mailparser.parse_from_string(raw)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            written = os.path.join(temp_dir, "f.bin")
+            self.assertNotEqual(os.path.getsize(written), 0)
+            with open(written, "rb") as attachment:
+                self.assertEqual(attachment.read(), body.encode("ascii"))
+
+    def test_unencoded_attachment_keeps_every_byte(self):
+        # Attachments declaring 7bit/8bit/binary used to be read back
+        # through the declared charset with errors="ignore", which dropped
+        # every byte that charset could not represent — half of a binary
+        # payload — so the extracted file never hashed like the one the
+        # recipient received.
+        original = bytes(range(256)) * 16
+
+        for transfer_encoding in ("7bit", "8bit", "binary"):
+            raw = (
+                b'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+                b"--B\r\nContent-Type: application/octet-stream\r\n"
+                b"Content-Transfer-Encoding: "
+                + transfer_encoding.encode("ascii")
+                + b"\r\n"
+                b'Content-Disposition: attachment; filename="setup.exe"\r\n\r\n'
+                + original
+                + b"\r\n--B--\r\n"
+            )
+
+            mail = mailparser.parse_from_bytes(raw)
+            attachment = mail.attachments[0]
+            self.assertTrue(attachment["binary"])
+            self.assertEqual(attachment["content_transfer_encoding"], "base64")
+            self.assertEqual(base64.b64decode(attachment["payload"]), original)
+
+            with tempfile.TemporaryDirectory() as temp_dir:
+                mail.write_attachments(temp_dir)
+                with open(os.path.join(temp_dir, "setup.exe"), "rb") as written:
+                    self.assertEqual(written.read(), original)
+
+    def test_write_attachments_case_insensitive_collision(self):
+        # os.path.normcase() is the identity on POSIX, so names differing
+        # only in case were treated as distinct while APFS, exFAT and SMB
+        # collapse them: the second attachment overwrote the first.
+        parts = "".join(
+            "--B\r\nContent-Type: application/octet-stream\r\n"
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
+            for name, payload in (("Invoice.pdf", "benign"), ("invoice.pdf", "malware"))
+        )
+        raw = f'Content-Type: multipart/mixed; boundary="B"\r\n\r\n{parts}--B--\r\n'
+
+        mail = mailparser.parse_from_string(raw)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mail.write_attachments(temp_dir)
+            written = os.listdir(temp_dir)
+
+            self.assertEqual(len(written), 2)
+            contents = []
+            for name in written:
+                with open(os.path.join(temp_dir, name), "rb") as attachment:
+                    contents.append(attachment.read())
+            self.assertEqual(sorted(contents), [b"benign", b"malware"])
 
     def test_add_content_type(self):
         mail = mailparser.parse_from_file(mail_test_3)
@@ -507,12 +1036,18 @@ Y29udGVudA==
 
         self.assertEqual(len(result["attachments"]), 1)
         self.assertIsInstance(result["attachments"][0]["mail_content_type"], str)
-        self.assertFalse(result["attachments"][0]["binary"])
+        # Attachments are kept as bytes, so a quoted-printable part is
+        # reported base64-wrapped rather than re-read through its charset.
+        self.assertTrue(result["attachments"][0]["binary"])
         self.assertIsInstance(result["attachments"][0]["payload"], str)
         self.assertEqual(
-            result["attachments"][0]["content_transfer_encoding"], "quoted-printable"
+            result["attachments"][0]["content_transfer_encoding"], "base64"
         )
         self.assertEqual(result["attachments"][0]["charset"], "iso-8859-1")
+        self.assertIn(
+            b"The WatchGuard Firebox",
+            base64.b64decode(result["attachments"][0]["payload"]),
+        )
         self.assertEqual(result["attachments"][0]["content-disposition"], "inline")
 
         mail = mailparser.parse_from_file(mail_malformed_1)

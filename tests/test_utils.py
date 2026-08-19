@@ -26,7 +26,11 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-from mailparser.exceptions import MailParserOSError, MailParserReceivedParsingError
+from mailparser.exceptions import (
+    MailParserOSError,
+    MailParserPathError,
+    MailParserReceivedParsingError,
+)
 from mailparser.utils import (
     _GETADDRESSES_SUPPORTS_STRICT,
     decode_header_part,
@@ -642,7 +646,9 @@ class TestUtilsEdgeCases(unittest.TestCase):
             except (NotImplementedError, OSError):  # pragma: no cover
                 self.skipTest("symlinks are not supported")
 
-            with self.assertRaises(ValueError):
+            # Containment failures keep their own type so that the
+            # per-attachment guard in write_attachments() cannot swallow them.
+            with self.assertRaises(MailParserPathError):
                 write_sample(False, "payload", output_dir, "attachment.txt")
             self.assertFalse(os.path.exists(target))
 
@@ -650,7 +656,7 @@ class TestUtilsEdgeCases(unittest.TestCase):
         """Deduplication preserves extensions and handles existing suffixes."""
         from mailparser.utils import _deduplicate_filename
 
-        used_filenames = set()
+        used_filenames = {}
         filenames = (
             "report.tar.gz",
             "report.tar.gz",
@@ -675,6 +681,38 @@ class TestUtilsEdgeCases(unittest.TestCase):
                 "README_1",
             ],
         )
+
+    def test_deduplicate_filename_scales_linearly(self):
+        """A batch of same-named attachments must not be quadratic."""
+        from mailparser.utils import _deduplicate_filename
+
+        used_filenames = {}
+        start = time.monotonic()
+        for _ in range(16000):
+            _deduplicate_filename("a.bin", used_filenames)
+        elapsed = time.monotonic() - start
+
+        # Restarting the suffix scan at 1 for every attachment took ~14s
+        # here; resuming from the last suffix takes milliseconds.
+        self.assertLess(elapsed, 5)
+
+    def test_deduplicate_long_names_scale_linearly(self):
+        """Names sharing a clamped stem must not rescan the whole range."""
+        from mailparser.utils import _deduplicate_filename, _safe_attachment_filename
+
+        used_filenames = {}
+        start = time.monotonic()
+        for i in range(4000):
+            # Distinct names that all clamp onto the same stem: keying the
+            # resume counter on the name as sent made each one quadratic.
+            filename = _safe_attachment_filename(
+                "a" * 238 + chr(65 + i % 26) + chr(65 + (i // 26) % 26)
+            )
+            _deduplicate_filename(filename, used_filenames)
+            _deduplicate_filename(filename, used_filenames)
+        elapsed = time.monotonic() - start
+
+        self.assertLess(elapsed, 5)
 
     def test_random_string(self):
         """Test random_string function"""
@@ -987,7 +1025,7 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         The ``strict`` parameter was added to ``email.utils.getaddresses`` in
         Python 3.13 (and backported only to later security patch releases of
-        3.9-3.12). mail-parser targets ``requires-python >=3.9,<3.15``, so on
+        3.9-3.12). mail-parser targets Python 3.9 and later, so on
         an earlier patch release (e.g. CPython 3.11.3) the call raised::
 
             TypeError: getaddresses() got an unexpected keyword argument 'strict'
