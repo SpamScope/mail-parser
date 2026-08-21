@@ -29,6 +29,12 @@ maintainers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/SpamScope/mail-parser"
+Source = "https://github.com/SpamScope/mail-parser"
+Issues = "https://github.com/SpamScope/mail-parser/issues"
+Changelog = "https://github.com/SpamScope/mail-parser/releases"
+
 [project.optional-dependencies]
 outlook = ["extract-msg>=0.54"]
 
