@@ -585,3 +585,16 @@ The default configuration includes:
 
 Customize the `docker-compose.yml` file to adjust mount points, command-line options, or
 environment variables for your specific use case.
+
+# Working with coding agents
+
+[AGENTS.md](AGENTS.md) is the shared source of development commands, coding
+conventions, architecture notes, and security review requirements.
+[Codex reads it automatically](https://developers.openai.com/codex/guides/agents-md).
+[CLAUDE.md](CLAUDE.md) imports the same file using
+[Claude Code's import syntax](https://code.claude.com/docs/en/memory#import-additional-files),
+so updates to shared guidance belong in `AGENTS.md`.
+
+The existing [security reviewer](.claude/agents/security-reviewer.md) remains
+available as a Claude Code sub-agent. Codex follows the same review procedure
+as described in `AGENTS.md`.
