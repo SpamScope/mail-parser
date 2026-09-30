@@ -63,7 +63,9 @@ log = logging.getLogger(__name__)
 # name a header after any of them, so they are skipped while collecting
 # headers: otherwise ``mail["defects"]`` would hold a string from the wire
 # instead of the list of parsed defects.
-_RESERVED_MAIL_KEYS = frozenset({"defects", "defects_categories", "has_defects"})
+_RESERVED_MAIL_KEYS = frozenset(
+    {"defects", "defects_categories", "has_defects", "address_header_defects"}
+)
 
 
 def parse_from_file_obj(fp):
@@ -322,6 +324,29 @@ class MailParser:
         self._mail = {}
         self._mail_partial = {}
         self._header_index = self._build_header_index()
+        self._address_header_defects = []
+        self._address_headers = {}
+        for header in sorted(ADDRESSES_HEADERS):
+            for occurrence, value in enumerate(self._header_index.get(header, [])):
+                diagnostics = []
+                addresses = get_addresses(value, defects=diagnostics)
+                if occurrence == 0:
+                    self._address_headers[header] = addresses
+                for defect in diagnostics:
+                    defect.update(header=header, occurrence=occurrence)
+                    self._address_header_defects.append(defect)
+        if self._address_header_defects:
+            self._has_defects = True
+            self._defects_categories.add("AddressHeaderDefect")
+            self._defects.append(
+                {
+                    "address-headers": [
+                        f"AddressHeaderDefect: {d['header']}[{d['occurrence']}]: "
+                        f"{d['reason']}"
+                        for d in self._address_header_defects
+                    ]
+                }
+            )
 
     def _build_header_index(self):
         """
@@ -380,18 +405,9 @@ class MailParser:
 
         # object headers
         if name_header in ADDRESSES_HEADERS:
-            values = self._header_index.get(name_header)
-            # ``Message.get()`` semantics: only the first occurrence
-            raw_header = values[0] if values else ""
-            # Parse addresses. RFC 5322 §3.4 does not allow unquoted "@" in
-            # display names, so a strict parser correctly rejects headers like
-            #   From: alice@example.com <bob@example.com>
-            # and returns ('', '').  mail-parser is a security/forensics tool,
-            # not an MTA: hiding addresses from analysts is worse than accepting
-            # non-conforming input.  get_addresses() applies a regex fallback
-            # when strict parsing yields only empty results — see its docstring
-            # in utils.py for the full rationale.
-            parsed_addresses = get_addresses(raw_header)
+            # First-occurrence semantics are preserved; all occurrences
+            # are inspected once for diagnostics during reset.
+            parsed_addresses = self._address_headers.get(name_header, [])
 
             # decoded addresses — skip entries with no address (absent header)
             return [
@@ -466,6 +482,9 @@ class MailParser:
             value = getattr(self, i) if i in COMPUTED_PARTS else self._header_value(i)
             if value:
                 mail[i] = value
+
+        if self.address_header_defects:
+            mail["address_header_defects"] = self.address_header_defects
 
         # add defects
         mail["has_defects"] = self.has_defects
@@ -1065,6 +1084,16 @@ class MailParser:
         if self.mail_partial.get("date") and self.date:
             self._mail_partial["date"] = self.date.isoformat()
         return json.dumps(self.mail_partial, ensure_ascii=False, indent=2)
+
+    @property
+    def address_header_defects(self):
+        """Recovery/ambiguity evidence, with header, occurrence and raw item.
+
+        ``recovered`` indicates a structurally determined mailbox. Otherwise
+        candidates are evidence only and are omitted from address tuples.
+        Occurrences are zero-based; duplicate header values remain in *_raw.
+        """
+        return self._address_header_defects
 
     @property
     def defects(self):
