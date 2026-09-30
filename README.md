@@ -266,6 +266,49 @@ mail.to_raw      # Original "To:" header string as it appears in the email
 The command-line tool outputs parsed emails in JSON format by default for easy integration with
 other tools and pipelines.
 
+### Address recovery and ambiguous headers
+
+Address properties such as `from_`, `to`, and `reply_to` retain their list of
+`(display_name, address)` tuples. Mailbox selection respects quoted strings,
+escapes, nested comments, groups, and folding whitespace. For example:
+
+```python
+mail = mailparser.parse_from_string(
+    "From: billing@trusted.example < billing@vendor.example >\r\n\r\n"
+)
+mail.from_
+# [('billing@trusted.example', 'billing@vendor.example')]
+mail.has_defects
+# True
+mail.address_header_defects[0]["reason"]
+# 'invalid-display-name'
+```
+
+RFC 5322 permits whitespace around the mailbox inside `<...>`; the unquoted
+`@` in this example's display name requires forensic recovery. A complete,
+unambiguous angle-address takes precedence over its display name. Addresses
+inside comments or quoted display names are never mailbox candidates.
+
+`address_header_defects` exposes recovery and ambiguity evidence. Each entry
+contains `header`, zero-based `occurrence`, the original `raw` list item,
+`reason`, `recovered`, and `candidates` (display-name/address dictionaries).
+It is included in `mail`, `mail_partial`, and their JSON output when nonempty,
+and also sets `has_defects` and the `AddressHeaderDefect` category. Diagnostics
+are computed once per parse, including repeated header occurrences; address
+properties retain their existing first-occurrence semantics.
+
+Ambiguous or incomplete items are omitted from address tuples, with their
+raw evidence and any structurally identified candidates retained in diagnostics.
+Valid neighbouring items are parsed independently. Consumers making filtering
+or attribution decisions should inspect these diagnostics: an empty address
+list does not establish that the original header contained no addresses.
+`structural-recovery` means the stdlib's interpretation could not be used; it
+is not by itself proof of an RFC violation. This recovery policy is not a full
+RFC validator or a guarantee of how every mail client displays malformed mail.
+The complete original header values remain available through `from_raw`,
+`to_raw`, etc.; literal headers colliding with computed metadata remain in
+`headers` and `message.get_all(...)`.
+
 ## Defects and Their Critical Role in Email Security
 
 Email structural defects are not merely technical curiosities—they represent **potential security
@@ -542,3 +585,16 @@ The default configuration includes:
 
 Customize the `docker-compose.yml` file to adjust mount points, command-line options, or
 environment variables for your specific use case.
+
+# Working with coding agents
+
+[AGENTS.md](AGENTS.md) is the shared source of development commands, coding
+conventions, architecture notes, and security review requirements.
+[Codex reads it automatically](https://developers.openai.com/codex/guides/agents-md).
+[CLAUDE.md](CLAUDE.md) imports the same file using
+[Claude Code's import syntax](https://code.claude.com/docs/en/memory#import-additional-files),
+so updates to shared guidance belong in `AGENTS.md`.
+
+The existing [security reviewer](.claude/agents/security-reviewer.md) remains
+available as a Claude Code sub-agent. Codex follows the same review procedure
+as described in `AGENTS.md`.
