@@ -40,6 +40,7 @@ from email.errors import HeaderParseError
 from email.header import decode_header
 from unicodedata import normalize
 
+from mailparser.addresses import parse_address_header
 from mailparser.const import (
     _CLAUSE_SPLITTER,
     _DATE_RE,
@@ -91,174 +92,38 @@ def _getaddresses(fieldvalues: list[str]) -> list[tuple[str, str]]:
     return email.utils.getaddresses(fieldvalues)
 
 
-# ---------------------------------------------------------------------------
-# RFC 5322 address parsing — fallback for non-compliant display names
-# ---------------------------------------------------------------------------
-# RFC 5322 §3.4 defines the display-name as a "phrase", which must not contain
-# unquoted special characters such as "@".  A header like
-#
-#     From: alice@example.com <bob@example.com>
-#
-# is therefore *technically non-conforming*: the display name contains an
-# unquoted "@".  Python's ``email.utils.getaddresses`` with ``strict=True``
-# (hardened against CVE-2023-27043) correctly rejects this and returns
-# ``[('', '')]``, leaving the real address invisible.
-#
-# mail-parser is a security / forensics tool, not an MTA.  Silently hiding an
-# address because its display-name looks like an e-mail address defeats the
-# purpose of the tool — analysts *need* to see those values.  We therefore
-# bypass strict compliance with a regex fallback whenever strict parsing yields
-# an empty address, always surfacing the value that is actually in the header.
-# Linear-time building blocks for the fallback below.  The previous
-# implementation used a single combined pattern whose ``[^<,]*?`` sub-pattern
-# overlapped an adjacent ``\s*`` quantifier (a space matched both).  Driven by
-# ``finditer`` over a padded header this backtracked quadratically ('<'
-# padding) to cubically (whitespace padding), turning an ordinary parse into a
-# denial of service (CWE-1333).  Each pattern here has a single, non-nested
-# quantifier over a negated character class, so every character is examined a
-# bounded number of times and matching stays linear in the header length.
-_ANGLE_ADDR_RE = re.compile(r"<([^<>\s]+)>")  # <email@addr>
-_BARE_ADDR_RE = re.compile(r"[^\s,<>]+@[^\s,<>]+")  # bare email@addr
-
-
-def _split_address_list(raw: str) -> list[str]:
-    """
-    Split a raw address header into its comma-separated items in linear time,
-    ignoring commas inside a double-quoted display name.
-
-    RFC 5322 address lists are comma-separated, but a quoted display name may
-    itself contain a comma (``"Last, First" <a@b.com>``).  A single pass tracks
-    quote state so those commas do not split the item.
-
-    Args:
-        raw (str): raw address-header value.
-
-    Returns:
-        list[str]: individual address items, in header order.
-    """
-    items: list[str] = []
-    buf: list[str] = []
-    in_quotes = False
-    for ch in raw:
-        if ch == '"':
-            in_quotes = not in_quotes
-            buf.append(ch)
-        elif ch == "," and not in_quotes:
-            items.append("".join(buf))
-            buf = []
-        else:
-            buf.append(ch)
-    items.append("".join(buf))
-    return items
-
-
-def _fallback_addresses(raw: str) -> list[tuple[str, str]]:
-    """
-    Recover ``(display_name, email_addr)`` pairs from an address header that
-    the strict RFC 5322 parser rejected, using a linear-time scan.
-
-    For each comma-separated item the display name is derived in Python from
-    the text preceding the angle-bracket address; items without angle brackets
-    fall back to a bare-email match.  This replaces the previous single
-    backtracking regex — vulnerable to polynomial ReDoS on padded headers
-    (CWE-1333) — while preserving its output on the RFC-non-compliant but
-    real-world-common shapes mail-parser must surface (e.g. an e-mail address
-    used as the display name).
-
-    Args:
-        raw (str): raw address-header value (already decoded to ``str``).
-
-    Returns:
-        list[tuple[str, str]]: recovered ``(display_name, email_addr)`` pairs;
-            ``display_name`` is an empty string when absent.
-    """
-    results: list[tuple[str, str]] = []
-    for item in _split_address_list(raw):
-        angle = _ANGLE_ADDR_RE.search(item)
-        if angle:
-            name = item[: angle.start()].strip().strip('"').strip()
-            results.append((name, angle.group(1)))
-        else:
-            bare = _BARE_ADDR_RE.search(item)
-            if bare:
-                results.append(("", bare.group(0)))
-    return results
-
-
 def get_addresses(
     raw_header: str | email.header.Header | None,
+    *,
+    defects: list | None = None,
 ) -> list[tuple[str, str]]:
-    """
-    Parse email addresses from a raw address header with a fallback for
-    RFC-non-compliant but real-world-common formats.
+    """Parse mailboxes with structural recovery for forensic input.
 
-    RFC 5322 §3.4 requires the display name (phrase) before an angle-bracket
-    address to consist only of printable ASCII characters that are *not*
-    special.  The ``@`` character is special, so a header such as::
-
-        From: alice@example.com <bob@example.com>
-
-    is technically non-conforming because the display name contains an
-    unquoted ``@``.  Python's ``email.utils.getaddresses`` with
-    ``strict=True`` (hardened against CVE-2023-27043) correctly returns
-    ``[('', '')]`` for this input, making the real sender invisible.
-
-    mail-parser is a *security / forensics* tool, not an MTA.  Silently
-    discarding an address because its display name happens to look like an
-    e-mail address would hide relevant forensic information from analysts —
-    the very opposite of what the tool is for.  We therefore bypass strict
-    RFC compliance by applying a regex-based fallback whenever the strict
-    parser yields only empty addresses, so that analysts always see the value
-    that was actually present in the header.
+    RFC 5322 sections 3.2, 3.4 and 4 distinguish phrases, comments and
+    angle-addrs. Unquoted email-like display names are recovered only when
+    a single complete angle-addr establishes the mailbox. Ambiguous items
+    are retained in diagnostics rather than promoted to mailbox identities.
 
     Args:
-        raw_header (str | email.header.Header | None): raw value of an
-            address header (e.g. ``From``, ``To``, ``CC`` …). Accepts a
-            plain ``str``, an ``email.header.Header`` instance (returned
-            by ``email.message.Message.get`` for headers containing
-            RFC 2047 encoded-words such as non-ASCII display names), or
-            ``None``.
+        raw_header: raw header string, email Header object, or None.
+        defects: optional list to receive recovery/ambiguity evidence.
 
     Returns:
-        list[tuple[str, str]]: list of ``(display_name, email_addr)`` tuples.
-            ``display_name`` is an empty string when absent.
+        List of (display_name, address) tuples. An absent/empty string
+        retains the stdlib empty-result convention for existing callers.
     """
-    # ``Message.get(name)`` returns an ``email.header.Header`` for any header
-    # whose value contains RFC 2047 encoded-words (typical for non-ASCII
-    # display names like ``=?utf-8?q?=C3=81rp=C3=A1d?=``). ``Header`` does
-    # not implement string methods such as ``.strip()`` and is not a valid
-    # input to ``email.utils.getaddresses``.
-    #
-    # Important: decode ``Header`` values into a plain parseable string first.
-    # In practice, strict address parsing can treat raw encoded-word tokens like
-    # ``=?unknown-8bit?...?=`` as the *address* itself, producing output such as
-    # ``To: =?unknown-8bit?...?=``.  Decoding first gives
-    # ``Álpám Longsom <recipient@example.com>`` so getaddresses() can split
-    # name/address correctly.
     if raw_header is None:
         return []
     if isinstance(raw_header, email.header.Header):
         raw_header = decode_header_part(raw_header.encode())
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
-
-    parsed = _getaddresses([raw_header])
-
-    # If every result from the strict parser has an empty address — while the
-    # raw header is non-empty — fall back to regex extraction so that the
-    # actual address values are not silently lost.
-    if raw_header.strip() and all(not addr for _, addr in parsed):
-        results = _fallback_addresses(raw_header)
-        if results:
-            log.debug(
-                "Strict address parsing yielded empty results for %r; "
-                "regex fallback recovered %d address(es)",
-                raw_header,
-                len(results),
-            )
-            return results
-
-    return parsed
+    if not raw_header.strip():
+        return _getaddresses([raw_header])
+    parsed, diagnostics = parse_address_header(raw_header, _getaddresses)
+    if defects is not None:
+        defects.extend(diagnostics)
+    return parsed or [("", "")]
 
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover

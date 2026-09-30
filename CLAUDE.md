@@ -80,11 +80,17 @@ parse. `Message.get_all()` is a linear scan, so the one call per distinct name p
 `_make_mail()` cost O(distinct × total) on attacker-chosen names. Look up via the index inside any
 loop over header names.
 
-**RFC non-compliance fallback in `get_addresses()`**: Python's
-`email.utils.getaddresses(strict=True)` (hardened against CVE-2023-27043) rejects headers where
-the display name contains `@`. Since this is a forensics tool, `utils.py` applies
-`_ADDR_FALLBACK_RE` whenever strict parsing returns empty results — always surfacing what is
-actually in the header.
+**Forensic address parsing**: `addresses.py` scans structural delimiters in a
+single pass, respecting quotes, escapes, nested comments and domain literals.
+`utils.get_addresses()` adapts input and delegates to it. Complete angle-addrs
+have precedence over display text; incomplete/ambiguous items are evidence,
+not selected mailboxes. Never search display names/comments for bare addresses
+or reintroduce the old overlapping fallback regex (ReDoS). Parsing a malformed
+list member must not change the interpretation of its neighbours. `core.py`
+caches address results and recovery diagnostics once per parse, examining every
+header occurrence while retaining first-occurrence semantics for address
+properties. `address_header_defects` is reserved computed metadata; literal
+wire headers with that name remain accessible through `headers`/`message`.
 
 **Received header parsing**: `utils.receiveds_parsing()` tokenizes on RFC 5321 clause keywords
 (`from`, `by`, `via`, `with`, `id`, `for`, `envelope-from`) using `const._CLAUSE_SPLITTER`.
