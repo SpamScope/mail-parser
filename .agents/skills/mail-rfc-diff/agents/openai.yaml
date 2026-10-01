@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mail RFC Diff Review"
+  short_description: "Review changed email parsing code against core RFCs"
+  default_prompt: "Use $mail-rfc-diff to review the selected changes and report only demonstrated RFC parsing issues."

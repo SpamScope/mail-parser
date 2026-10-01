@@ -613,3 +613,8 @@ so updates to shared guidance belong in `AGENTS.md`.
 The existing [security reviewer](.claude/agents/security-reviewer.md) remains
 available as a Claude Code sub-agent. Codex follows the same review procedure
 as described in `AGENTS.md`.
+
+Two repository skills provide RFC parsing reviews: `mail-rfc-diff` for changed
+code and `mail-rfc-assessment` for the entire repository. Both report demonstrated
+issues with RFC references, runnable examples, and suggested resolutions. See
+[installation and usage](docs/rfc-review-skills.md) for Codex and Claude Code.
