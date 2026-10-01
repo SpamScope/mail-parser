@@ -289,6 +289,21 @@ RFC 5322 permits whitespace around the mailbox inside `<...>`; the unquoted
 unambiguous angle-address takes precedence over its display name. Addresses
 inside comments or quoted display names are never mailbox candidates.
 
+Internationalized mailbox local parts and domains are accepted under
+[RFC 6532 §3.2](https://www.rfc-editor.org/rfc/rfc6532.html#section-3.2):
+`José <josé@example.com>`, `user@exämple.com`, and `山田 <yamada@例え.jp>`
+parse without address defects. UTF-8 atoms are supported alongside quoted
+local parts, comments, groups, and obsolete source routes. Unicode alone is
+not an anomaly; ASCII delimiters and ambiguity checks still apply.
+
+Mailbox code points are preserved: parsing does not apply NFC/NFKC, IDNA
+conversion, or trim non-ASCII characters that resemble whitespace. This
+preserves forensic identity rather than silently equating different inputs.
+Malformed UTF-8 does not become a different valid address by dropping bytes.
+It produces `invalid-utf8` evidence; undecodable bytes appear in diagnostic
+`raw` as escaped surrogate code points (for example `\udcff` represents
+byte `FF`). Valid neighbouring mailboxes remain available.
+
 `address_header_defects` exposes recovery and ambiguity evidence. Each entry
 contains `header`, zero-based `occurrence`, the original `raw` list item,
 `reason`, `recovered`, and `candidates` (display-name/address dictionaries).
