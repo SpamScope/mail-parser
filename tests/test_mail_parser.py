@@ -692,7 +692,8 @@ Y29udGVudA==
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -720,7 +721,7 @@ Y29udGVudA==
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertFalse(result)
+        self.assertTrue(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)
@@ -736,11 +737,12 @@ Y29udGVudA==
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
 
         result = mail.mail
         self.assertIsInstance(result, dict)
-        self.assertNotIn("defects", result)
+        self.assertIn("defects", result)
         self.assertIn("has_defects", result)
 
         result = mail.get_server_ipaddress(trust)
@@ -800,10 +802,14 @@ Y29udGVudA==
 
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertTrue(mail.has_defects)
-        self.assertEqual(1, len(mail.defects))
-        self.assertEqual(1, len(mail.defects_categories))
+        self.assertEqual(2, len(mail.defects))
+        self.assertEqual(2, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
         self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
+        self.assertIn("AddressHeaderDefect", mail.defects_categories)
+        self.assertEqual(
+            mail.address_header_defects[0]["reason"], "overlong-encoded-word"
+        )
 
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
@@ -1277,7 +1283,18 @@ Y29udGVudA==
         mail = mailparser.parse_from_bytes(mail_bytes)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
+        self.assertIn(
+            {
+                "text/html": [
+                    "CharsetDecodeDefect: part 4, charset 'utf-8' failed; "
+                    "decoded with utf-8 replacement characters. "
+                    "Original bytes remain in the MIME part."
+                ]
+            },
+            mail.defects,
+        )
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -1305,7 +1322,7 @@ Y29udGVudA==
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertFalse(result)
+        self.assertTrue(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)

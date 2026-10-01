@@ -324,6 +324,64 @@ The complete original header values remain available through `from_raw`,
 `to_raw`, etc.; literal headers colliding with computed metadata remain in
 `headers` and `message.get_all(...)`.
 
+Display names decode RFC 2047 encoded words only where the header grammar
+permits them. For example, an unquoted `=?utf-8?Q?Alice?=` becomes `Alice`,
+whereas the same text inside a quoted display name remains literal. Decoded
+punctuation cannot introduce another mailbox, and decoding happens only once.
+Recoverable encoded words longer than 75 characters remain readable and
+produce an `overlong-encoded-word` address diagnostic.
+
+### Trace recovery
+
+`Received` clause boundaries and the timestamp separator respect comments,
+quoted strings, domain literals and angle addresses. Ambiguous delimiters keep
+the original field in `received[*]["raw"]` and produce
+`received_header_defects` entries with `reason`, `raw`, `recovered`, `header`
+and zero-based `occurrence`. These diagnostics set `has_defects` and the
+`ReceivedHeaderDefect` category and appear in full and partial JSON output.
+An ambiguous trusted hop stops sender-IP attribution; older headers cannot
+supply a replacement IP. Balanced, unrecognized obsolete trace syntax remains
+raw without being declared invalid solely because it is obsolete.
+
+### Date diagnostics
+
+Impossible calendar dates, clock components and numeric timezone minutes no
+longer normalize silently into different timestamps. They return `None` and
+set `has_defects`. A mismatched weekday retains the numerical calendar date
+and records the inconsistency. `date_header_defects` covers every `Date`,
+`Resent-Date` and parsed `Received` timestamp, with `reason`, `raw`,
+`recovered`, selected ISO `value` (or `None`), `header` and zero-based
+`occurrence`. It appears in full/partial JSON and uses `DateHeaderDefect`.
+
+Valid obsolete comments, short years and alphabetic zones remain supported.
+Leap seconds map to the next representable Python datetime; the raw field
+retains `:60`. The historical UTC representation for `-0000` and unknown
+alphabetic zones does not establish the sender's local timezone. Dates outside
+Python's datetime range carry `date-out-of-range` diagnostics.
+
+### Inline text and charset recovery
+
+A named `text/plain` or `text/html` part with explicit
+`Content-Disposition: inline` appears in both the corresponding text collection
+and `attachments`. The attachment retains its filename, metadata and payload
+bytes. This additional body view is excluded for binary content, explicit
+attachments and named inline parts inside an attached MIME container. HTML is
+returned as text; parsing does not render it or fetch referenced resources.
+
+Body decoding tries the declared charset against the original bytes. When that
+fails, UTF-8 recovery keeps mislabeled readable text available and records a
+`CharsetDecodeDefect`, including the part index, charset and recovery outcome.
+If UTF-8 also fails, the text view uses replacement characters and reports that
+loss; the original bytes remain available in the MIME part and any attachment.
+Recovery sets `has_defects` even when the recovered text is readable.
+
+Raw UTF-8 filenames and MIME metadata remain readable without changing the
+original headers or payload. Invalid metadata bytes produce `MimeHeaderDefect`
+with escaped raw evidence, the header occurrence and MIME part index. A charset
+decoder that produces a non-Unicode scalar also triggers recovery: names retain
+their literal encoded form and text retains a safe byte-derived view, keeping
+JSON and CLI output encodable as UTF-8.
+
 ## Defects and Their Critical Role in Email Security
 
 Email structural defects are not merely technical curiosities—they represent **potential security
@@ -418,6 +476,17 @@ mail = mailparser.parse_from_file_msg(outlook_mail) # Parse Outlook .msg file
 mail = mailparser.parse_from_file_obj(fp)          # Parse from file object
 mail = mailparser.parse_from_string(raw_mail)      # Parse from string
 ```
+
+File paths are read as bytes, preserving undecodable octets and original MIME
+line endings just like `parse_from_bytes()`. This can expose defects that text
+decoding previously hid. Declared charsets now also apply to file input: a
+message mislabeled with a charset that successfully decodes its bytes can
+display differently from the previous unconditional UTF-8 file read. UTF-8
+recovery applies when the declared decode fails, not by guessing which valid
+interpretation the sender intended. For byte-level forensic evidence, inspect the parsed
+`message` and its `raw_items()`; undecodable header octets use Python's
+surrogateescape representation. The string API accepts text already decoded
+by its caller.
 
 ## Accessing Parsed Components
 
