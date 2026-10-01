@@ -22,9 +22,10 @@ import importlib.util
 import ipaddress
 import json
 import logging
+from bisect import bisect_right
+from email.feedparser import BytesFeedParser
 
 from mailparser.const import (
-    _HELO_RE,
     _IPV6_TAG_RE,
     ADDRESSES_HEADERS,
     COMPUTED_PARTS,
@@ -32,12 +33,13 @@ from mailparser.const import (
     REGXIP,
     REGXIP6,
 )
+from mailparser.dates import date_diagnostics, parse_mail_date
 from mailparser.exceptions import MailParserRecursionError
+from mailparser.received import helo_argument_spans
 from mailparser.utils import (
     _safe_attachment_filename,
     _safe_remove,
     as_string_safe,
-    convert_mail_date,
     decode_header_part,
     decode_headers,
     extract_msg_convert,
@@ -47,9 +49,8 @@ from mailparser.utils import (
     get_mail_keys,
     get_to_domains,
     group_spans,
-    in_spans,
+    mime_header_view,
     msgconvert,
-    ported_open,
     ported_string,
     random_string,
     raw_payload,
@@ -59,12 +60,30 @@ from mailparser.utils import (
 
 log = logging.getLogger(__name__)
 
+
+def _in_sorted_spans(position, spans):
+    """Check ordered disjoint spans without rescanning every preceding group.
+
+    HELO exclusions may share an end within one comment; the latest start
+    still identifies membership. Both span lists come from lexical order.
+    """
+    index = bisect_right(spans, (position, float("inf"))) - 1
+    return index >= 0 and position < spans[index][1]
+
+
 # Keys ``_make_mail()`` sets itself after walking the headers.  A sender can
 # name a header after any of them, so they are skipped while collecting
 # headers: otherwise ``mail["defects"]`` would hold a string from the wire
 # instead of the list of parsed defects.
 _RESERVED_MAIL_KEYS = frozenset(
-    {"defects", "defects_categories", "has_defects", "address_header_defects"}
+    {
+        "defects",
+        "defects_categories",
+        "has_defects",
+        "address_header_defects",
+        "received_header_defects",
+        "date_header_defects",
+    }
 )
 
 
@@ -220,7 +239,7 @@ class MailParser:
     @classmethod
     def from_file(cls, fp, is_outlook=False):
         """
-        Init a new object from a file path.
+        Init a new object from a file path without discarding octets.
 
         Args:
             fp (string): file path of raw email
@@ -233,8 +252,14 @@ class MailParser:
 
         def _build():
             try:
-                with ported_open(fp) as f:
-                    return email.message_from_file(f)
+                # Preserve invalid header octets and MIME payload bytes;
+                # BytesParser.parse() would still translate CR/LF through
+                # its text wrapper. Feed bytes directly in bounded chunks.
+                with open(fp, "rb") as f:
+                    parser = BytesFeedParser()
+                    while chunk := f.read(8192):
+                        parser.feed(chunk)
+                    return parser.close()
             finally:
                 # ``fp`` is a temp file produced by the Outlook conversion;
                 # remove it even if parsing raises, so failures do not leak
@@ -329,7 +354,7 @@ class MailParser:
         for header in sorted(ADDRESSES_HEADERS):
             for occurrence, value in enumerate(self._header_index.get(header, [])):
                 diagnostics = []
-                addresses = get_addresses(value, defects=diagnostics)
+                addresses = get_addresses(value, defects=diagnostics, decode_names=True)
                 if occurrence == 0:
                     self._address_headers[header] = addresses
                 for defect in diagnostics:
@@ -344,6 +369,59 @@ class MailParser:
                         f"AddressHeaderDefect: {d['header']}[{d['occurrence']}]: "
                         f"{d['reason']}"
                         for d in self._address_header_defects
+                    ]
+                }
+            )
+        self._date = None
+        self._timezone = 0
+        self._date_header_defects = []
+        occurrences = {}
+        for name, raw in self.message.raw_items() if self.message else []:
+            header = name.lower()
+            if header not in {"date", "resent-date"}:
+                continue
+            occurrence = occurrences.get(header, 0)
+            occurrences[header] = occurrence + 1
+            result = parse_mail_date(raw)
+            if header == "date" and occurrence == 0:
+                self._date = result.value
+                self._timezone = result.timezone
+            self._date_header_defects.extend(
+                date_diagnostics(result, raw, header, occurrence)
+            )
+        self._received_header_defects = []
+        self._received = receiveds_parsing(
+            [
+                value
+                for name, value in self.message.raw_items()
+                if name.lower() == "received"
+            ]
+            if self.message
+            else [],
+            defects=self._received_header_defects,
+            date_defects=self._date_header_defects,
+        )
+        if self._received_header_defects:
+            self._has_defects = True
+            self._defects_categories.add("ReceivedHeaderDefect")
+            self._defects.append(
+                {
+                    "received-headers": [
+                        f"ReceivedHeaderDefect: received[{d['occurrence']}]: "
+                        f"{d['reason']}"
+                        for d in self._received_header_defects
+                    ]
+                }
+            )
+        if self._date_header_defects:
+            self._has_defects = True
+            self._defects_categories.add("DateHeaderDefect")
+            self._defects.append(
+                {
+                    "date-headers": [
+                        f"DateHeaderDefect: {d['header']}[{d['occurrence']}]: "
+                        f"{d['reason']}"
+                        for d in self._date_header_defects
                     ]
                 }
             )
@@ -409,16 +487,10 @@ class MailParser:
             # are inspected once for diagnostics during reset.
             parsed_addresses = self._address_headers.get(name_header, [])
 
-            # decoded addresses — skip entries with no address (absent header)
+            # Display words were decoded once while lexical context was
+            # available. A quoted encoded-looking name must stay literal.
             return [
-                (
-                    (
-                        ""
-                        if (decoded_name := decode_header_part(name)) == email_addr
-                        else decoded_name
-                    ),
-                    email_addr,
-                )
+                ("" if name == email_addr else name, email_addr)
                 for name, email_addr in parsed_addresses
                 if email_addr
             ]
@@ -485,6 +557,10 @@ class MailParser:
 
         if self.address_header_defects:
             mail["address_header_defects"] = self.address_header_defects
+        if self.received_header_defects:
+            mail["received_header_defects"] = self.received_header_defects
+        if self.date_header_defects:
+            mail["date_header_defects"] = self.date_header_defects
 
         # add defects
         mail["has_defects"] = self.has_defects
@@ -493,6 +569,50 @@ class MailParser:
             mail["defects_categories"] = list(self.defects_categories)
 
         return mail
+
+    def _decode_body_payload(self, part, charset, part_index):
+        """Decode body text from original bytes and report charset recovery."""
+        payload = part.get_payload(decode=True)
+        cte = ported_string(part.get("Content-Transfer-Encoding", "")).strip().lower()
+        if not cte or cte in ("7bit", "8bit"):
+            # get_payload(False) already applies a lossy charset decode.
+            # The stored payload distinguishes Unicode string input from
+            # bytes carried by the stdlib as ASCII plus surrogateescape.
+            raw_text = part._payload
+            if isinstance(raw_text, str):
+                try:
+                    raw_text.encode("utf-8")
+                except UnicodeEncodeError:
+                    pass
+                else:
+                    return raw_text
+
+        if not payload:
+            return ""
+        try:
+            text = payload.decode(charset)
+            # Some Python codecs can produce lone surrogates. Such a
+            # value is not Unicode text and breaks UTF-8 JSON/CLI sinks.
+            text.encode("utf-8")
+        except (LookupError, UnicodeError):
+            try:
+                text = payload.decode("utf-8")
+                recovery = "decoded with utf-8"
+            except UnicodeDecodeError:
+                text = payload.decode("utf-8", "replace")
+                recovery = "decoded with utf-8 replacement characters"
+            self._has_defects = True
+            self._defects_categories.add("CharsetDecodeDefect")
+            self._defects.append(
+                {
+                    part.get_content_type(): [
+                        f"CharsetDecodeDefect: part {part_index}, "
+                        f"charset {charset!r} failed; {recovery}. "
+                        "Original bytes remain in the MIME part."
+                    ]
+                }
+            )
+        return ported_string(text)
 
     def parse(self):
         """
@@ -515,12 +635,24 @@ class MailParser:
             return self
 
         parts = []  # Normal parts plus defects
+        attachment_descendants = set()
 
         # walk all mail parts to search defects
         for p in self.message.walk():
             part_content_type = p.get_content_type()
             self._append_defects(p, part_content_type)
-            parts.append(p)
+            inside_attachment = p in attachment_descendants
+            parts.append((p, inside_attachment))
+            if p.is_multipart():
+                disposition = p.get_content_disposition()
+                # RFC 2183 section 2.9 applies disposition to the entire
+                # container. Do not newly expose named inline children of
+                # attached, unknown-disposition or filename-only containers.
+                blocks_inline = disposition not in (None, "inline") or (
+                    disposition != "inline" and bool(p.get_filename())
+                )
+                if inside_attachment or blocks_inline:
+                    attachment_descendants.update(p.get_payload())
 
         # If defects are in epilogue defects get epilogue
         if self.defects_categories & EPILOGUE_DEFECTS:
@@ -534,26 +666,51 @@ class MailParser:
             if epilogue is not None:
                 try:
                     p = email.message_from_string(epilogue)
-                    parts.append(p)
+                    # Recovered epilogues lack reliable nesting context;
+                    # retain their existing extraction behavior.
+                    parts.append((p, True))
                 except Exception:
                     log.error("Failed to get epilogue part. Check raw mail.")
 
         # walk all mail parts
-        for i, p in enumerate(parts):
+        for i, (p, inside_attachment) in enumerate(parts):
+            metadata, metadata_defects = mime_header_view(p)
+            filename = decode_header_part(
+                metadata.get_filename(), defects=metadata_defects
+            )
+            if metadata_defects:
+                self._has_defects = True
+                self._defects_categories.add("MimeHeaderDefect")
+                self._defects.append(
+                    {
+                        "mime-headers": [
+                            f"MimeHeaderDefect: part {i}, {detail}"
+                            for detail in metadata_defects
+                        ]
+                    }
+                )
             if (
                 not p.is_multipart()
-                or ported_string(p.get_content_disposition()).lower() == "attachment"
+                or ported_string(metadata.get_content_disposition()).lower()
+                == "attachment"
             ):
-                charset = p.get_content_charset("utf-8")
-                charset_raw = p.get_content_charset()
+                charset = metadata.get_content_charset("utf-8")
+                charset_raw = metadata.get_content_charset()
                 log.debug(f"Charset {charset!r} part {i!r}")
-                content_disposition = ported_string(p.get_content_disposition()).lower()
+                content_disposition = ported_string(
+                    metadata.get_content_disposition()
+                ).lower()
                 log.debug(f"content-disposition {content_disposition!r} part {i!r}")
-                content_id = ported_string(p.get("content-id"))
+                content_id = ported_string(metadata.get("content-id"))
                 log.debug(f"content-id {content_id!r} part {i!r}")
-                content_subtype = ported_string(p.get_content_subtype())
+                content_subtype = ported_string(metadata.get_content_subtype())
                 log.debug(f"content subtype {content_subtype!r} part {i!r}")
-                filename = decode_header_part(p.get_filename())
+                is_inline_body = (
+                    not inside_attachment
+                    and not p.is_multipart()
+                    and content_disposition == "inline"
+                    and p.get_content_type() in ("text/plain", "text/html")
+                )
 
                 is_attachment = False
                 if filename:
@@ -574,19 +731,21 @@ class MailParser:
                     log.debug(f"Email part {i!r} is an attachment")
                     log.debug(f"Filename {filename!r} part {i!r}")
                     binary = False
-                    mail_content_type = ported_string(p.get_content_type())
+                    mail_content_type = ported_string(metadata.get_content_type())
                     log.debug(f"Mail content type {mail_content_type!r} part {i!r}")
                     # Strip before comparing, exactly as email's own
                     # get_payload() does: a trailing space made every
                     # encoding branch below miss and the raw bytes fall
                     # through the text path, which drops the non-UTF-8 ones.
                     transfer_encoding = (
-                        ported_string(p.get("content-transfer-encoding", ""))
+                        ported_string(metadata.get("content-transfer-encoding", ""))
                         .strip()
                         .lower()
                     )
                     log.debug(f"Transfer encoding {transfer_encoding!r} part {i!r}")
-                    content_disposition = ported_string(p.get("content-disposition"))
+                    content_disposition = ported_string(
+                        metadata.get("content-disposition")
+                    )
                     log.debug(f"content-disposition {content_disposition!r} part {i!r}")
 
                     if p.is_multipart():
@@ -642,43 +801,10 @@ class MailParser:
                         }
                     )
 
-                # this isn't an attachments
-                else:
-                    log.debug(f"Email part {i!r} is not an attachment")
-
-                    payload = p.get_payload(decode=True)
-                    # Strip as well, for the same reason as the attachment
-                    # branch above: a trailing space sent the part down the
-                    # else branch, which re-reads the text through
-                    # raw-unicode-escape and turns it into literal escapes.
-                    cte = (
-                        ported_string(p.get("Content-Transfer-Encoding", ""))
-                        .strip()
-                        .lower()
-                    )
-
-                    if not cte or cte in ["7bit", "8bit"]:
-                        # message_from_bytes stores non-ASCII body bytes via
-                        # ascii+surrogateescape, producing surrogates in the
-                        # payload string.  message_from_string stores a proper
-                        # Unicode str (no surrogates).  Detect which case we
-                        # have via get_payload(decode=False) and decode
-                        # accordingly so the declared charset is honoured.
-                        raw_str = raw_payload(p)
-                        if isinstance(raw_str, str):
-                            try:
-                                # Raises if surrogates present (from_bytes path)
-                                raw_str.encode("utf-8")
-                                payload = raw_str
-                            except UnicodeEncodeError:
-                                # These encodings are not transformed by
-                                # get_payload(decode=True), so ``payload``
-                                # already holds the original bytes.
-                                payload = ported_string(payload, encoding=charset)
-                        else:
-                            payload = ported_string(payload, encoding=charset)
-                    else:
-                        payload = ported_string(payload, encoding=charset)
+                # Named inline text has both a body and an attachment view.
+                if not is_attachment or is_inline_body:
+                    log.debug(f"Decoding body text for email part {i!r}")
+                    payload = self._decode_body_payload(p, charset, i)
 
                     if payload:
                         if p.get_content_subtype() == "html":
@@ -801,18 +927,18 @@ class MailParser:
             list of IP address strings, in the order they appear
         """
         # Blank the "IPv6:" tag with a non-space filler of the same width:
-        # offsets stay aligned, and no new token boundary or _HELO_RE
-        # lookbehind position is created inside the sender's own token.
+        # offsets stay aligned, and no new token boundary is created
+        # inside the sender's own token.
         from_part = _IPV6_TAG_RE.sub("_____", get_from_clause(received_header))
         if not from_part:
             return []
 
         groups = group_spans(from_part)
-        helo_spans = [
-            m.span()
-            for m in _HELO_RE.finditer(from_part)
-            if in_spans(m.start(), groups)
-        ]
+        # A multi-word HELO can contain clause words and fake IPs. Once
+        # comments remain intact, excluding only its first token would
+        # promote the trailing sender text. Exclude through the enclosing
+        # group's end, while retaining a connection IP before the marker.
+        helo_spans = helo_argument_spans(from_part, groups)
         first_token_end = len(from_part.split(" ", 1)[0])
 
         # Merge both families positionally.  Choosing IPv4 over IPv6 by
@@ -822,12 +948,12 @@ class MailParser:
             list(REGXIP.finditer(from_part)) + list(REGXIP6.finditer(from_part)),
             key=lambda m: m.start(),
         )
-        matches = [m for m in matches if not in_spans(m.start(), helo_spans)]
+        matches = [m for m in matches if not _in_sorted_spans(m.start(), helo_spans)]
 
         candidates = [
             m.group()
             for m in matches
-            if m.start() >= first_token_end and in_spans(m.start(), groups)
+            if m.start() >= first_token_end and _in_sorted_spans(m.start(), groups)
         ]
         if candidates:
             return candidates
@@ -935,8 +1061,7 @@ class MailParser:
         """
         Return a list of all received headers parsed
         """
-        output = self.received_raw
-        return receiveds_parsing(output)
+        return self._received
 
     @property
     def received_json(self):
@@ -1021,28 +1146,14 @@ class MailParser:
         """
         Return the mail date in datetime.datetime format and UTC.
         """
-        date = self.message.get("date") if self.message else None
-        conv = None
-
-        try:
-            conv, _ = convert_mail_date(date)
-        except Exception:
-            pass
-        return conv
+        return self._date
 
     @property
     def timezone(self):
         """
         Return timezone. Offset from UTC.
         """
-        date = self.message.get("date") if self.message else None
-        timezone = 0
-
-        try:
-            _, timezone = convert_mail_date(date)
-        except Exception:
-            pass
-        return timezone
+        return self._timezone
 
     @property
     def date_json(self):
@@ -1094,6 +1205,26 @@ class MailParser:
         Occurrences are zero-based; duplicate header values remain in *_raw.
         """
         return self._address_header_defects
+
+    @property
+    def received_header_defects(self):
+        """Return raw ambiguous trace fields and their wire occurrences.
+
+        Unbalanced lexical syntax is retained as evidence and excluded
+        from sender attribution. Occurrence indices are zero-based.
+        """
+        return self._received_header_defects
+
+    @property
+    def date_header_defects(self):
+        """Return date recovery evidence for all date-bearing occurrences.
+
+        Reasons distinguish invalid syntax/components from a mismatched
+        weekday whose numerical calendar date could be recovered safely.
+        Raw evidence retains the complete original field, including the
+        trace clauses for Received dates.
+        """
+        return self._date_header_defects
 
     @property
     def defects(self):

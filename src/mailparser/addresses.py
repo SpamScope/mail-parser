@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from email.header import decode_header
 
 _FOLD = re.compile(r"\r?\n[ \t]+")
+_ENCODED_WORD = re.compile(r"=\?([^?\s]+)\?([bBqQ])\?([^?\s]*)\?=")
 # Anchored grammar checks: atom, quote and delimiter character sets do not
 # overlap. In particular, do not search for bare addresses in arbitrary text
 # or hand long malformed word sequences to headerregistry's quadratic parser.
@@ -234,25 +236,130 @@ def _name(value: str) -> str:
     return _escape_surrogates("".join(result).strip(" \t\r\n"))
 
 
+def _decoded_word(
+    value: str, start: int, comment: bool, problems: set[str]
+) -> tuple[str, int] | None:
+    """Recover one lexical word, reporting RFC 2047's length violation.
+
+    Each regex component stops at whitespace or a question mark. Attempts
+    only start at word boundaries, so even a failed match scans its token
+    a constant number of times, rather than rescanning the whole suffix.
+    """
+    match = _ENCODED_WORD.match(value, start)
+    if not match:
+        return None
+    end = match.end()
+    if end < len(value) and value[end] not in (" \t)" if comment else " \t"):
+        return None
+    if end - start > 75:
+        problems.add("overlong-encoded-word")
+    try:
+        pieces = []
+        for data, charset in decode_header(match.group()):
+            if isinstance(data, bytes):
+                encoding = (charset or "ascii").split("*", 1)[0]
+                if encoding == "unknown-8bit":
+                    encoding = "utf-8"
+                data = data.decode(encoding)
+            if _SURROGATE_RE.search(data):
+                problems.add("invalid-encoded-word")
+                return None
+            # Never inject control characters into the structural parser.
+            if any(ord(ch) < 32 and ch != "\t" for ch in data):
+                return None
+            pieces.append(data)
+    except (LookupError, UnicodeError, ValueError):
+        return None
+    return "".join(pieces), end
+
+
+def _display_source(value: str, phrase: bool, problems: set[str]) -> str:
+    """Decode lexical display words into safely quoted parser input.
+
+    Structural mailbox checks use the original input. RFC 2047 words may
+    be decoded in a phrase or comment, never inside quotes or addr-specs.
+    Escape the rendered text before the conventional-name parser sees it,
+    so decoded commas, angles and comments cannot become delimiters.
+    """
+    value = _FOLD.sub(" ", value)
+    output = []
+    comment = 0
+    quoted = escaped = False
+    i = 0
+    while i < len(value):
+        ch = value[i]
+        if escaped:
+            escaped = False
+        elif ch == "\\" and (quoted or comment):
+            escaped = True
+        elif comment and ch == ")":
+            comment -= 1
+        elif not quoted and ch == "(":
+            comment += 1
+        elif not comment and ch == '"':
+            quoted = not quoted
+        elif not quoted and not comment and ch == "<":
+            phrase = False
+        elif (
+            not quoted
+            and (comment or phrase)
+            and ch == "="
+            and (i == 0 or value[i - 1] in (" \t(" if comment else " \t"))
+        ):
+            word = _decoded_word(value, i, bool(comment), problems)
+            if word:
+                pieces = [word[0]]
+                end = word[1]
+                # Adjacent encoded words discard intervening FWS. Join
+                # once, rather than repeatedly copying an expanding name.
+                while end < len(value):
+                    next_start = end
+                    while next_start < len(value) and value[next_start] in " \t":
+                        next_start += 1
+                    if next_start == end:
+                        break
+                    word = _decoded_word(value, next_start, bool(comment), problems)
+                    if not word:
+                        break
+                    pieces.append(word[0])
+                    end = word[1]
+                text = "".join(pieces).replace("\\", "\\\\")
+                if comment:
+                    text = text.replace("(", "\\(").replace(")", "\\)")
+                else:
+                    text = '"' + text.replace('"', '\\"') + '"'
+                output.append(text)
+                i = end
+                continue
+        output.append(ch)
+        i += 1
+    return "".join(output)
+
+
 def _escape_surrogates(value: str) -> str:
     """Keep invalid code points visible without emitting invalid UTF-8 JSON."""
     return value.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
-def parse_address_header(raw: str, strict_parser):
+def parse_address_header(raw: str, strict_parser, *, decode_names=False):
     """Return mailbox tuples and evidence for recovery or ambiguity.
 
     ``strict_parser`` is the runtime-compatible email.utils adapter. Each
     list member is parsed independently so a malformed member cannot change
-    the interpretation of a neighbouring, valid quoted name.
+    the interpretation of a neighbouring, valid quoted name. Set
+    ``decode_names`` to render display words after structural validation.
     """
     results = []
     diagnostics = []
     for item in _scan(raw):
         candidates = []
+        display_problems: set[str] = set()
         # Derive the prefix once: repeating it for every angle-addr would
         # copy quadratically much text on a long ambiguous item.
-        name = _name(item.text[: item.angles[0][0]]) if item.angles else ""
+        prefix = item.text[: item.angles[0][0]] if item.angles else ""
+        name = _name(
+            _display_source(prefix, True, display_problems) if decode_names else prefix
+        )
         for index, (left, right) in enumerate(item.angles):
             address = _mailbox(item.text[left + 1 : right])
             if address:
@@ -288,6 +395,8 @@ def parse_address_header(raw: str, strict_parser):
             # Deep comments are stripped by the iterative scanner before
             # reaching the stdlib's recursive comment parser.
             source = item.raw if item.comment_depth < 16 else item.text
+            if decode_names:
+                source = _display_source(source, bool(item.angles), display_problems)
             parsed = strict_parser([source])
             if [addr for _, addr in parsed if addr] == [a for _, a in selected]:
                 selected = [(name, addr) for name, addr in parsed if addr]
@@ -295,6 +404,8 @@ def parse_address_header(raw: str, strict_parser):
                 # Parsing can reject legal CFWS too. This records recovery,
                 # not a claim that every rejection proves RFC noncompliance.
                 reason = reason or "structural-recovery"
+        if display_problems:
+            reason = ",".join(filter(None, [reason, *sorted(display_problems)]))
         results.extend(selected)
         if reason:
             diagnostics.append(

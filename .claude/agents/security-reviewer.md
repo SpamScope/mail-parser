@@ -134,8 +134,12 @@ delimiter, check the search is anchored:
   loop then falls through to older, fully attacker-forged `Received` headers —
   so the failure mode is not "returns nothing", it is "returns the attacker's
   value". Always test the fall-through, not just the single-header case.
-- Use the existing anchored `const._CLAUSE_SPLITTER` rather than a bare `\bby\b`
-  (`\b` still matches inside `host.by.example`, since `.` is a non-word char).
+- Use the shared context-aware scanner in `received.py` through
+  `utils.get_from_clause()`. A bare `\bby\b` still matches inside
+  `host.by.example`; keywords and semicolons inside comments, quoted strings,
+  domain literals and angle addresses are not clause boundaries. Check HELO
+  exclusions cover the remainder of their comment, and measure many IP groups
+  independently to catch repeated full-span scans.
 
 Prove these with a control matrix, not a single PoC: benign hostname, malicious
 hostname alone, forged header alone, and both together. If a benign hostname
