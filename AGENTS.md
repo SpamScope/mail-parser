@@ -227,9 +227,12 @@ After every change:
 1. Run full test suite; fix all failures before reporting done.
 1. Run a security review of the change using the procedure in
    [`.claude/agents/security-reviewer.md`](.claude/agents/security-reviewer.md).
-   In Claude Code, use the `security-reviewer` sub-agent. In Codex or another
-   agent, give the Markdown body of that file to a review sub-agent when
-   available, or follow it directly when delegation is unavailable. The YAML
+   This review is mandatory for both Claude Code and Codex. In Claude Code,
+   use the `security-reviewer` sub-agent. In Codex or another agent, read the
+   file and give its full Markdown body, the change scope, and relevant
+   validation results to a dedicated review sub-agent whenever delegation is
+   available. Follow the procedure directly only when delegation is
+   unavailable, and disclose that fallback in the change summary. The YAML
    front matter configures Claude Code only; it does not select tools or models
    in Codex. All parsed input is attacker-controlled, so any change to parsing,
    regexes, subprocess, temp files, or attachment handling must be reviewed.
