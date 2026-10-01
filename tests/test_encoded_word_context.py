@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from work_budget import bounded_address_work, bounded_encoded_word_work
 
 import mailparser
 from mailparser.utils import get_addresses
@@ -138,14 +139,12 @@ def test_encoded_names_do_not_hide_invalid_utf8_evidence():
 
 def test_many_display_words_remain_bounded():
     """A long encoded phrase has linear-sized output and one mailbox."""
-    import time
-
     count = 8000
     value = "=?utf-8?Q?A?= " * count + "<alice@example.com>"
-    started = time.perf_counter()
-    mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
+    with bounded_address_work(len(value)):
+        with bounded_encoded_word_work(count, len(value)):
+            mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert mail.from_ == [("A" * count, "alice@example.com")]
-    assert time.perf_counter() - started < 2
 
 
 @pytest.mark.parametrize("context", ["phrase", "comment"])
@@ -193,13 +192,12 @@ def test_overlong_quoted_encoded_looking_text_remains_literal():
 @pytest.mark.parametrize("terminated", [True, False])
 def test_long_encoded_tokens_and_failed_matches_remain_bounded(terminated):
     """Matching a long invalid token must not repeatedly scan its suffix."""
-    import time
-
     count = 4000
     word = "=?utf-8?Q?" + "A" * 100 + ("?=" if terminated else "")
     value = (word + " ") * count + "<alice@example.com>"
-    started = time.perf_counter()
-    mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
+    with bounded_address_work(len(value)):
+        with bounded_encoded_word_work(count, len(value)):
+            mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert len(mail.from_) == 1
     assert mail.from_[0][1] == "alice@example.com"
     if terminated:
@@ -207,7 +205,6 @@ def test_long_encoded_tokens_and_failed_matches_remain_bounded(terminated):
         assert mail.address_header_defects[0]["reason"] == "overlong-encoded-word"
     else:
         assert mail.from_[0][0] == " ".join([word] * count)
-    assert time.perf_counter() - started < 2
 
 
 @pytest.mark.parametrize("charset", ["unicode_escape", "raw_unicode_escape"])

@@ -1,10 +1,10 @@
 """RFC 5322 boundaries and forensic recovery regressions for issue #175."""
 
 import json
-import time
 from itertools import product
 
 import pytest
+from work_budget import bounded_address_work
 
 import mailparser
 from mailparser.const import ADDRESSES_HEADERS
@@ -203,11 +203,11 @@ def test_issue175_matrix(display, address, tail):
         "bad@name " + "(" * 4000 + "comment" + ")" * 4000 + " <real@example.com>",
         "x" * 40000,
     ],
+    ids=["space-padding", "open-angles", "nested-comments", "long-atom"],
 )
 def test_hostile_address_input_finishes(value):
-    start = time.perf_counter()
-    mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
-    assert time.perf_counter() - start < 2
+    with bounded_address_work(len(value)):
+        mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert isinstance(mail.from_, list)
 
 
@@ -249,13 +249,13 @@ def test_repeated_headers_are_all_inspected_without_changing_first_value():
         "word " * 16000 + "user@example.com",
         "<one@example.com> " * 16000,
     ],
+    ids=["many-words", "many-angle-addresses"],
 )
 def test_malformed_words_and_many_angles_do_not_trigger_quadratic_work(value):
-    start = time.perf_counter()
-    mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
+    with bounded_address_work(len(value)):
+        mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert mail.from_ == []
     assert mail.has_defects
-    assert time.perf_counter() - start < 2
 
 
 @pytest.mark.parametrize(

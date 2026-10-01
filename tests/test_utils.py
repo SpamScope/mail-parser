@@ -22,10 +22,12 @@ import inspect
 import os
 import subprocess
 import tempfile
-import time
 import unittest
 from unittest.mock import Mock, patch
 
+from work_budget import CountedNames, bounded_address_work, bounded_text_work
+
+from mailparser import utils
 from mailparser.exceptions import (
     MailParserOSError,
     MailParserPathError,
@@ -167,24 +169,12 @@ class TestUtils(unittest.TestCase):
                 os.unlink(tmp_name)
 
     def test_parse_received_space_padding_is_linear(self):
-        """
-        Regression for the Received-header ReDoS (CWE-1333).
-
-        A long run of spaces that is not followed by a clause keyword must not
-        drive ``_CLAUSE_SPLITTER`` into quadratic backtracking. Before the fix
-        (whitespace collapsed before the split) 20 000 padding spaces took
-        several seconds and a header-size-limit-sized run took minutes; after
-        the fix parsing is linear and effectively instant. The generous bound
-        stays robust on slow CI while still failing hard on any reintroduced
-        super-linear blowup.
-        """
+        """Padding must be traversed with linear scanning work."""
         received = "from host " + " " * 20000 + "nope; Mon, 10 Aug 2026 09:00:00 +0000"
-        start = time.perf_counter()
-        result = parse_received(received)
-        elapsed = time.perf_counter() - start
+        with bounded_text_work(utils, ("split_received",), len(received)):
+            result = parse_received(received)
         self.assertIsInstance(result, dict)
         self.assertEqual(result["date"], "Mon, 10 Aug 2026 09:00:00 +0000")
-        self.assertLess(elapsed, 2.0)
 
     def test_parse_received_no_matches(self):
         """Test parse_received with header that matches nothing"""
@@ -686,33 +676,28 @@ class TestUtilsEdgeCases(unittest.TestCase):
         """A batch of same-named attachments must not be quadratic."""
         from mailparser.utils import _deduplicate_filename
 
-        used_filenames = {}
-        start = time.monotonic()
+        used_filenames = CountedNames(16000)
         for _ in range(16000):
             _deduplicate_filename("a.bin", used_filenames)
-        elapsed = time.monotonic() - start
 
-        # Restarting the suffix scan at 1 for every attachment took ~14s
-        # here; resuming from the last suffix takes milliseconds.
-        self.assertLess(elapsed, 5)
+        self.assertEqual(len(used_filenames), 16000)
 
     def test_deduplicate_long_names_scale_linearly(self):
         """Names sharing a clamped stem must not rescan the whole range."""
         from mailparser.utils import _deduplicate_filename, _safe_attachment_filename
 
-        used_filenames = {}
-        start = time.monotonic()
+        used_filenames = CountedNames(8000)
+        generated = []
         for i in range(4000):
             # Distinct names that all clamp onto the same stem: keying the
             # resume counter on the name as sent made each one quadratic.
             filename = _safe_attachment_filename(
                 "a" * 238 + chr(65 + i % 26) + chr(65 + (i // 26) % 26)
             )
-            _deduplicate_filename(filename, used_filenames)
-            _deduplicate_filename(filename, used_filenames)
-        elapsed = time.monotonic() - start
+            generated.append(_deduplicate_filename(filename, used_filenames))
+            generated.append(_deduplicate_filename(filename, used_filenames))
 
-        self.assertLess(elapsed, 5)
+        self.assertEqual(len(set(generated)), 8000)
 
     def test_random_string(self):
         """Test random_string function"""
@@ -983,40 +968,17 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(result, [("Last, First", "user@example.com")])
 
     def test_get_addresses_fallback_email_as_name_space_padding_is_linear(self):
-        """
-        Regression for the fallback ReDoS (CWE-1333).
-
-        ``From: alice@example.com <bob@example.com>`` forces the regex
-        fallback (the display name is an unquoted e-mail address, which the
-        strict parser rejects). The old combined pattern backtracked
-        cubically on trailing whitespace, so a few thousand padding spaces
-        took seconds and a real-world header (~100 KB) took hours. The
-        linear scan must recover the address and finish effectively
-        instantly; the generous bound keeps the assertion robust on slow CI
-        while still failing hard on any reintroduced super-linear blowup
-        (2000 spaces measured at ~3.5 s before the fix, <0.01 s after).
-        """
+        """Structural recovery must scan padded display names linearly."""
         header = "alice@example.com <bob@example.com>" + " " * 2000
-        start = time.perf_counter()
-        result = get_addresses(header)
-        elapsed = time.perf_counter() - start
+        with bounded_address_work(len(header)):
+            result = get_addresses(header)
         self.assertEqual(result, [("alice@example.com", "bob@example.com")])
-        self.assertLess(elapsed, 2.0)
 
     def test_get_addresses_fallback_angle_padding_is_linear(self):
-        """
-        Regression for the fallback ReDoS (CWE-1333), quadratic variant.
-
-        A run of ``<`` characters yields no parseable address, forcing the
-        fallback. The old pattern backtracked quadratically over the
-        padding; the linear scan must return no addresses (falling through
-        to the strict parser's result) without a super-linear slowdown.
-        """
-        start = time.perf_counter()
-        result = get_addresses("<" * 40000)
-        elapsed = time.perf_counter() - start
+        """Unclosed angles must remain evidence with bounded scan work."""
+        with bounded_address_work(40000):
+            result = get_addresses("<" * 40000)
         self.assertTrue(all(not addr for _, addr in result))
-        self.assertLess(elapsed, 2.0)
 
     def test_get_addresses_without_strict_parameter(self):
         """

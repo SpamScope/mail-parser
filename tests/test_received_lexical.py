@@ -1,11 +1,12 @@
 """Received lexical boundaries and forensic attribution regressions."""
 
 import json
-import time
 
 import pytest
+from work_budget import bounded_text_work
 
 import mailparser
+from mailparser import utils
 from mailparser.utils import get_from_clause, parse_received
 
 DATE = "Thu, 01 Oct 2026 12:00:00 +0000"
@@ -165,10 +166,9 @@ def test_deep_comments_scan_without_recursion_or_backtracking():
     """Attacker-chosen comment depth and spacing stay bounded."""
     origin = "sender.example " + "(" * 20000 + "; by " + ")" * 20000
     header = f"from {origin} by mx.example; {DATE}"
-    start = time.perf_counter()
-    assert parse_received(header)["from"] == origin
-    assert get_from_clause(header) == origin
-    assert time.perf_counter() - start < 2
+    with bounded_text_work(utils, ("split_received",), len(header)):
+        assert parse_received(header)["from"] == origin
+        assert get_from_clause(header) == origin
 
 
 @pytest.mark.parametrize(

@@ -3,11 +3,12 @@
 import datetime
 import io
 import json
-import time
 
 import pytest
+from work_budget import bounded_text_work
 
 import mailparser
+from mailparser import dates
 from mailparser.utils import convert_mail_date
 
 VALID = "Thu, 01 Oct 2026 12:00:00 +0000"
@@ -190,15 +191,15 @@ def test_absent_date_preserves_api_defaults():
 def test_extreme_date_components_are_bounded(size):
     """Large years and nested comments neither overflow nor recurse."""
     huge = "01 Oct " + "9" * size + " 12:00:00 +0000"
-    start = time.perf_counter()
-    mail = _mail(huge)
+    with bounded_text_work(dates, ("_date_tokens",), len(huge)):
+        mail = _mail(huge)
     assert mail.date is None
     assert mail.date_header_defects[0]["reason"] == "date-out-of-range"
     nested = "(" * size + "note" + ")" * size
-    parsed = _mail(nested + VALID)
+    with bounded_text_work(dates, ("_date_tokens",), len(nested + VALID)):
+        parsed = _mail(nested + VALID)
     assert parsed.date is not None
     assert parsed.date.isoformat() == EXPECTED
-    assert time.perf_counter() - start < 2
 
 
 def test_invalid_date_octets_remain_in_diagnostics():
