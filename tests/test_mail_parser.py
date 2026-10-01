@@ -25,11 +25,12 @@ import os
 import shutil
 import sys
 import tempfile
-import time
 import unittest
+from email.message import Message
 from unittest.mock import patch
 
 import pytest
+from work_budget import WorkBudget
 
 import mailparser
 from mailparser.const import REGXIP6
@@ -692,7 +693,8 @@ Y29udGVudA==
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -720,7 +722,7 @@ Y29udGVudA==
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertFalse(result)
+        self.assertTrue(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)
@@ -736,11 +738,12 @@ Y29udGVudA==
         mail = mailparser.parse_from_file(mail_test_2)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
 
         result = mail.mail
         self.assertIsInstance(result, dict)
-        self.assertNotIn("defects", result)
+        self.assertIn("defects", result)
         self.assertIn("has_defects", result)
 
         result = mail.get_server_ipaddress(trust)
@@ -800,10 +803,14 @@ Y29udGVudA==
 
         mail = mailparser.parse_from_file(mail_test_1)
         self.assertTrue(mail.has_defects)
-        self.assertEqual(1, len(mail.defects))
-        self.assertEqual(1, len(mail.defects_categories))
+        self.assertEqual(2, len(mail.defects))
+        self.assertEqual(2, len(mail.defects_categories))
         self.assertIn("defects", mail.mail)
         self.assertIn("CloseBoundaryNotFoundDefect", mail.defects_categories)
+        self.assertIn("AddressHeaderDefect", mail.defects_categories)
+        self.assertEqual(
+            mail.address_header_defects[0]["reason"], "overlong-encoded-word"
+        )
 
     def test_defects_bug(self):
         mail = mailparser.parse_from_file(mail_malformed_2)
@@ -1277,7 +1284,18 @@ Y29udGVudA==
         mail = mailparser.parse_from_bytes(mail_bytes)
         trust = "smtp.customers.net"
 
-        self.assertFalse(mail.has_defects)
+        self.assertTrue(mail.has_defects)
+        self.assertIn("CharsetDecodeDefect", mail.defects_categories)
+        self.assertIn(
+            {
+                "text/html": [
+                    "CharsetDecodeDefect: part 4, charset 'utf-8' failed; "
+                    "decoded with utf-8 replacement characters. "
+                    "Original bytes remain in the MIME part."
+                ]
+            },
+            mail.defects,
+        )
 
         raw = "217.76.210.112"
         result = mail.get_server_ipaddress(trust)
@@ -1305,7 +1323,7 @@ Y29udGVudA==
         self.assertEqual(raw, result)
 
         result = mail.has_defects
-        self.assertFalse(result)
+        self.assertTrue(result)
 
         result = len(mail.attachments)
         self.assertEqual(3, result)
@@ -2115,34 +2133,26 @@ def test_body_bytes_payload_decoded_with_charset():
 # --------------------------------------------------------------------- #
 
 
-def _timed_parse(raw):
-    """Parse ``raw`` and return the elapsed wall-clock seconds."""
-    start = time.perf_counter()
-    mailparser.parse_from_string(raw)
-    return time.perf_counter() - start
+@pytest.mark.parametrize("count", [2000, 8000])
+@pytest.mark.parametrize("distinct", [True, False], ids=["distinct", "repeated"])
+def test_distinct_header_names_scale_linearly(count, distinct, monkeypatch):
+    """Bound full header-list rescans on both independent growth axes."""
+    budget = WorkBudget(8 * (count + 1))
+    original = Message.get_all
 
+    def counted_get_all(message, *args, **kwargs):
+        budget.spend(len(message._headers))
+        return original(message, *args, **kwargs)
 
-def test_distinct_header_names_scale_linearly():
-    """
-    Parsing cost must stay linear in the number of *distinct* header names.
-
-    Every distinct name used to trigger its own full rescan of the header
-    list (Message.get_all is O(total)), so cost grew as O(distinct x total):
-    16,000 names cost ~5.8 s against ~0.06 s for 32,000 repeats of one name.
-    Header names are attacker-chosen and cheap to generate (CWE-407).
-    """
-
-    def build(n):
-        headers = "".join(f"X{i:05d}: v\r\n" for i in range(n))
-        return f"From: a@b.c\r\n{headers}\r\nbody\r\n"
-
-    small = min(_timed_parse(build(2000)) for _ in range(3))
-    large = min(_timed_parse(build(8000)) for _ in range(3))
-
-    # 4x the names must not cost anywhere near 16x the time.  The bound is
-    # loose so the test does not flake on a loaded machine; the quadratic
-    # behaviour it guards against was ~14x here.
-    assert large < small * 8, f"{small=} {large=} — scaling is not linear"
+    monkeypatch.setattr(Message, "get_all", counted_get_all)
+    headers = "".join(f"X{i if distinct else 0:05d}: v\r\n" for i in range(count))
+    mail = mailparser.parse_from_string(f"From: a@b.c\r\n{headers}\r\nbody\r\n")
+    parsed_headers = mail.headers
+    assert len(parsed_headers) == (count + 1 if distinct else 2)
+    if distinct:
+        assert all(parsed_headers[f"X{i:05d}"] == "v" for i in range(count))
+    else:
+        assert parsed_headers["X00000"] == ["v"] * count
 
 
 def test_header_named_after_a_method_does_not_break_mail_json():
@@ -2171,7 +2181,7 @@ def test_header_named_parse_is_reported_as_a_header():
     assert mail.mail["parse"] == "x"
 
 
-def test_header_named_headers_json_does_not_recurse():
+def test_header_named_headers_json_does_not_recurse(monkeypatch):
     """
     "Headers_json: x" used to drive unbounded recursion: the headers property
     resolved the name through getattr, reaching the headers_json property,
@@ -2186,8 +2196,15 @@ def test_header_named_headers_json_does_not_recurse():
     filler = "".join(f"Z{i:04d}: v\r\n" for i in range(3200))
     raw = f"Headers_json: x\r\n{filler}\r\nbody\r\n"
 
-    elapsed = _timed_parse(raw)
-    assert elapsed < 2, f"parse took {elapsed:.1f}s — recursion is back"
+    def unexpected_serialization(self):
+        pytest.fail("wire header invoked the headers_json property")
+
+    monkeypatch.setattr(
+        mailparser.MailParser, "headers_json", property(unexpected_serialization)
+    )
+    mail = mailparser.parse_from_string(raw)
+    assert mail.headers["Headers_json"] == "x"
+    assert json.loads(mail.mail_json)["headers_json"] == "x"
 
 
 def test_header_named_headers_json_variants_do_not_recurse():
@@ -2291,7 +2308,7 @@ def test_get_from_clause_is_anchored():
     assert get_from_clause("by mx.victim.com\r\n\twith ESMTP") == ""
 
 
-def test_json_suffixed_header_name_does_not_amplify():
+def test_json_suffixed_header_name_does_not_amplify(monkeypatch):
     """
     A header named ``X_json_json_...`` must not build a tower of JSON.
 
@@ -2304,8 +2321,18 @@ def test_json_suffixed_header_name_does_not_amplify():
     name = "X" + "_json" * 40
     raw = "".join(f"{name}{i}: x\r\n" for i in range(40)) + "\r\nbody\r\n"
 
-    elapsed = _timed_parse(raw)
-    assert elapsed < 2, f"parse took {elapsed:.1f}s — the suffix cycle is back"
+    original = mailparser.MailParser.__getattr__
+
+    def checked_getattr(self, attribute):
+        assert not attribute.lower().startswith("x_json"), (
+            "wire header entered recursive attribute dispatch"
+        )
+        return original(self, attribute)
+
+    monkeypatch.setattr(mailparser.MailParser, "__getattr__", checked_getattr)
+    parsed = mailparser.parse_from_string(raw)
+    assert parsed.headers == {f"{name}{i}": "x" for i in range(40)}
+    assert len(parsed.headers_json) < 2 * len(raw)
 
     mail = mailparser.parse_from_string(f"{name}: x\r\n\r\n")
     # the wire value, not a JSON tower built out of it
@@ -2447,12 +2474,11 @@ def test_headers_dedupes_case_variants_of_one_name():
     raw = "".join(f"{v}: value\r\n" for v in variants) + "\r\nbody\r\n"
 
     mail = mailparser.parse_from_string(raw)
-    start = time.perf_counter()
     headers = mail.headers
-    elapsed = time.perf_counter() - start
 
     assert len(headers) == 1
-    assert elapsed < 2, f"headers took {elapsed:.1f}s — the blowup is back"
+    assert next(iter(headers.values())) == ["value"] * 8000
+    assert len(mail.headers_json) < len(raw)
 
     # honest duplicates keep every value under one key
     assert mailparser.parse_from_string("Subject: a\r\nSUBJECT: b\r\n\r\n").headers == {

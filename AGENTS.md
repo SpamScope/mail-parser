@@ -114,6 +114,8 @@ optional Outlook dependencies are installed with `uv sync --extra outlook`).
 | --------------- | --------------------------------------------------------------------- |
 | `core.py`       | `MailParser` class + `parse_from_*` factory functions                 |
 | `addresses.py`  | Forensic address scanner and recovery diagnostics                     |
+| `received.py`   | Context-aware lexical scanning of SMTP trace clauses                  |
+| `dates.py`      | Date semantics, obsolete forms and occurrence-aware diagnostics       |
 | `utils.py`      | Stateless parsing helpers (address, received headers, date, encoding) |
 | `const.py`      | Compiled regexes, header sets, clause splitter                        |
 | `exceptions.py` | Custom exception hierarchy                                            |
@@ -163,9 +165,12 @@ header occurrence while retaining first-occurrence semantics for address
 properties. `address_header_defects` is reserved computed metadata; literal
 wire headers with that name remain accessible through `headers`/`message`.
 
-**Received header parsing**: `utils.receiveds_parsing()` tokenizes on RFC 5321 clause keywords
-(`from`, `by`, `via`, `with`, `id`, `for`, `envelope-from`) using `const._CLAUSE_SPLITTER`.
-Output list is ordered first-hop first. Unparseable headers fall back to `{"raw": ...}`.
+**Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
+`received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
+inside comments, quoted strings, domain literals and angle addresses are not
+structural separators. `get_from_clause()` uses the same scanner. Output is
+ordered first-hop first. Unparseable headers retain their original `raw` value;
+ambiguous syntax also produces `received_header_defects` with occurrence context.
 
 **Sender-IP attribution fails closed**: `get_server_ipaddress()` walks trust-matching `Received`
 headers only while a hop names a *private* IP (an internal relay); a hop naming **no** IP ends the
@@ -173,21 +178,25 @@ search with `None`. Never resume the walk on that case — older `Received` head
 the sender, so "extraction failed" would become "returns the sender's chosen IP".
 
 Candidate addresses come only from the `from` clause (`utils.get_from_clause()`, which ends at the
-next RFC 5321 keyword). Inside it, `_sender_ip_candidates()` applies one positional rule, because
+next top-level RFC 5321 keyword). Inside it, `_sender_ip_candidates()` applies one positional rule, because
 **text cannot be classified by what it looks like** — a closed `[...]` pair the sender wrote is
 byte-identical to one the MTA wrote, and `EHLO [8.8.8.8]` is a form RFC 5321 §4.1.3 requires:
 
 - the **first token** is the HELO name, whatever its shape, and is never a candidate;
 - an explicit **HELO marker inside a comment group** (`(helo=x)`, `(account a@b HELO x)`) is
-  sender text and is excluded, located with `const._HELO_RE`;
+  located structurally by `received.helo_argument_spans()`; its argument and the remainder of that comment
+  are sender text and are excluded;
 - a candidate must sit **inside a `(`/`[` group** (`utils.group_spans()`), which is what makes a
   clause truncated by a multi-word HELO fail closed — what it leaves behind is bare;
 - IPv4 and IPv6 matches are merged **positionally**, never family-first: choosing IPv4 first let
   one private literal at EHLO suppress the IPv6 scan and hide the real sender.
 
+Use ordered span lookup for IP candidates: rescanning all comment groups for
+each candidate makes attribution quadratic on attacker-chosen trace fields.
+
 Only concession: `from [ip] (helo=x)` (Exim/CommuniGate), accepted when there is no other
-candidate and the marker is in a group. Do not add lookbehind guards to `_HELO_RE` to patch new
-cases — three rounds of that each reopened a hole the previous one closed.
+candidate and the marker is in a group. Keep marker recognition inside the structural scanner; do not reintroduce regex
+lookbehind patches for each new HELO layout.
 
 **Defect detection**: During `parse()`, every MIME part is walked and `_append_defects()` records
 RFC violations. `EPILOGUE_DEFECTS` triggers special epilogue extraction to recover hidden payloads
@@ -227,9 +236,12 @@ After every change:
 1. Run full test suite; fix all failures before reporting done.
 1. Run a security review of the change using the procedure in
    [`.claude/agents/security-reviewer.md`](.claude/agents/security-reviewer.md).
-   In Claude Code, use the `security-reviewer` sub-agent. In Codex or another
-   agent, give the Markdown body of that file to a review sub-agent when
-   available, or follow it directly when delegation is unavailable. The YAML
+   This review is mandatory for both Claude Code and Codex. In Claude Code,
+   use the `security-reviewer` sub-agent. In Codex or another agent, read the
+   file and give its full Markdown body, the change scope, and relevant
+   validation results to a dedicated review sub-agent whenever delegation is
+   available. Follow the procedure directly only when delegation is
+   unavailable, and disclose that fallback in the change summary. The YAML
    front matter configures Claude Code only; it does not select tools or models
    in Codex. All parsed input is attacker-controlled, so any change to parsing,
    regexes, subprocess, temp files, or attachment handling must be reviewed.

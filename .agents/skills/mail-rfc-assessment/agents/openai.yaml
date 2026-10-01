@@ -1,0 +1,4 @@
+interface:
+  display_name: "Mail RFC Repository Assessment"
+  short_description: "Assess repository-wide parsing against core email RFCs"
+  default_prompt: "Use $mail-rfc-assessment to assess the repository and report demonstrated RFC parsing issues with runnable examples."

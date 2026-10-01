@@ -19,7 +19,6 @@ limitations under the License.
 from __future__ import annotations
 
 import base64
-import datetime
 import email
 import email.header
 import email.utils
@@ -38,24 +37,22 @@ import tempfile
 from collections import Counter, namedtuple
 from email.errors import HeaderParseError
 from email.header import decode_header
+from email.message import Message
 from unicodedata import normalize
 
 from mailparser.addresses import parse_address_header
 from mailparser.const import (
-    _CLAUSE_SPLITTER,
-    _DATE_RE,
     _ENVELOPE_FROM_RE,
-    _SENDGRID_DATE_RE,
-    _WS_RUN_RE,
     ADDRESSES_HEADERS,
-    JUNK_PATTERN,
     OTHERS_PARTS,
 )
+from mailparser.dates import date_diagnostics, parse_mail_date
 from mailparser.exceptions import (
     MailParserOSError,
     MailParserPathError,
     MailParserReceivedParsingError,
 )
+from mailparser.received import split_received
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +93,7 @@ def get_addresses(
     raw_header: str | email.header.Header | None,
     *,
     defects: list | None = None,
+    decode_names: bool = False,
 ) -> list[tuple[str, str]]:
     """Parse mailboxes with structural recovery for forensic input.
 
@@ -107,6 +105,8 @@ def get_addresses(
     Args:
         raw_header: raw header string, email Header object, or None.
         defects: optional list to receive recovery/ambiguity evidence.
+        decode_names: decode display words in their lexical context. The
+            default retains encoded words for existing helper callers.
 
     Returns:
         List of (display_name, address) tuples. An absent/empty string
@@ -115,12 +115,27 @@ def get_addresses(
     if raw_header is None:
         return []
     if isinstance(raw_header, email.header.Header):
-        raw_header = decode_header_part(raw_header.encode())
+        # Address identity must not pass through ported_string's NFC
+        # normalization, decode errors="ignore", or Unicode whitespace
+        # stripping. Keep invalid octets as surrogates for the scanner to
+        # flag, rather than joining their neighbours into a new mailbox.
+        chunks = []
+        for data, charset in decode_header(raw_header.encode()):
+            if isinstance(data, bytes):
+                charset = charset if charset != "unknown-8bit" else "utf-8"
+                try:
+                    data = data.decode(charset or "utf-8", "surrogateescape")
+                except (LookupError, UnicodeError):
+                    data = data.decode("utf-8", "surrogateescape")
+            chunks.append(data)
+        raw_header = "".join(chunks)
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
-    if not raw_header.strip():
+    if not raw_header.strip(" \t\r\n"):
         return _getaddresses([raw_header])
-    parsed, diagnostics = parse_address_header(raw_header, _getaddresses)
+    parsed, diagnostics = parse_address_header(
+        raw_header, _getaddresses, decode_names=decode_names
+    )
     if defects is not None:
         defects.extend(diagnostics)
     return parsed or [("", "")]
@@ -197,12 +212,13 @@ def ported_string(raw_data, encoding="utf-8", errors="ignore"):
         return str(raw_data, "utf-8", errors)
 
 
-def decode_header_part(header):
+def decode_header_part(header, *, defects=None):
     """
     Given a raw header returns a decoded header
 
     Args:
         header (string): header to decode
+        defects (list): optional destination for unsafe decoded text evidence
 
     Returns:
         str
@@ -222,7 +238,63 @@ def decode_header_part(header):
         log.error(f"Failed decoding header part: {header}")
         output += header
 
+    try:
+        output.encode("utf-8")
+    except UnicodeEncodeError:
+        if defects is not None:
+            defects.append(f"invalid-encoded-word: non-Unicode scalar; raw={header!r}")
+        # Preserve the literal header when a codec fabricates a surrogate;
+        # it is not a Unicode scalar and cannot reach a UTF-8 output sink.
+        return str(header).encode("utf-8", "backslashreplace").decode("utf-8").strip()
     return output.strip()
+
+
+def mime_header_view(part: Message) -> tuple[Message, list[str]]:
+    """Return a UTF-8 MIME metadata view without changing the raw part.
+
+    Args:
+        part: original MIME part, retaining raw headers and payload.
+
+    Returns:
+        A header-only compat32 message and descriptions of invalid UTF-8
+        metadata, including each header occurrence and its raw octets.
+        Invalid bytes appear as replacement characters in the display
+        view; exact evidence remains in the descriptions and original.
+    """
+    view = Message()
+    view.set_default_type(part.get_default_type())
+    defects = []
+    occurrences: Counter[str] = Counter()
+    for name, raw in part.raw_items():
+        header = name.lower()
+        if header not in {
+            "content-type",
+            "content-disposition",
+            "content-id",
+            "content-transfer-encoding",
+        }:
+            continue
+        occurrence = occurrences[header]
+        occurrences[header] += 1
+        value = str(raw)
+        try:
+            octets = value.encode("utf-8", "surrogateescape")
+        except UnicodeEncodeError:
+            # A direct string caller can supply non-octet surrogates.
+            evidence = value.encode("utf-8", "backslashreplace").decode()
+            value = re.sub(r"[\ud800-\udfff]", "\ufffd", value)
+        else:
+            try:
+                value = octets.decode("utf-8")
+            except UnicodeDecodeError:
+                evidence = octets.decode("ascii", "backslashreplace")
+                value = octets.decode("utf-8", "replace")
+            else:
+                evidence = None
+        if evidence is not None:
+            defects.append(f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}")
+        view[name] = value
+    return view, defects
 
 
 def ported_open(file_):
@@ -423,8 +495,8 @@ def get_from_clause(received):
 
     The sender address lives in the ``from`` clause; the ``by`` clause
     names the *receiving* server and must never be mistaken for it.
-    Clause boundaries are located with the anchored RFC 5321 tokenizer
-    ``_CLAUSE_SPLITTER`` rather than a substring search, because a plain
+    Clause boundaries use the same context-aware scanner as parsing,
+    ignoring comments and quoted strings. This also matters because a plain
     ``received.find("by")`` also matches inside a hostname — ``derby``,
     ``nearby`` — and the hostname comes from the sender's HELO. A false
     match truncates the clause, extraction fails on the genuine hop, and
@@ -439,32 +511,12 @@ def get_from_clause(received):
         string with the ``from`` clause value, or an empty string when the
         header has no ``from`` clause
     """
-    # Collapse whitespace runs before splitting, so the splitter stays
-    # linear — see the note on _WS_RUN_RE in const.py.
-    header = _WS_RUN_RE.sub(" ", received)
-
-    # split() yields [preamble, keyword, value, keyword, value, ...]
-    parts = _CLAUSE_SPLITTER.split(header)
-    keywords = [(i, parts[i].lower()) for i in range(1, len(parts) - 1, 2)]
-
-    start = next((i for i, kw in keywords if kw == "from"), None)
-    if start is None:
-        # No ``from`` clause: attribution fails closed.  Returning the whole
-        # header instead would surface an IP taken from the ``by``, ``for``,
-        # ``with`` or ``id`` clause as the sender's — and the ``for`` clause
-        # holds the envelope recipient, which the sender picks at RCPT TO
-        # (``victim+8.8.8.8@example.com``).
-        return str()
-
-    # The clause ends at the next keyword, full stop.  Extending it to a
-    # later ``by`` to survive a multi-word HELO drags the ``by``, ``for``
-    # and ``envelope-from`` values into the result, and the last two are
-    # sender-chosen: a quoted local part supplies the whitespace, so
-    # ``MAIL FROM:<"x 8.8.8.8 by q"@evil.example>`` puts an attacker IP
-    # into the sender-attribution scan (CWE-345).  A multi-word HELO does
-    # truncate this clause, but that only costs the candidates — the caller
-    # then fails closed rather than reporting an attacker-chosen address.
-    return parts[start + 1].strip()
+    try:
+        clauses, _ = split_received(received)
+    except MailParserReceivedParsingError:
+        # Ambiguous delimiters on the authoritative hop must stop the walk.
+        return ""
+    return next((value for key, value in clauses if key == "from"), "")
 
 
 def group_spans(text):
@@ -482,22 +534,12 @@ def group_spans(text):
         list of (start, end) tuples, in order, excluding the delimiters
     """
     spans = []
-    depth = 0
-    start = 0
-
-    for i, char in enumerate(text):
-        if char in "([":
-            if depth == 0:
-                start = i + 1
-            depth += 1
-        elif char in ")]" and depth:
-            depth -= 1
-            if depth == 0:
-                spans.append((start, i))
-
-    if depth:
-        spans.append((start, len(text)))
-
+    try:
+        split_received(text, groups=spans)
+    except MailParserReceivedParsingError:
+        # The helper also exposes incomplete groups for existing callers;
+        # attribution only calls it after get_from_clause validated them.
+        pass
     return spans
 
 
@@ -515,7 +557,7 @@ def in_spans(position, spans):
     return any(start <= position < end for start, end in spans)
 
 
-def parse_received(received):
+def parse_received(received, *, defects=None):
     """
     Parse a single received header by tokenizing on RFC 5321 §4.4 keywords.
 
@@ -525,6 +567,7 @@ def parse_received(received):
 
     Arguments:
         received {str} -- single received header
+        defects {list} -- optional destination for recovery diagnostics
 
     Raises:
         MailParserReceivedParsingError -- Raised when a
@@ -536,38 +579,11 @@ def parse_received(received):
 
     values_by_clause = {}
 
-    # --- Step 1: Extract date (after semicolon, or SendGrid format) ---
-    date_match = _DATE_RE.search(received)
-    if date_match:
-        values_by_clause["date"] = date_match.group(1)
-        # Work only on the part before the semicolon for clause parsing
-        header_body = received[: date_match.start()]
-    else:
-        # Try SendGrid non-standard date
-        sg_match = _SENDGRID_DATE_RE.search(received)
-        if sg_match:
-            values_by_clause["date"] = sg_match.group(1)
-            header_body = received[: sg_match.start()]
-        else:
-            header_body = received
+    clauses, date = split_received(received, defects=defects)
+    if date is not None:
+        values_by_clause["date"] = date
 
-    # --- Step 2: Tokenize on clause keywords ---
-    # Collapse whitespace runs first so ``_CLAUSE_SPLITTER`` stays linear: a
-    # header padded with a long run of spaces that is not followed by a clause
-    # keyword otherwise backtracks quadratically — a denial of service on
-    # attacker-supplied Received headers (CWE-1333).  The date has already been
-    # extracted from the raw header above, so collapsing here does not affect it.
-    header_body = _WS_RUN_RE.sub(" ", header_body)
-    # _CLAUSE_SPLITTER.split gives: [preamble, kw1, val1, kw2, val2, ...]
-    parts = _CLAUSE_SPLITTER.split(header_body)
-
-    # parts[0] is preamble (before first keyword), then alternating kw/value
-    i = 1  # skip preamble
-    while i + 1 < len(parts):
-        keyword = parts[i].lower()
-        value = parts[i + 1].strip()
-        i += 2
-
+    for keyword, value in clauses:
         if keyword in ("envelope-from", "envelope-sender"):
             # Extract email from angle brackets
             m = _ENVELOPE_FROM_RE.search(value)
@@ -609,34 +625,61 @@ def parse_received(received):
     return values_by_clause
 
 
-def receiveds_parsing(receiveds):
+def receiveds_parsing(receiveds, *, defects=None, date_defects=None):
     """
     This function parses the receiveds headers.
 
     Args:
         receiveds (list): list of raw receiveds headers
+        defects (list): optional destination for occurrence diagnostics.
+        date_defects (list): optional destination for timestamp diagnostics.
 
     Returns:
         a list of parsed receiveds headers with first hop in first position
     """
 
     parsed = []
-    receiveds = [re.sub(JUNK_PATTERN, " ", i).strip() for i in receiveds]
     n = len(receiveds)
     log.debug(f"Nr. of receiveds. {n}")
 
     for idx, received in enumerate(receiveds):
         log.debug(f"Parsing received {idx + 1}/{n}")
         log.debug(f"Try to parse {received!r}")
+        diagnostics = []
+        raw_evidence = received.encode("utf-8", "backslashreplace").decode("utf-8")
         try:
-            # try to parse the current received header...
-            values_by_clause = parse_received(received)
-        except MailParserReceivedParsingError:
-            # if we can't, let's append the raw
-            parsed.append({"raw": received})
+            # BytesParser stores raw octets using surrogateescape. Decode
+            # valid UTF-8 for display, retaining malformed octets losslessly.
+            value = received.encode("utf-8", "surrogateescape").decode(
+                "utf-8", "surrogateescape"
+            )
+        except UnicodeEncodeError:
+            value = received
+        try:
+            values_by_clause = parse_received(value, defects=diagnostics)
+        except MailParserReceivedParsingError as error:
+            # Preserve original folding and delimiters, not normalized text.
+            parsed.append({"raw": raw_evidence})
+            reason = str(error)
+            # Unrecognized but balanced obsolete trace tokens are not
+            # necessarily invalid (RFC 5322 section 4.5.7).
+            if not reason.startswith("Unable to match any clauses"):
+                diagnostics.append({"reason": reason, "recovered": False})
         else:
-            # otherwise append the full values_by_clause dict
-            parsed.append(values_by_clause)
+            parsed.append(
+                {
+                    key: item.encode("utf-8", "backslashreplace").decode("utf-8")
+                    for key, item in values_by_clause.items()
+                }
+            )
+        if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+            diagnostics.append(
+                {"reason": "invalid-utf8", "recovered": "raw" not in parsed[-1]}
+            )
+        if defects is not None:
+            for defect in diagnostics:
+                defect.update(raw=raw_evidence, header="received", occurrence=idx)
+                defects.append(defect)
 
     log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
 
@@ -652,25 +695,29 @@ def receiveds_parsing(receiveds):
 
     else:
         # all's good! we have parsed or raw receiveds for each received header
-        return receiveds_format(parsed)
+        return receiveds_format(
+            parsed, raw_headers=receiveds, date_defects=date_defects
+        )
 
 
 def convert_mail_date(date):
+    """Convert a recoverable mail date to a UTC datetime and offset.
+
+    Args:
+        date (str): modern or obsolete RFC 5322 date-time value.
+
+    Returns:
+        tuple: UTC datetime and the legacy signed decimal-hour offset.
+        An inconsistent weekday retains the numerical date; MailParser
+        additionally exposes its occurrence-aware diagnostic.
+
+    Raises:
+        ValueError: syntax or components prevent a safe selected datetime.
     """
-    Convert a mail date in a datetime object.
-    """
-    log.debug(f"Date to parse: {date!r}")
-    d = email.utils.parsedate_tz(date)
-    if d is None:
+    result = parse_mail_date(date)
+    if result.value is None:
         raise ValueError(f"Cannot parse date: {date!r}")
-    log.debug(f"Date parsed: {d!r}")
-    t = email.utils.mktime_tz(d)
-    log.debug(f"Date parsed in timestamp: {t!r}")
-    date_utc = datetime.datetime.fromtimestamp(t, datetime.timezone.utc)
-    timezone = d[9] / 3600.0 if d[9] else 0
-    timezone = f"{timezone:+.1f}"
-    log.debug(f"Calculated timezone: {timezone!r}")
-    return date_utc, timezone
+    return result.value, result.timezone
 
 
 def receiveds_not_parsed(receiveds):
@@ -699,13 +746,15 @@ def receiveds_not_parsed(receiveds):
     return output
 
 
-def receiveds_format(receiveds):
+def receiveds_format(receiveds, *, raw_headers=None, date_defects=None):
     """
     Given a list of receiveds hop, adds metadata and reformat
     field values
 
     Args:
         receiveds (list): list of receiveds hops already formatted
+        raw_headers (list): optional original fields in wire order.
+        date_defects (list): optional destination for timestamp diagnostics.
 
     Returns:
         list of receiveds reformated and with new fields
@@ -715,30 +764,23 @@ def receiveds_format(receiveds):
     output = []
     counter = Counter()
 
-    for i in receiveds[::-1]:
+    for occurrence in range(len(receiveds) - 1, -1, -1):
+        i = receiveds[occurrence]
         # Clean strings
-        j = {k: v.strip() for k, v in i.items() if v}
+        j = {k: (v if k == "raw" else v.strip()) for k, v in i.items() if v}
 
         # Add hop
         j["hop"] = counter["hop"] + 1
 
         # Add UTC date
-        if i.get("date"):
-            # Modify date to manage strange header like:
-            # "for <eboktor@romolo.com>; Tue, 7 Mar 2017 14:29:24 -0800",
-            i["date"] = i["date"].split(";")[-1]
-            # Strip leading RFC 2822 comments like:
-            # "(version=TLSv1/SSLv3 cipher=AES128-GCM-SHA256 bits=128/128) Wed, ..."
-            i["date"] = re.sub(r"^\s*(?:\([^)]*\)\s*)+", "", i["date"])
-            try:
-                j["date_utc"], _ = convert_mail_date(i["date"])
-            except (TypeError, ValueError, OverflowError, OSError):
-                # Out-of-range dates fail in three different ways: a huge
-                # year overflows int64 inside calendar.timegm()
-                # (OverflowError), and a huge timezone offset pushes the
-                # timestamp into the band where datetime.fromtimestamp()
-                # reports EOVERFLOW (OSError).
-                j["date_utc"] = None
+        if "date" in i:
+            result = parse_mail_date(i["date"])
+            j["date_utc"] = result.value
+            if date_defects is not None:
+                raw = raw_headers[occurrence] if raw_headers else i["date"]
+                date_defects.extend(
+                    date_diagnostics(result, raw, "received", occurrence)
+                )
 
         # Add delay
         size = len(output)

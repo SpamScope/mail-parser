@@ -1,0 +1,721 @@
+{
+  "baseline_revision": "522e1f37bef2309dcec8107964ba1e74377b24e6",
+  "cases": {
+    "mail_malformed_1/bytes": {
+      "attachments": "2d28ff49565070b77e1a0a3c8eb76e287be7b16c551b331c0a31e8e337e88e95",
+      "headers": "552a99598f369d274b2f1e970e5817b58a8ecd5c239f7b3c826880ab517f19ca",
+      "mail": "fbb52ec018b7d1dcf76d38d3daefd547c7f319c7a5d6d41299fcc7c4fddb3364",
+      "mime": "4b463f6fcbf2a77ab017822a44996c9346321148df8fb2925a38b8571285f08f",
+      "partial": "2cb2c8ffbaae031bdd620f669094c171c01a278c37da6f23140b15c5b89ffa5d",
+      "text_html": "5d1f3e8e0e3432000a59e99e4a18b30c5bd081b09e8159ff201a7e1060ab44d6",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "46db0fe400ee4228d58ae6cc94e876cb946a8ead664066a0c238d6e12de80715"
+    },
+    "mail_malformed_1/file": {
+      "attachments": "2d28ff49565070b77e1a0a3c8eb76e287be7b16c551b331c0a31e8e337e88e95",
+      "headers": "552a99598f369d274b2f1e970e5817b58a8ecd5c239f7b3c826880ab517f19ca",
+      "mail": "fbb52ec018b7d1dcf76d38d3daefd547c7f319c7a5d6d41299fcc7c4fddb3364",
+      "mime": "4b463f6fcbf2a77ab017822a44996c9346321148df8fb2925a38b8571285f08f",
+      "partial": "2cb2c8ffbaae031bdd620f669094c171c01a278c37da6f23140b15c5b89ffa5d",
+      "text_html": "5d1f3e8e0e3432000a59e99e4a18b30c5bd081b09e8159ff201a7e1060ab44d6",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "46db0fe400ee4228d58ae6cc94e876cb946a8ead664066a0c238d6e12de80715"
+    },
+    "mail_malformed_1/string": {
+      "attachments": "2d28ff49565070b77e1a0a3c8eb76e287be7b16c551b331c0a31e8e337e88e95",
+      "headers": "552a99598f369d274b2f1e970e5817b58a8ecd5c239f7b3c826880ab517f19ca",
+      "mail": "fbb52ec018b7d1dcf76d38d3daefd547c7f319c7a5d6d41299fcc7c4fddb3364",
+      "mime": "4b463f6fcbf2a77ab017822a44996c9346321148df8fb2925a38b8571285f08f",
+      "partial": "2cb2c8ffbaae031bdd620f669094c171c01a278c37da6f23140b15c5b89ffa5d",
+      "text_html": "5d1f3e8e0e3432000a59e99e4a18b30c5bd081b09e8159ff201a7e1060ab44d6",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "46db0fe400ee4228d58ae6cc94e876cb946a8ead664066a0c238d6e12de80715"
+    },
+    "mail_malformed_2/bytes": {
+      "attachments": "52f846b01df6d8d3898630e6cfcfe22e6fb7c43fc5a77c5af7b120e9d4eaa3c0",
+      "headers": "f74c1bf6e04613659aedeeede737fc76170223bbd0d765558dc97cbb92dafeaa",
+      "mail": "a47308ddad865058900ebafbd2493a47bfd505e424145ec5d8818955f4951658",
+      "mime": "70f9d8496f803ff897c39bf894b62864e8092f7b3f494fac66866e830b069b9b",
+      "partial": "429e1b2c194c1be5cf6bf5df53df6da22d40fe75a7392a7c8fcfd102ebda3a0e",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "42b294a0d21d34329069dfd0fc96e9bda0ae941d54ca72051908febe9e68a974"
+    },
+    "mail_malformed_2/file": {
+      "attachments": "52f846b01df6d8d3898630e6cfcfe22e6fb7c43fc5a77c5af7b120e9d4eaa3c0",
+      "headers": "f74c1bf6e04613659aedeeede737fc76170223bbd0d765558dc97cbb92dafeaa",
+      "mail": "a47308ddad865058900ebafbd2493a47bfd505e424145ec5d8818955f4951658",
+      "mime": "70f9d8496f803ff897c39bf894b62864e8092f7b3f494fac66866e830b069b9b",
+      "partial": "429e1b2c194c1be5cf6bf5df53df6da22d40fe75a7392a7c8fcfd102ebda3a0e",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "42b294a0d21d34329069dfd0fc96e9bda0ae941d54ca72051908febe9e68a974"
+    },
+    "mail_malformed_2/string": {
+      "attachments": "52f846b01df6d8d3898630e6cfcfe22e6fb7c43fc5a77c5af7b120e9d4eaa3c0",
+      "headers": "f74c1bf6e04613659aedeeede737fc76170223bbd0d765558dc97cbb92dafeaa",
+      "mail": "a47308ddad865058900ebafbd2493a47bfd505e424145ec5d8818955f4951658",
+      "mime": "70f9d8496f803ff897c39bf894b62864e8092f7b3f494fac66866e830b069b9b",
+      "partial": "429e1b2c194c1be5cf6bf5df53df6da22d40fe75a7392a7c8fcfd102ebda3a0e",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "42b294a0d21d34329069dfd0fc96e9bda0ae941d54ca72051908febe9e68a974"
+    },
+    "mail_malformed_3/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "7238fc92c5c185df74b584c7aa29efdb0f1256620b546b8f703c3fed9dfa84c4",
+      "mail": "e2a1be00522d0241df3120472ee0d8dd62888e26cc054117de9d85095fedc21f",
+      "mime": "a9d3b0d29e9285552edf31eb036495ea8d14a83c366c4f9d2e1aa1eb9192d9b8",
+      "partial": "bd12044928f7dd6cd362103259691938c71df4824f218e84bbdedbad72038c3b",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "39fbd194c300cfc90eb8d6439785053a8ceb1d3d415c1f082acaafb21b8fb41c",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_malformed_3/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "7238fc92c5c185df74b584c7aa29efdb0f1256620b546b8f703c3fed9dfa84c4",
+      "mail": "e2a1be00522d0241df3120472ee0d8dd62888e26cc054117de9d85095fedc21f",
+      "mime": "a9d3b0d29e9285552edf31eb036495ea8d14a83c366c4f9d2e1aa1eb9192d9b8",
+      "partial": "bd12044928f7dd6cd362103259691938c71df4824f218e84bbdedbad72038c3b",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "39fbd194c300cfc90eb8d6439785053a8ceb1d3d415c1f082acaafb21b8fb41c",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_malformed_3/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "7238fc92c5c185df74b584c7aa29efdb0f1256620b546b8f703c3fed9dfa84c4",
+      "mail": "e2a1be00522d0241df3120472ee0d8dd62888e26cc054117de9d85095fedc21f",
+      "mime": "a9d3b0d29e9285552edf31eb036495ea8d14a83c366c4f9d2e1aa1eb9192d9b8",
+      "partial": "bd12044928f7dd6cd362103259691938c71df4824f218e84bbdedbad72038c3b",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "39fbd194c300cfc90eb8d6439785053a8ceb1d3d415c1f082acaafb21b8fb41c",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_outlook_1/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "mail": "5f14c6af9bc95928f0d89232bf2606fe8f99c0725e6f1193670314a87f41c27a",
+      "mime": "54d59b6382f683e66bea37928c4b960555e620705ba707ffdaec2fc16a143446",
+      "partial": "5f14c6af9bc95928f0d89232bf2606fe8f99c0725e6f1193670314a87f41c27a",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "28b64e48784986088a3ef862bcf65da64dfab40157e761a1f23a37483b674706"
+    },
+    "mail_outlook_1/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "mail": "5f14c6af9bc95928f0d89232bf2606fe8f99c0725e6f1193670314a87f41c27a",
+      "mime": "54d59b6382f683e66bea37928c4b960555e620705ba707ffdaec2fc16a143446",
+      "partial": "5f14c6af9bc95928f0d89232bf2606fe8f99c0725e6f1193670314a87f41c27a",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "28b64e48784986088a3ef862bcf65da64dfab40157e761a1f23a37483b674706"
+    },
+    "mail_outlook_1/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "mail": "5dde7b38fcbdc40757924a408f53426ef5fbb5e977dd026da88331a6f6445a0b",
+      "mime": "a741defd3802cfd1b9e15a56f492d654ece3d0c25323d6097f5d4603ace99a2e",
+      "partial": "5dde7b38fcbdc40757924a408f53426ef5fbb5e977dd026da88331a6f6445a0b",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "0b0b5d3c22554f089f8ddcdb7112bdb3a4a9705c145a1987c710bc6e6620ec51"
+    },
+    "mail_test_1/bytes": {
+      "attachments": "6f64bcc2fd430f95e4f742123be0100d39dbd64062a54d7c76b638cf9cec22b4",
+      "headers": "790605d6686616ce05a60baab8692dbaa19dd12060a7e3c23475bcd987d89178",
+      "mail": "e67558914dd89dff88f2e9ba5dbc5db9a8558a35607345bff0f4e8460f89ead3",
+      "mime": "2987eea3a5e208ee85a277d68b6aa5ed524ea7dd85a07178ea69f0d55805da93",
+      "partial": "35f6ec82b2fc682ff9ef91fa16a680942df1e2e1b35051eab3b6ced65e66b87c",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_1/file": {
+      "attachments": "6f64bcc2fd430f95e4f742123be0100d39dbd64062a54d7c76b638cf9cec22b4",
+      "headers": "790605d6686616ce05a60baab8692dbaa19dd12060a7e3c23475bcd987d89178",
+      "mail": "e67558914dd89dff88f2e9ba5dbc5db9a8558a35607345bff0f4e8460f89ead3",
+      "mime": "2987eea3a5e208ee85a277d68b6aa5ed524ea7dd85a07178ea69f0d55805da93",
+      "partial": "35f6ec82b2fc682ff9ef91fa16a680942df1e2e1b35051eab3b6ced65e66b87c",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_1/string": {
+      "attachments": "6f64bcc2fd430f95e4f742123be0100d39dbd64062a54d7c76b638cf9cec22b4",
+      "headers": "790605d6686616ce05a60baab8692dbaa19dd12060a7e3c23475bcd987d89178",
+      "mail": "e67558914dd89dff88f2e9ba5dbc5db9a8558a35607345bff0f4e8460f89ead3",
+      "mime": "2add858696edc46c9bc1ae8183c3fd8ab12ecd790dd24352b42fd5cbb282fcf3",
+      "partial": "35f6ec82b2fc682ff9ef91fa16a680942df1e2e1b35051eab3b6ced65e66b87c",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_10/bytes": {
+      "attachments": "c6fcd07c78ad3c65f0db93b66bc78dfd10f7b708ed1e661d8f5ec7ab3ea8f9e4",
+      "headers": "361de78bd3daf5b5802462266b3196966677c31a892c94d038da6db5b9a37178",
+      "mail": "3a8a8bee8b78a4c54cea81c112810c0fe5ee702eb5d173bf1ab4be35ec758bab",
+      "mime": "3b065f643572b7a1760f7b40e75fd0d2e968b2b97f9d205e4e4225c60e039e1d",
+      "partial": "9bc4e777bfb86eb702e9ec8205f82e634758c17a02bc1f4b88852e5df859cf99",
+      "text_html": "d4e811b15b06357b748a4eba7db3cbc5a375cb30aa1126bebb397fae878c8f27",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "b4d7d5c310e25ed085bdcbc7f066f61f36124eea78fb0886a491a2c246516182"
+    },
+    "mail_test_10/file": {
+      "attachments": "c6fcd07c78ad3c65f0db93b66bc78dfd10f7b708ed1e661d8f5ec7ab3ea8f9e4",
+      "headers": "361de78bd3daf5b5802462266b3196966677c31a892c94d038da6db5b9a37178",
+      "mail": "3a8a8bee8b78a4c54cea81c112810c0fe5ee702eb5d173bf1ab4be35ec758bab",
+      "mime": "3b065f643572b7a1760f7b40e75fd0d2e968b2b97f9d205e4e4225c60e039e1d",
+      "partial": "9bc4e777bfb86eb702e9ec8205f82e634758c17a02bc1f4b88852e5df859cf99",
+      "text_html": "d4e811b15b06357b748a4eba7db3cbc5a375cb30aa1126bebb397fae878c8f27",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "b4d7d5c310e25ed085bdcbc7f066f61f36124eea78fb0886a491a2c246516182"
+    },
+    "mail_test_10/string": {
+      "attachments": "c6fcd07c78ad3c65f0db93b66bc78dfd10f7b708ed1e661d8f5ec7ab3ea8f9e4",
+      "headers": "361de78bd3daf5b5802462266b3196966677c31a892c94d038da6db5b9a37178",
+      "mail": "3a8a8bee8b78a4c54cea81c112810c0fe5ee702eb5d173bf1ab4be35ec758bab",
+      "mime": "3b065f643572b7a1760f7b40e75fd0d2e968b2b97f9d205e4e4225c60e039e1d",
+      "partial": "9bc4e777bfb86eb702e9ec8205f82e634758c17a02bc1f4b88852e5df859cf99",
+      "text_html": "d4e811b15b06357b748a4eba7db3cbc5a375cb30aa1126bebb397fae878c8f27",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "b4d7d5c310e25ed085bdcbc7f066f61f36124eea78fb0886a491a2c246516182"
+    },
+    "mail_test_11/bytes": {
+      "attachments": "88f8da4ac4802a84d13c44f4d7d4cb732ec8374b095fc5255e43e9bab30f49ca",
+      "headers": "f05dd31157676e8cb79485b13ce245ffc374d51bf9aebefe40475c5936faf638",
+      "mail": "a41d6faee637af38e5cbb85f871e1afa3e309082f5a6d549bd41fa7a52a8b1b3",
+      "mime": "11afb805bd69715d66aa6ac0d1f1480b4150424f99e328a600d195eb8bc9e15f",
+      "partial": "d0f9d143392f48b148919b54ca59c54eb25a94542113f3a84f31383f195c024a",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_11/file": {
+      "attachments": "88f8da4ac4802a84d13c44f4d7d4cb732ec8374b095fc5255e43e9bab30f49ca",
+      "headers": "f05dd31157676e8cb79485b13ce245ffc374d51bf9aebefe40475c5936faf638",
+      "mail": "a41d6faee637af38e5cbb85f871e1afa3e309082f5a6d549bd41fa7a52a8b1b3",
+      "mime": "11afb805bd69715d66aa6ac0d1f1480b4150424f99e328a600d195eb8bc9e15f",
+      "partial": "d0f9d143392f48b148919b54ca59c54eb25a94542113f3a84f31383f195c024a",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_11/string": {
+      "attachments": "88f8da4ac4802a84d13c44f4d7d4cb732ec8374b095fc5255e43e9bab30f49ca",
+      "headers": "f05dd31157676e8cb79485b13ce245ffc374d51bf9aebefe40475c5936faf638",
+      "mail": "a41d6faee637af38e5cbb85f871e1afa3e309082f5a6d549bd41fa7a52a8b1b3",
+      "mime": "11afb805bd69715d66aa6ac0d1f1480b4150424f99e328a600d195eb8bc9e15f",
+      "partial": "d0f9d143392f48b148919b54ca59c54eb25a94542113f3a84f31383f195c024a",
+      "text_html": "1bc3c2d9f7bbafe77c8ce9de3531ebf0b8e6dffe8e0e9009fbf1a9317f2992cc",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_12/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "972b26cd599cf521b1738735ed39dc145010dd526908b9032bc5145ab38a7d31",
+      "mail": "627eafe12950e3ec84a31265a438d0bf734e0dfa654204a9cc0384e12df4b778",
+      "mime": "98ff961858fe6b8b474e6cb064a9a3f94b50d33944db4222a44301addb9a086e",
+      "partial": "0fd4f146b7f4f29eadc290f32c3da4123eab7473a76ae72fdea7ab8964f2bba9",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3db1c81fc4ed22629e125087c4ae2b59bd7e8388b47bd5a447d0c0ccf5191ff1"
+    },
+    "mail_test_12/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "972b26cd599cf521b1738735ed39dc145010dd526908b9032bc5145ab38a7d31",
+      "mail": "627eafe12950e3ec84a31265a438d0bf734e0dfa654204a9cc0384e12df4b778",
+      "mime": "98ff961858fe6b8b474e6cb064a9a3f94b50d33944db4222a44301addb9a086e",
+      "partial": "0fd4f146b7f4f29eadc290f32c3da4123eab7473a76ae72fdea7ab8964f2bba9",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3db1c81fc4ed22629e125087c4ae2b59bd7e8388b47bd5a447d0c0ccf5191ff1"
+    },
+    "mail_test_12/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "972b26cd599cf521b1738735ed39dc145010dd526908b9032bc5145ab38a7d31",
+      "mail": "835f4adc08dfcc473292abc6d6815fc506124bc789ea77830ecaa7f15146264a",
+      "mime": "26e127617fd9709a4b246fe1c200be5ccc39105d0dcfba30c41ff5a74df507b0",
+      "partial": "bfa3cc66089d44536af7f40c69d9a5e80b52ec9727ffe6feefdbcfffeca2b3e1",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3db1c81fc4ed22629e125087c4ae2b59bd7e8388b47bd5a447d0c0ccf5191ff1"
+    },
+    "mail_test_13/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "a20dc3e709b2ca0395e5dce8a0c00dfc949222bc1154b9019854838d5b49103f",
+      "mail": "e1aa37245f48343495cb62fcbd3976c00c15e41c7049c6a844d7582556bb7124",
+      "mime": "02f16da5a3600efa075b332a9dc66ca44e434377ef8235ee885716b1f7d8a91d",
+      "partial": "cec7d0d119c7c9e336478bbc99250796232b653272cd9e35b7b979e2681817f6",
+      "text_html": "cf64368f3d5780bc88c98f99d4c9fb9bac3ab98a27440f29e11f926669af0a56",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "d237338558261ea8cd1bff4d809ffc261b0d67b87f488aba8ae153808b14763a"
+    },
+    "mail_test_13/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "a20dc3e709b2ca0395e5dce8a0c00dfc949222bc1154b9019854838d5b49103f",
+      "mail": "e1aa37245f48343495cb62fcbd3976c00c15e41c7049c6a844d7582556bb7124",
+      "mime": "02f16da5a3600efa075b332a9dc66ca44e434377ef8235ee885716b1f7d8a91d",
+      "partial": "cec7d0d119c7c9e336478bbc99250796232b653272cd9e35b7b979e2681817f6",
+      "text_html": "cf64368f3d5780bc88c98f99d4c9fb9bac3ab98a27440f29e11f926669af0a56",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "d237338558261ea8cd1bff4d809ffc261b0d67b87f488aba8ae153808b14763a"
+    },
+    "mail_test_13/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "a20dc3e709b2ca0395e5dce8a0c00dfc949222bc1154b9019854838d5b49103f",
+      "mail": "e1aa37245f48343495cb62fcbd3976c00c15e41c7049c6a844d7582556bb7124",
+      "mime": "02f16da5a3600efa075b332a9dc66ca44e434377ef8235ee885716b1f7d8a91d",
+      "partial": "cec7d0d119c7c9e336478bbc99250796232b653272cd9e35b7b979e2681817f6",
+      "text_html": "cf64368f3d5780bc88c98f99d4c9fb9bac3ab98a27440f29e11f926669af0a56",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "d237338558261ea8cd1bff4d809ffc261b0d67b87f488aba8ae153808b14763a"
+    },
+    "mail_test_14/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d18f2149c82088d58780699675ab9853d3f4fd370ec84b28c37b6057d611f57f",
+      "mail": "c300b343dbc358a3833b0103ff6b76f2e1a6c7456d7b7411db41c98692cb49d5",
+      "mime": "700b12498f243edc5ea3c6945e93874a5e791fe34126b136ab5e39fbbf4e9d3e",
+      "partial": "2b56334820e526cea86732f91b89efeaff2f11c8665ef9ac70d0436b4558eded",
+      "text_html": "62299de06621556ecfcaeac2a39a8c2bc8c61d605c2a2a309703c65204ee23b6",
+      "text_other": "203b4347977eddf2501843dfcd515501bd3c65a8f47ed2494e086ec033972f52",
+      "text_plain": "2b7da2096316cf249f819d0f446a1db9e7562371970eaf37fd3ad5886add46af"
+    },
+    "mail_test_14/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d18f2149c82088d58780699675ab9853d3f4fd370ec84b28c37b6057d611f57f",
+      "mail": "c300b343dbc358a3833b0103ff6b76f2e1a6c7456d7b7411db41c98692cb49d5",
+      "mime": "700b12498f243edc5ea3c6945e93874a5e791fe34126b136ab5e39fbbf4e9d3e",
+      "partial": "2b56334820e526cea86732f91b89efeaff2f11c8665ef9ac70d0436b4558eded",
+      "text_html": "62299de06621556ecfcaeac2a39a8c2bc8c61d605c2a2a309703c65204ee23b6",
+      "text_other": "203b4347977eddf2501843dfcd515501bd3c65a8f47ed2494e086ec033972f52",
+      "text_plain": "2b7da2096316cf249f819d0f446a1db9e7562371970eaf37fd3ad5886add46af"
+    },
+    "mail_test_14/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d18f2149c82088d58780699675ab9853d3f4fd370ec84b28c37b6057d611f57f",
+      "mail": "c300b343dbc358a3833b0103ff6b76f2e1a6c7456d7b7411db41c98692cb49d5",
+      "mime": "700b12498f243edc5ea3c6945e93874a5e791fe34126b136ab5e39fbbf4e9d3e",
+      "partial": "2b56334820e526cea86732f91b89efeaff2f11c8665ef9ac70d0436b4558eded",
+      "text_html": "62299de06621556ecfcaeac2a39a8c2bc8c61d605c2a2a309703c65204ee23b6",
+      "text_other": "203b4347977eddf2501843dfcd515501bd3c65a8f47ed2494e086ec033972f52",
+      "text_plain": "2b7da2096316cf249f819d0f446a1db9e7562371970eaf37fd3ad5886add46af"
+    },
+    "mail_test_15/bytes": {
+      "attachments": "dc1972966d151d890f565f6ff87541e5411f144310b4fac49d62907f580f9595",
+      "headers": "f93dc663149c9d25a4a3011f9ccfb83573941b79470de524879642ad093b7bf8",
+      "mail": "009adfa6dd7f5d47d3463eda0a0e0603fbc3ec141eda1d64a2f41ccad655cb2b",
+      "mime": "94a164b21e6f8bcc1c6a4b8bcbe447ca565b28a90bf2aa696751d36867737ee6",
+      "partial": "65e934798ed573547d2adf3f361baed6501e327aa8d857137e1c3d7773800e1f",
+      "text_html": "c0d397aae8307ebf23f9a1bde8da851820f2fcf73c3a71d0cda41dcee8eb430b",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "357d262c842e934067d988e4995b357ccb2704ba84a4a535b8502b88b7b5c546"
+    },
+    "mail_test_15/file": {
+      "attachments": "dc1972966d151d890f565f6ff87541e5411f144310b4fac49d62907f580f9595",
+      "headers": "f93dc663149c9d25a4a3011f9ccfb83573941b79470de524879642ad093b7bf8",
+      "mail": "009adfa6dd7f5d47d3463eda0a0e0603fbc3ec141eda1d64a2f41ccad655cb2b",
+      "mime": "94a164b21e6f8bcc1c6a4b8bcbe447ca565b28a90bf2aa696751d36867737ee6",
+      "partial": "65e934798ed573547d2adf3f361baed6501e327aa8d857137e1c3d7773800e1f",
+      "text_html": "c0d397aae8307ebf23f9a1bde8da851820f2fcf73c3a71d0cda41dcee8eb430b",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "357d262c842e934067d988e4995b357ccb2704ba84a4a535b8502b88b7b5c546"
+    },
+    "mail_test_15/string": {
+      "attachments": "dc1972966d151d890f565f6ff87541e5411f144310b4fac49d62907f580f9595",
+      "headers": "f93dc663149c9d25a4a3011f9ccfb83573941b79470de524879642ad093b7bf8",
+      "mail": "009adfa6dd7f5d47d3463eda0a0e0603fbc3ec141eda1d64a2f41ccad655cb2b",
+      "mime": "94a164b21e6f8bcc1c6a4b8bcbe447ca565b28a90bf2aa696751d36867737ee6",
+      "partial": "65e934798ed573547d2adf3f361baed6501e327aa8d857137e1c3d7773800e1f",
+      "text_html": "c0d397aae8307ebf23f9a1bde8da851820f2fcf73c3a71d0cda41dcee8eb430b",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "357d262c842e934067d988e4995b357ccb2704ba84a4a535b8502b88b7b5c546"
+    },
+    "mail_test_16/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "94713f44b5d035eb0e3ac5f22e0ff039429fa01de60d6ade963788b1cc0f8ede",
+      "mail": "38751365e1e5555b3bd52d8947421c515b0bf8caa0e7519b7ca2315e5b1c494a",
+      "mime": "acbe7c65aad0662b05e519fb27a4445c2519fc8c8d7d36a378de7198fed83b24",
+      "partial": "eb5cd7852ae32c54087a5833bc772c706d8488d0ceeb3fe56398009f52d2d331",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c86e7d9bd4b864ad234199fba72482e0feaf01d0c8ce890474088c003f334730"
+    },
+    "mail_test_16/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "94713f44b5d035eb0e3ac5f22e0ff039429fa01de60d6ade963788b1cc0f8ede",
+      "mail": "38751365e1e5555b3bd52d8947421c515b0bf8caa0e7519b7ca2315e5b1c494a",
+      "mime": "acbe7c65aad0662b05e519fb27a4445c2519fc8c8d7d36a378de7198fed83b24",
+      "partial": "eb5cd7852ae32c54087a5833bc772c706d8488d0ceeb3fe56398009f52d2d331",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c86e7d9bd4b864ad234199fba72482e0feaf01d0c8ce890474088c003f334730"
+    },
+    "mail_test_16/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "94713f44b5d035eb0e3ac5f22e0ff039429fa01de60d6ade963788b1cc0f8ede",
+      "mail": "38751365e1e5555b3bd52d8947421c515b0bf8caa0e7519b7ca2315e5b1c494a",
+      "mime": "acbe7c65aad0662b05e519fb27a4445c2519fc8c8d7d36a378de7198fed83b24",
+      "partial": "eb5cd7852ae32c54087a5833bc772c706d8488d0ceeb3fe56398009f52d2d331",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c86e7d9bd4b864ad234199fba72482e0feaf01d0c8ce890474088c003f334730"
+    },
+    "mail_test_17/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d49bdcbe818fefd4d2a21f312dccc3b1f3f01cb565929d05c246c1b31cb60985",
+      "mail": "a02097a96779b92ae9ca5dae619ed1832fbc52819d87594e283ec16e098f605d",
+      "mime": "c4b0708c899e35c64e4a8518d67993a9e83c91de9cca218a952e727bcfaa5517",
+      "partial": "97037cea7eef9a7fa1633d6285fd5a2f98736ab7f77efcdd74004003156ea003",
+      "text_html": "893e554ba2685d55955726b4d5546f419e9d964f67458e42df38ce5f784db2fe",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3da3bc0692a5eb64acdee272eee66146324e7b028b95360b0ea5e77d37cf9601"
+    },
+    "mail_test_17/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d49bdcbe818fefd4d2a21f312dccc3b1f3f01cb565929d05c246c1b31cb60985",
+      "mail": "a02097a96779b92ae9ca5dae619ed1832fbc52819d87594e283ec16e098f605d",
+      "mime": "c4b0708c899e35c64e4a8518d67993a9e83c91de9cca218a952e727bcfaa5517",
+      "partial": "97037cea7eef9a7fa1633d6285fd5a2f98736ab7f77efcdd74004003156ea003",
+      "text_html": "893e554ba2685d55955726b4d5546f419e9d964f67458e42df38ce5f784db2fe",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3da3bc0692a5eb64acdee272eee66146324e7b028b95360b0ea5e77d37cf9601"
+    },
+    "mail_test_17/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "d49bdcbe818fefd4d2a21f312dccc3b1f3f01cb565929d05c246c1b31cb60985",
+      "mail": "a02097a96779b92ae9ca5dae619ed1832fbc52819d87594e283ec16e098f605d",
+      "mime": "c4b0708c899e35c64e4a8518d67993a9e83c91de9cca218a952e727bcfaa5517",
+      "partial": "97037cea7eef9a7fa1633d6285fd5a2f98736ab7f77efcdd74004003156ea003",
+      "text_html": "893e554ba2685d55955726b4d5546f419e9d964f67458e42df38ce5f784db2fe",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "3da3bc0692a5eb64acdee272eee66146324e7b028b95360b0ea5e77d37cf9601"
+    },
+    "mail_test_18/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "15be351269e27ff38e4177bd108463a8f18520e7a394554087542882fe7b1568",
+      "mail": "eb0400e6d8531ca2c30302962226943a32627b90303dd47ef92903140d7cab8a",
+      "mime": "0664c6297b88d1b8bd18cd283a1d7df439c24bce742f8098e7558dd904a5ec1a",
+      "partial": "e60d598cf26f1d9fd51a0cf5a4f47718f62ae4b705674fdd69ac645067648932",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "22621ce38dc7b29fa2bfa753c86217ebd9cac03c4b4615bf4dd7e014d3cd8fdd"
+    },
+    "mail_test_18/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "15be351269e27ff38e4177bd108463a8f18520e7a394554087542882fe7b1568",
+      "mail": "eb0400e6d8531ca2c30302962226943a32627b90303dd47ef92903140d7cab8a",
+      "mime": "0664c6297b88d1b8bd18cd283a1d7df439c24bce742f8098e7558dd904a5ec1a",
+      "partial": "e60d598cf26f1d9fd51a0cf5a4f47718f62ae4b705674fdd69ac645067648932",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "22621ce38dc7b29fa2bfa753c86217ebd9cac03c4b4615bf4dd7e014d3cd8fdd"
+    },
+    "mail_test_18/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "15be351269e27ff38e4177bd108463a8f18520e7a394554087542882fe7b1568",
+      "mail": "eb0400e6d8531ca2c30302962226943a32627b90303dd47ef92903140d7cab8a",
+      "mime": "0664c6297b88d1b8bd18cd283a1d7df439c24bce742f8098e7558dd904a5ec1a",
+      "partial": "e60d598cf26f1d9fd51a0cf5a4f47718f62ae4b705674fdd69ac645067648932",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "22621ce38dc7b29fa2bfa753c86217ebd9cac03c4b4615bf4dd7e014d3cd8fdd"
+    },
+    "mail_test_19/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16d613a4c4289b1adb96cbd379e013cec227b8cda176ffa9be424d7594017a07",
+      "mail": "64806b116c702c009f97dac9c7a8ece88097d094b9d726b4b885dabd1b39f6ab",
+      "mime": "decdb8ba4622273aefd7d0a41f669cb594569ed5b7dd53022c805210077b7783",
+      "partial": "82d4378e25d09ceae56ef499330259cfc657cf55143489c17dbb647125ec61f3",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "db4f34469be339f5d26ca7d19067e4a82452888c5201e42a9d752a76ea2b2aaf"
+    },
+    "mail_test_19/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16d613a4c4289b1adb96cbd379e013cec227b8cda176ffa9be424d7594017a07",
+      "mail": "64806b116c702c009f97dac9c7a8ece88097d094b9d726b4b885dabd1b39f6ab",
+      "mime": "decdb8ba4622273aefd7d0a41f669cb594569ed5b7dd53022c805210077b7783",
+      "partial": "82d4378e25d09ceae56ef499330259cfc657cf55143489c17dbb647125ec61f3",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "db4f34469be339f5d26ca7d19067e4a82452888c5201e42a9d752a76ea2b2aaf"
+    },
+    "mail_test_19/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16d613a4c4289b1adb96cbd379e013cec227b8cda176ffa9be424d7594017a07",
+      "mail": "64806b116c702c009f97dac9c7a8ece88097d094b9d726b4b885dabd1b39f6ab",
+      "mime": "decdb8ba4622273aefd7d0a41f669cb594569ed5b7dd53022c805210077b7783",
+      "partial": "82d4378e25d09ceae56ef499330259cfc657cf55143489c17dbb647125ec61f3",
+      "text_html": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "db4f34469be339f5d26ca7d19067e4a82452888c5201e42a9d752a76ea2b2aaf"
+    },
+    "mail_test_2/bytes": {
+      "attachments": "c235c18763867f8dd99e4b1d4956902818cabcc11e79a53c0aacec2508658aa9",
+      "headers": "4cbf5719f9775d846dded8524c4e40c18e87eb95f16d2806a2f85519e5624216",
+      "mail": "ffaaba13ea3f892b61dd4fa98f6f83f81a54ea4378eda21bff7df6119489720e",
+      "mime": "a49cfca11b5aae710c759f12a606a00440453e496e1c64cf25b68bacc5045309",
+      "partial": "77db9a01b27162b7cd45645269e428ced0bc0612d8723f53ae92acafe50234ed",
+      "text_html": "f2dd55c90d54cbd147b87a855f6c53880c1aefe9c7b8aa1c4a096da9dec9af01",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c24c3a4decb0cfb705bc7201e6873702cb81fee64fa6f32eb2865bc21d4fcbee"
+    },
+    "mail_test_2/file": {
+      "attachments": "c235c18763867f8dd99e4b1d4956902818cabcc11e79a53c0aacec2508658aa9",
+      "headers": "4cbf5719f9775d846dded8524c4e40c18e87eb95f16d2806a2f85519e5624216",
+      "mail": "ffaaba13ea3f892b61dd4fa98f6f83f81a54ea4378eda21bff7df6119489720e",
+      "mime": "a49cfca11b5aae710c759f12a606a00440453e496e1c64cf25b68bacc5045309",
+      "partial": "77db9a01b27162b7cd45645269e428ced0bc0612d8723f53ae92acafe50234ed",
+      "text_html": "f2dd55c90d54cbd147b87a855f6c53880c1aefe9c7b8aa1c4a096da9dec9af01",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c24c3a4decb0cfb705bc7201e6873702cb81fee64fa6f32eb2865bc21d4fcbee"
+    },
+    "mail_test_2/string": {
+      "attachments": "c235c18763867f8dd99e4b1d4956902818cabcc11e79a53c0aacec2508658aa9",
+      "headers": "4cbf5719f9775d846dded8524c4e40c18e87eb95f16d2806a2f85519e5624216",
+      "mail": "ffaaba13ea3f892b61dd4fa98f6f83f81a54ea4378eda21bff7df6119489720e",
+      "mime": "a49cfca11b5aae710c759f12a606a00440453e496e1c64cf25b68bacc5045309",
+      "partial": "77db9a01b27162b7cd45645269e428ced0bc0612d8723f53ae92acafe50234ed",
+      "text_html": "f2dd55c90d54cbd147b87a855f6c53880c1aefe9c7b8aa1c4a096da9dec9af01",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "c24c3a4decb0cfb705bc7201e6873702cb81fee64fa6f32eb2865bc21d4fcbee"
+    },
+    "mail_test_3/bytes": {
+      "attachments": "fc8c56de69fd1c348387a0af43ff97fc5a340fd335ee54aa89b123f0a4d38e92",
+      "headers": "8220baaee4b1ad597a9c6d9034d41b67670e29b04c54e7df2a7f877b9aec2457",
+      "mail": "c06502fe2b7290dae0392fe5094dc4ef678a2bf3a0bb9f876a7055f19108c9c0",
+      "mime": "d33e6e9ff4781aa114d4f5985ed1ea554fea2763d61deb52e164dd218ed11d62",
+      "partial": "fce1fd82f4deca68ff31938f4384764c690d844d96ca2c8919d65e28c3bbd484",
+      "text_html": "56302e187ff64cde34688a956d560ae38b6135dd2fa9a64319cd5fe33434be73",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e7001cd252710a3b64e5074ded8c135e96b7917df54db9a606d0c2b0153c6f95"
+    },
+    "mail_test_3/file": {
+      "attachments": "fc8c56de69fd1c348387a0af43ff97fc5a340fd335ee54aa89b123f0a4d38e92",
+      "headers": "8220baaee4b1ad597a9c6d9034d41b67670e29b04c54e7df2a7f877b9aec2457",
+      "mail": "c06502fe2b7290dae0392fe5094dc4ef678a2bf3a0bb9f876a7055f19108c9c0",
+      "mime": "d33e6e9ff4781aa114d4f5985ed1ea554fea2763d61deb52e164dd218ed11d62",
+      "partial": "fce1fd82f4deca68ff31938f4384764c690d844d96ca2c8919d65e28c3bbd484",
+      "text_html": "56302e187ff64cde34688a956d560ae38b6135dd2fa9a64319cd5fe33434be73",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e7001cd252710a3b64e5074ded8c135e96b7917df54db9a606d0c2b0153c6f95"
+    },
+    "mail_test_3/string": {
+      "attachments": "fc8c56de69fd1c348387a0af43ff97fc5a340fd335ee54aa89b123f0a4d38e92",
+      "headers": "8220baaee4b1ad597a9c6d9034d41b67670e29b04c54e7df2a7f877b9aec2457",
+      "mail": "c06502fe2b7290dae0392fe5094dc4ef678a2bf3a0bb9f876a7055f19108c9c0",
+      "mime": "d33e6e9ff4781aa114d4f5985ed1ea554fea2763d61deb52e164dd218ed11d62",
+      "partial": "fce1fd82f4deca68ff31938f4384764c690d844d96ca2c8919d65e28c3bbd484",
+      "text_html": "56302e187ff64cde34688a956d560ae38b6135dd2fa9a64319cd5fe33434be73",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e7001cd252710a3b64e5074ded8c135e96b7917df54db9a606d0c2b0153c6f95"
+    },
+    "mail_test_4/bytes": {
+      "attachments": "967a3d505f586209d91a26762e8c133fe4ce66d245e8fe060985b0ab2d07998a",
+      "headers": "a94baecc84568de710761a02f08d6a21ef86115bceb60378a3dbca8df7a2858c",
+      "mail": "371566b07ba4d4954340449a4837ed3c5ec7fa22f35e69fa54b7994cede7135a",
+      "mime": "bff0bf039927f6c0011c4118267440d8fe6504f570d3e4c9ecf98fc487ad9906",
+      "partial": "adecb047b6ae411485cb699a0d3c74ee61f4be5fac7f36f6ec8203c83695dc3a",
+      "text_html": "c54625eb7ad8f63dacff3747f1ac9bd08056564f010eadc7c20c6bd868f6ff38",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_4/file": {
+      "attachments": "967a3d505f586209d91a26762e8c133fe4ce66d245e8fe060985b0ab2d07998a",
+      "headers": "a94baecc84568de710761a02f08d6a21ef86115bceb60378a3dbca8df7a2858c",
+      "mail": "371566b07ba4d4954340449a4837ed3c5ec7fa22f35e69fa54b7994cede7135a",
+      "mime": "bff0bf039927f6c0011c4118267440d8fe6504f570d3e4c9ecf98fc487ad9906",
+      "partial": "adecb047b6ae411485cb699a0d3c74ee61f4be5fac7f36f6ec8203c83695dc3a",
+      "text_html": "c54625eb7ad8f63dacff3747f1ac9bd08056564f010eadc7c20c6bd868f6ff38",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_4/string": {
+      "attachments": "967a3d505f586209d91a26762e8c133fe4ce66d245e8fe060985b0ab2d07998a",
+      "headers": "a94baecc84568de710761a02f08d6a21ef86115bceb60378a3dbca8df7a2858c",
+      "mail": "28379a246c2b11955d371f2daee8b22ddfc9b8b9641b1747d049df698d58d7a7",
+      "mime": "80b3c4b83d6441a5a8221f3537142bfd01b41e0271f3cc97b2115c4f893a4cff",
+      "partial": "2afb7b3a1f84eecab4ebfe685f39ccb1766ac3089d32daba5d48f2b890af09ac",
+      "text_html": "e5460edac5df20aa06c8b846b8bf883ec162e6d604557b154114c2ad0158c038",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_5/bytes": {
+      "attachments": "1636e7d7ed9280705dac095fdd5f892bee420a4e22b87d087c993ca0c5ff52ff",
+      "headers": "6a743e6c2807dac9fef4117fc27b38a88f6d40d1157975150950f736db5aa848",
+      "mail": "961913f78d065ef4d56692440a58171ad41abac31b49c01193e80fc76eb7882d",
+      "mime": "e03f7355176c4285ac030c351d9300d91bdbb972af72c36204fbdbe2d3f3cb0f",
+      "partial": "21c7a7a1ce32090d9f5259ca4c15f3f616a238712c78655b6a25117d76b47dbd",
+      "text_html": "c9dba3942a8c1774e2b1f66b80de58f6179e2558070fc068bc7f17f978a4733c",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4e4e365884d5029efde0ed67ed8c4b4529cc2fafdc16311fd1f0422ec2b6397e"
+    },
+    "mail_test_5/file": {
+      "attachments": "1636e7d7ed9280705dac095fdd5f892bee420a4e22b87d087c993ca0c5ff52ff",
+      "headers": "6a743e6c2807dac9fef4117fc27b38a88f6d40d1157975150950f736db5aa848",
+      "mail": "961913f78d065ef4d56692440a58171ad41abac31b49c01193e80fc76eb7882d",
+      "mime": "e03f7355176c4285ac030c351d9300d91bdbb972af72c36204fbdbe2d3f3cb0f",
+      "partial": "21c7a7a1ce32090d9f5259ca4c15f3f616a238712c78655b6a25117d76b47dbd",
+      "text_html": "c9dba3942a8c1774e2b1f66b80de58f6179e2558070fc068bc7f17f978a4733c",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4e4e365884d5029efde0ed67ed8c4b4529cc2fafdc16311fd1f0422ec2b6397e"
+    },
+    "mail_test_5/string": {
+      "attachments": "1636e7d7ed9280705dac095fdd5f892bee420a4e22b87d087c993ca0c5ff52ff",
+      "headers": "6a743e6c2807dac9fef4117fc27b38a88f6d40d1157975150950f736db5aa848",
+      "mail": "961913f78d065ef4d56692440a58171ad41abac31b49c01193e80fc76eb7882d",
+      "mime": "e03f7355176c4285ac030c351d9300d91bdbb972af72c36204fbdbe2d3f3cb0f",
+      "partial": "21c7a7a1ce32090d9f5259ca4c15f3f616a238712c78655b6a25117d76b47dbd",
+      "text_html": "c9dba3942a8c1774e2b1f66b80de58f6179e2558070fc068bc7f17f978a4733c",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4e4e365884d5029efde0ed67ed8c4b4529cc2fafdc16311fd1f0422ec2b6397e"
+    },
+    "mail_test_6/bytes": {
+      "attachments": "b87669b0328cfb13a3f5c35d7a8306066311db34854c9baa38d5adb5a98932b6",
+      "headers": "a10bdf3bba43f11dbf6d930cc52a9e2affc9d2ed1ff7f355ab10617849e662fd",
+      "mail": "056f7aa1b9c69e961e92afcdd52b5357a6f41e0b497e3a4ef0be17af3bf149e9",
+      "mime": "3c7567642c25e56855e8b6d3e448a85e54fc88d53f0e398765372926e037f4a5",
+      "partial": "5a1b8d4c67f0a332233ef7ed59c422753d0f809b5f4c8fc6a9a5a227e3171e29",
+      "text_html": "c1d2ee837bd795bce4986353da5d47dd5e19b13b6c141c7960af03967d5db572",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_6/file": {
+      "attachments": "b87669b0328cfb13a3f5c35d7a8306066311db34854c9baa38d5adb5a98932b6",
+      "headers": "a10bdf3bba43f11dbf6d930cc52a9e2affc9d2ed1ff7f355ab10617849e662fd",
+      "mail": "056f7aa1b9c69e961e92afcdd52b5357a6f41e0b497e3a4ef0be17af3bf149e9",
+      "mime": "3c7567642c25e56855e8b6d3e448a85e54fc88d53f0e398765372926e037f4a5",
+      "partial": "5a1b8d4c67f0a332233ef7ed59c422753d0f809b5f4c8fc6a9a5a227e3171e29",
+      "text_html": "c1d2ee837bd795bce4986353da5d47dd5e19b13b6c141c7960af03967d5db572",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_6/string": {
+      "attachments": "b87669b0328cfb13a3f5c35d7a8306066311db34854c9baa38d5adb5a98932b6",
+      "headers": "a10bdf3bba43f11dbf6d930cc52a9e2affc9d2ed1ff7f355ab10617849e662fd",
+      "mail": "056f7aa1b9c69e961e92afcdd52b5357a6f41e0b497e3a4ef0be17af3bf149e9",
+      "mime": "3c7567642c25e56855e8b6d3e448a85e54fc88d53f0e398765372926e037f4a5",
+      "partial": "5a1b8d4c67f0a332233ef7ed59c422753d0f809b5f4c8fc6a9a5a227e3171e29",
+      "text_html": "c1d2ee837bd795bce4986353da5d47dd5e19b13b6c141c7960af03967d5db572",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_7/bytes": {
+      "attachments": "e3f7fa13153ee8fc0b5ebef9c92608a64d0527435464ef2050e16722ea132510",
+      "headers": "fc571fddaa9b996a484f32e5293963e28b8c2227243cf7c4251086d5e6b80712",
+      "mail": "67f062d488316e23c333249b38e43127eac88030ef515382e55def6c440556c2",
+      "mime": "16889755daebad5977b3f1d62a6376af2480a5b807ad6d0f2d03482329bc42ce",
+      "partial": "76f9b8c8338f1680791580fd1256a4cef645c5a5d226cfed25b8a9d2bbf5603a",
+      "text_html": "c7e19438870f378f7b596ed82f9847c9d5ef8678f0e71574a8e5c5f2d2ba8a65",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "49cd1b3e879b4b5c7884e65e5335d3639d995528adce97411383a72f3a5d39a4"
+    },
+    "mail_test_7/file": {
+      "attachments": "e3f7fa13153ee8fc0b5ebef9c92608a64d0527435464ef2050e16722ea132510",
+      "headers": "fc571fddaa9b996a484f32e5293963e28b8c2227243cf7c4251086d5e6b80712",
+      "mail": "67f062d488316e23c333249b38e43127eac88030ef515382e55def6c440556c2",
+      "mime": "16889755daebad5977b3f1d62a6376af2480a5b807ad6d0f2d03482329bc42ce",
+      "partial": "76f9b8c8338f1680791580fd1256a4cef645c5a5d226cfed25b8a9d2bbf5603a",
+      "text_html": "c7e19438870f378f7b596ed82f9847c9d5ef8678f0e71574a8e5c5f2d2ba8a65",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "49cd1b3e879b4b5c7884e65e5335d3639d995528adce97411383a72f3a5d39a4"
+    },
+    "mail_test_7/string": {
+      "attachments": "e3f7fa13153ee8fc0b5ebef9c92608a64d0527435464ef2050e16722ea132510",
+      "headers": "fc571fddaa9b996a484f32e5293963e28b8c2227243cf7c4251086d5e6b80712",
+      "mail": "67f062d488316e23c333249b38e43127eac88030ef515382e55def6c440556c2",
+      "mime": "16889755daebad5977b3f1d62a6376af2480a5b807ad6d0f2d03482329bc42ce",
+      "partial": "76f9b8c8338f1680791580fd1256a4cef645c5a5d226cfed25b8a9d2bbf5603a",
+      "text_html": "c7e19438870f378f7b596ed82f9847c9d5ef8678f0e71574a8e5c5f2d2ba8a65",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "49cd1b3e879b4b5c7884e65e5335d3639d995528adce97411383a72f3a5d39a4"
+    },
+    "mail_test_8/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "9d699383f2c2cbfee2e83e16e482d9f2420192066e625e278000e81094d507bc",
+      "mail": "1046820834feed0bb64faf87a2b73dd5a2fe177591cbad8304e0384d670de6d3",
+      "mime": "d94af71f027c48da7bb7e7ce4864e06b2b70b40e99cf00aa72022afb56e2afae",
+      "partial": "ce586b864ac0baeaed673648a04922423ad71e5b0ca5a7460bb54e4f41e09e8e",
+      "text_html": "f580a99b3ac5edf680f6c336c9b3bcdf61fac0408033165535814f7652e27b38",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e8e95703fa64de65640a215b32ed79af5aa1f5d667031295d1f2a206987c1284"
+    },
+    "mail_test_8/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "9d699383f2c2cbfee2e83e16e482d9f2420192066e625e278000e81094d507bc",
+      "mail": "1046820834feed0bb64faf87a2b73dd5a2fe177591cbad8304e0384d670de6d3",
+      "mime": "d94af71f027c48da7bb7e7ce4864e06b2b70b40e99cf00aa72022afb56e2afae",
+      "partial": "ce586b864ac0baeaed673648a04922423ad71e5b0ca5a7460bb54e4f41e09e8e",
+      "text_html": "f580a99b3ac5edf680f6c336c9b3bcdf61fac0408033165535814f7652e27b38",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e8e95703fa64de65640a215b32ed79af5aa1f5d667031295d1f2a206987c1284"
+    },
+    "mail_test_8/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "9d699383f2c2cbfee2e83e16e482d9f2420192066e625e278000e81094d507bc",
+      "mail": "1046820834feed0bb64faf87a2b73dd5a2fe177591cbad8304e0384d670de6d3",
+      "mime": "d94af71f027c48da7bb7e7ce4864e06b2b70b40e99cf00aa72022afb56e2afae",
+      "partial": "ce586b864ac0baeaed673648a04922423ad71e5b0ca5a7460bb54e4f41e09e8e",
+      "text_html": "f580a99b3ac5edf680f6c336c9b3bcdf61fac0408033165535814f7652e27b38",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "e8e95703fa64de65640a215b32ed79af5aa1f5d667031295d1f2a206987c1284"
+    },
+    "mail_test_9/bytes": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
+      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
+      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_9/file": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
+      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
+      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    "mail_test_9/string": {
+      "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
+      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
+      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
+      "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    }
+  },
+  "invariants_checked": [
+    "All 69 cases parse on Python 3.13/3.14; unchanged historical string-route exception on Python 3.9/3.10 for binary mail_outlook_1.",
+    "Attachment count and decoded payload hashes, address values, Date/timezone, Received UTC/delay unchanged.",
+    "No body-part count decreases; raw MIME for bytes/string unchanged; raw MIME for file equals bytes."
+  ],
+  "legacy_mime": {
+    "mail_test_6/bytes": {
+      "mime": "4c44e0300b6e2233e16313ccc4a479826e9e8825e50695a84fe6106ba5507153"
+    },
+    "mail_test_6/file": {
+      "mime": "4c44e0300b6e2233e16313ccc4a479826e9e8825e50695a84fe6106ba5507153"
+    },
+    "mail_test_6/string": {
+      "mime": "4c44e0300b6e2233e16313ccc4a479826e9e8825e50695a84fe6106ba5507153"
+    }
+  },
+  "reviewed_changes": [
+    "Received: ignore clause words inside comments; recover FOR before the misplaced date separator in mail_test_8 with diagnostics; preserve date folding. Existing UTC timestamps and hop delays unchanged.",
+    "Address names: preserve the recovered Cyrillic display names in mail_test_1/11 and add overlong-encoded-word diagnostics.",
+    "MIME UTF-8 metadata: mail_test_1/bytes recovers the original Unicode filename/disposition. File-route metadata and all attachment byte hashes are preserved.",
+    "Inline body: mail_test_3 includes the existing named inline WatchGuard text in the body; attachment remains byte-identical.",
+    "Charset recovery: mail_test_2/6/9 expose replacement markers and diagnostics for formerly discarded octets; mail_test_12/bytes recovers valid UTF-8 mislabeled GB2312.",
+    "File input: raw MIME now matches the bytes route, including non-ASCII octets and CRLF; mail_test_17 body/header folding retains original CRLF.",
+    "Intentional compatibility change: mail_test_4/file now honors declared windows-1251 like the bytes route. Two UTF-8-looking C3B3 sequences display as Cyrillic characters rather than the old unconditional UTF-8 interpretation; original bytes remain intact.",
+    "mail_outlook_1 is a binary MSG container passed to generic EML APIs in this corpus: raw bytes are preserved, body newline/UTF-8 replacement recovery differs. This is not an Outlook conversion test."
+  ]
+}
