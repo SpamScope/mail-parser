@@ -117,13 +117,36 @@ Or contribute with Bitcoin:
 
 Thank you for supporting the evolution of mail-parser!
 
-# mail-parser on Web
+# mail-parser in the ecosystem
 
-Explore mail-parser on these platforms:
+## Packages and distributions
 
-- **[FreeBSD port](https://www.freshports.org/mail/py-mail-parser/)**
-- **[Arch User Repository](https://aur.archlinux.org/packages/mailparser/)**
-- **[REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)**
+Find mail-parser in these package repositories and security toolkits:
+
+- **[FreeBSD](https://www.freshports.org/mail/py-mail-parser/)**: available as the
+  `mail/py-mail-parser` port.
+- **[Arch User Repository (AUR)](https://aur.archlinux.org/packages/mailparser/)**:
+  community-maintained `mailparser` package for Arch Linux.
+- **[Debian](https://packages.debian.org/source/sid/mail-parser)**: `mail-parser`
+  source package in Debian unstable (sid).
+- **[REMnux](https://docs.remnux.org/discover-the-tools/analyze+documents/email+messages#mail-parser)**:
+  included in the REMnux malware analysis toolkit for analyzing email messages.
+
+## Integrations
+
+- **[IBM Security QRadar SOAR — Parse Utilities](https://github.com/ibmresilient/resilient-community-apps/blob/main/fn_parse_utilities/README.md)**:
+  uses mail-parser to extract headers, body parts, and attachments from `.eml`
+  and `.msg` files for incident response workflows.
+
+## Research use
+
+mail-parser is also used in academic research:
+
+- **[A Large-Scale Empirical Study of Modern Phishing Email Content](https://arxiv.org/abs/2609.30683)**
+  — Jaehwan Park et al., arXiv preprint, September 2026.
+  The study analyzes 2.9 million phishing emails and uses mail-parser to extract
+  PDF, image, and calendar invitation attachments from their MIME structure
+  (Section III-A, reference 34).
 
 # Description
 
