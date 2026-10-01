@@ -115,10 +115,23 @@ def get_addresses(
     if raw_header is None:
         return []
     if isinstance(raw_header, email.header.Header):
-        raw_header = decode_header_part(raw_header.encode())
+        # Address identity must not pass through ported_string's NFC
+        # normalization, decode errors="ignore", or Unicode whitespace
+        # stripping. Keep invalid octets as surrogates for the scanner to
+        # flag, rather than joining their neighbours into a new mailbox.
+        chunks = []
+        for data, charset in decode_header(raw_header.encode()):
+            if isinstance(data, bytes):
+                charset = charset if charset != "unknown-8bit" else "utf-8"
+                try:
+                    data = data.decode(charset or "utf-8", "surrogateescape")
+                except (LookupError, UnicodeError):
+                    data = data.decode("utf-8", "surrogateescape")
+            chunks.append(data)
+        raw_header = "".join(chunks)
     elif not isinstance(raw_header, str):
         raw_header = str(raw_header)
-    if not raw_header.strip():
+    if not raw_header.strip(" \t\r\n"):
         return _getaddresses([raw_header])
     parsed, diagnostics = parse_address_header(raw_header, _getaddresses)
     if defects is not None:

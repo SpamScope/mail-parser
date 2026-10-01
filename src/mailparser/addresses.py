@@ -1,4 +1,4 @@
-"""Structural address recovery for untrusted RFC 5322 header values.
+"""Structural address recovery for RFC 5322 / RFC 6532 header values.
 
 The scanner owns lexical boundaries and checks complete addr-specs against
 bounded grammar patterns. The stdlib supplies conventional display names for
@@ -15,7 +15,12 @@ _FOLD = re.compile(r"\r?\n[ \t]+")
 # Anchored grammar checks: atom, quote and delimiter character sets do not
 # overlap. In particular, do not search for bare addresses in arbitrary text
 # or hand long malformed word sequences to headerregistry's quadratic parser.
-_ATOM = r"[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+"
+# RFC 6532 section 3.2 extends atext with UTF8-non-ascii. These are
+# Unicode scalar values (RFC 3629), not \w or all code points >= 128:
+# surrogates cannot occur in valid UTF-8 and must remain defect evidence.
+_UTF8_NON_ASCII = r"\x80-\ud7ff\ue000-\U0010ffff"
+_SURROGATE_RE = re.compile(r"[\ud800-\udfff]")
+_ATOM = rf"[a-zA-Z0-9!#$%&'*+/=?^_`{{|}}~{_UTF8_NON_ASCII}-]+"
 _QUOTED = r'"(?:[^"\\\r\n]|\\[^\r\n])*"'
 _WORD = rf"(?:{_ATOM}|{_QUOTED})"
 _LOCAL = rf"{_WORD}(?:[ \t]*\.[ \t]*{_WORD})*"
@@ -47,8 +52,9 @@ def _scan(raw: str) -> list[_Item]:
     def emit(end):
         nonlocal buf, angles, problems, start, max_comment
         text = "".join(buf)
-        if text.strip() or problems:
-            items.append(_Item(raw[start:end], text, angles, problems, max_comment))
+        raw_item = raw[start:end]
+        if text.strip(" \t\r\n") or problems or _SURROGATE_RE.search(raw_item):
+            items.append(_Item(raw_item, text, angles, problems, max_comment))
         buf, angles, problems = [], [], []
         start = end + 1
         max_comment = 0
@@ -113,7 +119,9 @@ def _scan(raw: str) -> list[_Item]:
             else:
                 group = True
                 # Preserve malformed labels as diagnostics, never mailboxes.
-                if not _valid_phrase("".join(buf)):
+                if not _valid_phrase("".join(buf)) or _SURROGATE_RE.search(
+                    raw[start:i]
+                ):
                     problems.append("invalid-group-name")
                     emit(i)
                 buf = []
@@ -138,7 +146,9 @@ def _scan(raw: str) -> list[_Item]:
 
 def _mailbox(value: str) -> str | None:
     """Validate the whole addr-spec, including quoted local parts and CFWS."""
-    value = _FOLD.sub(" ", value).strip()
+    value = _FOLD.sub(" ", value).strip(" \t\r\n")
+    if _SURROGATE_RE.search(value):
+        return None
     # RFC 5322 section 4.4: obsolete source routes precede the addr-spec.
     if value.startswith(("@", ",")):
         literal = escaped = False
@@ -154,7 +164,7 @@ def _mailbox(value: str) -> str | None:
             elif ch == "]":
                 literal = False
             elif not literal and ch in ",:":
-                domain = value[start:i].strip()
+                domain = value[start:i].strip(" \t\r\n")
                 if domain:
                     domains.append(domain)
                 start = i + 1
@@ -167,7 +177,7 @@ def _mailbox(value: str) -> str | None:
             for domain in domains
         ):
             return None
-        value = value[start:].strip()
+        value = value[start:].strip(" \t\r\n")
     if not _ADDR_SPEC.fullmatch(value):
         return None
     # CFWS is not part of an atom. Retain spaces and escapes inside quoted
@@ -193,7 +203,7 @@ def _mailbox(value: str) -> str | None:
 def _valid_phrase(value: str) -> bool:
     """Check label specials outside quoted strings (period is obs-phrase)."""
     quoted = escaped = False
-    for ch in _FOLD.sub(" ", value).strip():
+    for ch in _FOLD.sub(" ", value).strip(" \t\r\n"):
         if ord(ch) < 32 and ch != "\t":
             return False
         if escaped:
@@ -204,14 +214,14 @@ def _valid_phrase(value: str) -> bool:
             quoted = not quoted
         elif not quoted and ch in "@<>[]:;,\\":
             return False
-    return bool(value.strip()) and not (quoted or escaped)
+    return bool(value.strip(" \t\r\n")) and not (quoted or escaped)
 
 
 def _name(value: str) -> str:
     """Recover a display phrase, unquoting quoted pairs without regexes."""
     result = []
     quoted = escaped = False
-    for ch in _FOLD.sub(" ", value).strip():
+    for ch in _FOLD.sub(" ", value).strip(" \t\r\n"):
         if escaped:
             result.append(ch)
             escaped = False
@@ -221,7 +231,12 @@ def _name(value: str) -> str:
             quoted = not quoted
         else:
             result.append(ch)
-    return "".join(result).strip()
+    return _escape_surrogates("".join(result).strip(" \t\r\n"))
+
+
+def _escape_surrogates(value: str) -> str:
+    """Keep invalid code points visible without emitting invalid UTF-8 JSON."""
+    return value.encode("utf-8", "backslashreplace").decode("utf-8")
 
 
 def parse_address_header(raw: str, strict_parser):
@@ -248,13 +263,15 @@ def parse_address_header(raw: str, strict_parser):
             reason = ",".join(sorted(set(item.problems)))
         elif item.angles:
             left, right = item.angles[0]
-            if len(item.angles) != 1 or item.text[right + 1 :].strip():
+            if len(item.angles) != 1 or item.text[right + 1 :].strip(" \t\r\n"):
                 reason = "ambiguous-angle-address"
             elif not candidates:
                 reason = "invalid-angle-address"
             else:
                 selected = candidates
-                if item.text[:left].strip() and not _valid_phrase(item.text[:left]):
+                if item.text[:left].strip(" \t\r\n") and not _valid_phrase(
+                    item.text[:left]
+                ):
                     reason = "invalid-display-name"
         else:
             address = _mailbox(item.text)
@@ -264,7 +281,10 @@ def parse_address_header(raw: str, strict_parser):
             else:
                 reason = "invalid-or-ambiguous-address"
 
-        if selected:
+        invalid_utf8 = bool(_SURROGATE_RE.search(item.raw))
+        if invalid_utf8:
+            reason = "invalid-utf8"
+        if selected and not invalid_utf8:
             # Deep comments are stripped by the iterative scanner before
             # reaching the stdlib's recursive comment parser.
             source = item.raw if item.comment_depth < 16 else item.text
@@ -280,7 +300,7 @@ def parse_address_header(raw: str, strict_parser):
             diagnostics.append(
                 {
                     "reason": reason,
-                    "raw": item.raw,
+                    "raw": _escape_surrogates(item.raw),
                     "recovered": bool(selected),
                     "candidates": [
                         {"display_name": name, "address": addr}
