@@ -407,6 +407,223 @@ JSON and CLI output encodable as UTF-8.
 
 ## Defects and Their Critical Role in Email Security
 
+### Inspecting defects and recovered evidence
+
+A defect is a parsing anomaly, an inconsistent value, or a recovery/ambiguity
+diagnostic; it does not by itself establish malicious intent or an RFC violation.
+During parsing, mail-parser collects Python `email` defects from the MIME tree
+and adds its own address, trace, date, charset and MIME-metadata diagnostics:
+`mail.has_defects` becomes `True`, `mail.defects_categories` contains the category
+names, and `mail.defects` contains a list of dictionaries mapping a content type
+(for example `multipart/mixed`) or a diagnostic group (`address-headers`,
+`received-headers`, `date-headers`, `mime-headers`) to lists of textual
+descriptions. `AddressHeaderDefect`, `ReceivedHeaderDefect` and `DateHeaderDefect`
+also populate `mail.address_header_defects`, `mail.received_header_defects` and
+`mail.date_header_defects`, respectively; these properties always exist and are
+empty lists when there are no corresponding diagnostics. Their entries contain
+`reason`, `raw`, `header`, zero-based `occurrence` and `recovered`, plus address
+`candidates` or the selected ISO date `value` where applicable. All occurrences
+are examined, including repeated headers, while address properties and `mail.date`
+retain first-occurrence semantics. `recovered=True` means a value was recovered,
+not that the original input was valid; ambiguous address candidates remain
+evidence rather than selected mailboxes, and valid neighbours remain available.
+`CharsetDecodeDefect`, `MimeHeaderDefect` and collected standard-library defects
+have textual entries in `mail.defects`, without dedicated structured properties;
+the standard-library categories are described in
+[Python's defect reference](https://docs.python.org/3/library/email.errors.html),
+but this is not a guarantee that every defect Python can detect is collected
+(for example, transfer-decoding defects added after the MIME-tree collection may
+remain only in a part's `defects`). Full and partial output always include
+`has_defects`; when defects exist they include `defects` and
+`defects_categories`, with structured header diagnostics included when nonempty
+(JSON represents the category set as a list). Original evidence remains accessible
+through header properties such as `mail.from_raw`, `mail.message`, and individual
+MIME parts. A "bad epilogue" has no separate category or `epilogue_defects`
+property: `StartBoundaryNotFoundDefect` activates an attempt to recover a part
+between the declared boundary markers in the top-level `mail.message.epilogue`,
+and recovered content enters the usual text/attachment outputs without a separate
+recovery-success diagnostic. This is a limited recovery path, not a scan of every
+nested epilogue; an exception during this attempt is logged. An ordinary epilogue
+is permitted by [RFC 2046 section 5.1.1](https://www.rfc-editor.org/rfc/rfc2046.html#section-5.1.1)
+and is not itself a defect. The examples below cover each reporting family,
+successful and unsuccessful recovery, repeated headers, multiple simultaneous
+defects and valid controls; `has_defects=False` only means the implemented checks
+found no anomalies, not that the email passed a complete RFC validation.
+
+```python
+import base64
+import json
+import mailparser
+
+# 1. Recovered address: all four diagnostic views describe the same problem.
+mail = mailparser.parse_from_string(
+    "From: billing@trusted.example < billing@vendor.example >\r\n\r\n"
+)
+assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
+assert mail.has_defects is True
+assert "AddressHeaderDefect" in mail.defects_categories
+assert mail.defects == [{"address-headers": [
+    "AddressHeaderDefect: from[0]: invalid-display-name"
+]}]
+assert mail.address_header_defects == [{
+    "reason": "invalid-display-name",
+    "raw": "billing@trusted.example < billing@vendor.example >",
+    "recovered": True,
+    "candidates": [{
+        "display_name": "billing@trusted.example",
+        "address": "billing@vendor.example",
+    }],
+    "header": "from",
+    "occurrence": 0,
+}]
+assert json.loads(mail.mail_json)["address_header_defects"] == (
+    mail.address_header_defects
+)
+
+# 2. Incomplete address: no selected mailbox; a valid neighbouring field survives.
+mail = mailparser.parse_from_string(
+    "From: Alice <alice@example.com\r\n"
+    "To: Bob <bob@example.com>\r\n\r\n"
+)
+assert mail.from_ == []
+assert mail.to == [("Bob", "bob@example.com")]
+assert mail.address_header_defects[0]["reason"] == "unclosed-delimiter"
+assert mail.address_header_defects[0]["recovered"] is False
+
+# 3. Repeated headers: diagnostics also cover occurrences after the first.
+mail = mailparser.parse_from_string(
+    "From: Alice <alice@example.com>\r\n"
+    "From: billing@trusted.example <billing@vendor.example>\r\n\r\n"
+)
+assert mail.from_ == [("Alice", "alice@example.com")]
+assert mail.address_header_defects[0]["occurrence"] == 1
+
+# 4. Received: ambiguous trace syntax stays raw, with structured diagnostics.
+trace = (
+    "from sender.example (unclosed; by mx.example; "
+    "1 Jan 2024 12:00:00 +0000"
+)
+mail = mailparser.parse_from_string(f"Received: {trace}\r\n\r\n")
+assert "ReceivedHeaderDefect" in mail.defects_categories
+assert mail.received_header_defects[0]["reason"] == "unclosed-comment"
+assert mail.received_header_defects[0]["recovered"] is False
+assert mail.received[0]["raw"] == trace
+assert "received-headers" in mail.defects[0]
+trace = (
+    "from sender.example by mx.example with ESMTP id token; "
+    "for <bob@example.com>; 1 Jan 2024 12:00:00 +0000"
+)
+mail = mailparser.parse_from_string(f"Received: {trace}\r\n\r\n")
+assert mail.received_header_defects[0]["reason"] == "misplaced-date-separator"
+assert mail.received_header_defects[0]["recovered"] is True
+assert mail.received[0]["for"] == "<bob@example.com>"
+
+# 5. Dates: an impossible date is not selected; a wrong weekday is recoverable.
+mail = mailparser.parse_from_string(
+    "Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n"
+)
+assert "DateHeaderDefect" in mail.defects_categories
+assert mail.date is None
+assert mail.date_header_defects[0]["reason"] == "invalid-calendar-date"
+assert mail.date_header_defects[0]["recovered"] is False
+assert "date-headers" in mail.defects[0]
+mail = mailparser.parse_from_string(
+    "Date: Tue, 1 Jan 2024 12:00:00 +0000\r\n\r\n"
+)
+assert mail.date.isoformat() == "2024-01-01T12:00:00+00:00"
+assert mail.date_header_defects[0]["reason"] == "weekday-mismatch"
+assert mail.date_header_defects[0]["recovered"] is True
+# Date diagnostics also cover Resent-Date and timestamps inside Received.
+mail = mailparser.parse_from_string(
+    "Resent-Date: 31 Feb 2024 12:00:00 +0000\r\n"
+    "Received: from sender.example by mx.example; "
+    "1 Jan 2024 25:00:00 +0000\r\n\r\n"
+)
+assert {d["header"] for d in mail.date_header_defects} == {
+    "resent-date", "received"
+}
+
+# 6. Charset: failed declared decoding, then readable UTF-8 or replacement text.
+for payload, expected in [(b"caf\xc3\xa9", "café"), (b"a\xffb", "a\ufffdb")]:
+    mail = mailparser.parse_from_bytes(
+        b"Content-Type: text/plain; charset=ascii\r\n\r\n" + payload
+    )
+    assert "CharsetDecodeDefect" in mail.defects_categories
+    assert expected in mail.body
+    assert "CharsetDecodeDefect:" in mail.defects[0]["text/plain"][0]
+    assert mail.message.get_payload(decode=True) == payload
+
+# 7. MIME metadata: damaged filename bytes are retained in textual evidence.
+mail = mailparser.parse_from_bytes(
+    b"Content-Type: application/octet-stream\r\n"
+    b'Content-Disposition: attachment; filename="a\xffb.bin"\r\n'
+    b"Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8="
+)
+assert "MimeHeaderDefect" in mail.defects_categories
+assert "\\xff" in " ".join(mail.defects[0]["mime-headers"])
+assert base64.b64decode(mail.attachments[0]["payload"]) == b"Hello"
+
+# 8. Standard-library structure defects: missing parameter/start/closing boundary.
+for raw, category in [
+    ("Content-Type: multipart/mixed\r\n\r\nHello",
+     "NoBoundaryInMultipartDefect"),
+    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\nHello',
+     "StartBoundaryNotFoundDefect"),
+    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
+     '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n',
+     "CloseBoundaryNotFoundDefect"),
+    ("Subject: example\r\ninvalid header line\r\n\r\nHello",
+     "MissingHeaderBodySeparatorDefect"),
+]:
+    mail = mailparser.parse_from_string(raw)
+    assert mail.has_defects
+    assert category in mail.defects_categories
+    assert any(category in text for entry in mail.defects
+               for texts in entry.values() for text in texts)
+
+# 9. Bad epilogue: reusing the parent's boundary corrupts nested MIME structure.
+# The attachment after the first closing boundary lands in the outer epilogue.
+raw = (
+    'MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="b"\r\n\r\n'
+    '--b\r\nContent-Type: multipart/alternative; boundary="b"\r\n\r\n'
+    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b--\r\n'
+    '--b\r\nContent-Type: application/octet-stream; name="evidence.txt"\r\n'
+    'Content-Disposition: attachment; filename="evidence.txt"\r\n'
+    'Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8=\r\n--b--\r\n'
+)
+mail = mailparser.parse_from_string(raw)
+assert mail.has_defects
+assert "StartBoundaryNotFoundDefect" in mail.defects_categories
+assert "multipart/alternative" in mail.defects[0]
+assert "evidence.txt" in mail.message.epilogue
+assert mail.attachments[0]["filename"] == "evidence.txt"
+assert base64.b64decode(mail.attachments[0]["payload"]) == b"Hello"
+
+# 10. Multiple families coexist; inspect every entry rather than only defects[0].
+mail = mailparser.parse_from_string(
+    "From: billing@trusted.example <billing@vendor.example>\r\n"
+    "Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n"
+)
+assert {"AddressHeaderDefect", "DateHeaderDefect"} <= mail.defects_categories
+assert mail.address_header_defects and mail.date_header_defects
+
+# 11. Valid controls: obsolete date syntax and an ordinary epilogue are accepted.
+for raw in [
+    "From: Alice <alice@example.com>\r\n"
+    "Date: 1 Jan 24 12:00:00 GMT\r\n\r\nHello",
+    'Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
+    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n'
+    '--b--\r\nOrdinary epilogue\r\n',
+]:
+    mail = mailparser.parse_from_string(raw)
+    assert mail.has_defects is False
+    assert mail.defects_categories == set()
+    assert mail.defects == []
+    assert mail.address_header_defects == []
+    assert mail.received_header_defects == []
+    assert mail.date_header_defects == []
+```
+
 Email structural defects are not merely technical curiosities—they represent **potential security
 vulnerabilities** that sophisticated attackers actively exploit to bypass spam filters, antivirus
 scanners, and email security gateways.
