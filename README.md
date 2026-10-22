@@ -405,6 +405,53 @@ decoder that produces a non-Unicode scalar also triggers recovery: names retain
 their literal encoded form and text retains a safe byte-derived view, keeping
 JSON and CLI output encodable as UTF-8.
 
+Header decoding is strict. An unknown charset, invalid byte sequence or
+non-Unicode scalar leaves the complete original header value literal instead
+of dropping bytes or mixing a decoded prefix with the original. A
+`HeaderDecodeDefect` sets `has_defects`; `mail.header_decoding_defects` contains
+`reason`, `raw`, `header`, zero-based `occurrence`, zero-based MIME `part` and
+`recovered`. Here `recovered=True` means the literal evidence is available,
+not that decoding succeeded. This also covers nested non-address headers;
+address display names retain their existing context-aware diagnostics.
+Malformed encoded attachment names remain literal with `MimeHeaderDefect`.
+Raw Unicode text remains readable alongside encoded-words; decoding leaves
+literal spans intact and removes only ASCII folding whitespace between
+adjacent encoded-words. The optional RFC 2231 language suffix, such as
+`UTF-8*en`, is separated from the charset before strict decoding.
+
+### Resource limits for container representations
+
+Attached multipart containers and forwarded messages can repeat the same
+descendant payloads many times. Their optional textual representations share
+a per-message serialization budget. Preflight estimates reject expensive
+subtrees before copying; actual generator visits and writes to all internal
+text/byte buffers are also charged, including failed charset fallbacks.
+The character-work budget is 32 times the original tree's estimated size,
+with a floor of 1 Mi characters and a ceiling of 32 Mi characters. The estimate
+includes raw header/payload lengths and 256 characters of overhead per part.
+The node-visit budget is 16 times the number of MIME parts, with a floor of
+1,024 and a ceiling of 100,000. These are work units, not an input-size limit
+or an exact process-memory allowance.
+
+When a representation cannot fit, it is omitted entirely from `attachments`;
+no empty or truncated file is invented. `ResourceLimitDefect` sets
+`has_defects`, and `mail.resource_limit_defects` records its `reason`, MIME
+`part`, `filename` and `recovered=False`. Child attachments and neighboring
+body parts continue to be recovered under the existing disposition rules.
+The original container remains accessible at
+`list(mail.message.walk())[defect["part"]]` for ordinary MIME-tree parts.
+Recovered epilogue parts have indices after that original tree and remain
+traceable to the original epilogue text. Neither a resource limit nor a
+recovery diagnostic establishes malicious intent or invalid MIME syntax.
+
+Both new diagnostic properties always return lists. Nonempty lists appear
+in full and partial JSON output; literal wire headers colliding with those
+names remain accessible through `headers` and `message`. The serialization
+budget applies during parsing to container copies, not to input ingestion,
+individual leaf payloads, or an explicit later `message_as_string` request.
+Applications processing untrusted mail should still bound input size and
+isolate workers according to their own resource constraints.
+
 ## Defects and Their Critical Role in Email Security
 
 ### Inspecting defects and recovered evidence

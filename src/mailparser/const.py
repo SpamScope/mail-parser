@@ -18,6 +18,9 @@ limitations under the License.
 
 import re
 
+# Each component stops at a question mark, keeping token scans bounded.
+_ENCODED_WORD_RE = re.compile(r"=\?([^?\s]+)\?([bBqQ])\?([^?\s]*)\?=")
+
 # IPv4 pattern - validates octet range (0-255) per RFC 791
 REGXIP = re.compile(
     r"(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
