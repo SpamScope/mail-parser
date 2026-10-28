@@ -366,6 +366,20 @@ An ambiguous trusted hop stops sender-IP attribution; older headers cannot
 supply a replacement IP. Balanced, unrecognized obsolete trace syntax remains
 raw without being declared invalid solely because it is obsolete.
 
+Envelope annotations (`envelope-from` and `envelope-sender`) are scanned
+without regex backtracking, preserving quoted delimiters, comments, domain
+literals and obsolete routes. Nested or unterminated envelope paths are not
+selected as addresses: `nested-envelope-address` or
+`unclosed-envelope-address` diagnostics retain the complete original field,
+including folding, while other trace clauses remain available. For these
+diagnostics, `recovered` indicates whether a later complete path was recovered
+from an affected clause after the outer path closes. Markers use ASCII
+case equivalence only; Unicode lookalikes remain literal evidence.
+Repeated reasons are aggregated per header to avoid
+duplicating the raw evidence for every malformed fragment. These annotations
+are lexical extractions, not full SMTP mailbox validation; the existing output
+for the valid null sender `<>` remains an absent envelope value.
+
 ### Date diagnostics
 
 Impossible calendar dates, clock components and numeric timezone minutes no

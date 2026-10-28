@@ -43,7 +43,6 @@ from unicodedata import normalize
 from mailparser.addresses import parse_address_header
 from mailparser.const import (
     _ENCODED_WORD_RE,
-    _ENVELOPE_FROM_RE,
     ADDRESSES_HEADERS,
     OTHERS_PARTS,
 )
@@ -53,7 +52,7 @@ from mailparser.exceptions import (
     MailParserPathError,
     MailParserReceivedParsingError,
 )
-from mailparser.received import split_received
+from mailparser.received import extract_envelope_address, split_received
 from mailparser.serialization import bounded_flatten
 
 log = logging.getLogger(__name__)
@@ -641,6 +640,7 @@ def parse_received(received, *, defects=None):
     """
 
     values_by_clause = {}
+    envelope_defects = []
 
     clauses, date = split_received(received, defects=defects)
     if date is not None:
@@ -648,10 +648,9 @@ def parse_received(received, *, defects=None):
 
     for keyword, value in clauses:
         if keyword in ("envelope-from", "envelope-sender"):
-            # Extract email from angle brackets
-            m = _ENVELOPE_FROM_RE.search(value)
-            if m:
-                values_by_clause[keyword.replace("-", "_")] = m.group(1)
+            address = extract_envelope_address(value, defects=envelope_defects)
+            if address is not None:
+                values_by_clause[keyword.replace("-", "_")] = address
         elif keyword == "for":
             values_by_clause[keyword] = value
         elif keyword == "from":
@@ -672,13 +671,25 @@ def parse_received(received, *, defects=None):
             ("envelope_from", "envelope-from"),
             ("envelope_sender", "envelope-sender"),
         ):
-            if env_key not in values_by_clause and env_name in clause_val.lower():
-                m = re.search(
-                    r"(?i)" + re.escape(env_name) + r"\s+<([^>]+)>",
-                    clause_val,
+            if env_key not in values_by_clause:
+                address = extract_envelope_address(
+                    clause_val, marker=env_name, defects=envelope_defects
                 )
-                if m:
-                    values_by_clause[env_key] = m.group(1)
+                if address is not None:
+                    values_by_clause[env_key] = address
+
+    if defects is not None:
+        # Each diagnostic will carry the complete raw field. Aggregate
+        # repeated reasons before that evidence is attached/serialized.
+        reasons = {}
+        for diagnostic in envelope_defects:
+            reason = diagnostic["reason"]
+            recovered = diagnostic["recovered"]
+            reasons[reason] = reasons.get(reason, False) or recovered
+        defects.extend(
+            {"reason": reason, "recovered": recovered}
+            for reason, recovered in reasons.items()
+        )
 
     if not values_by_clause:
         msg = "Unable to match any clauses in %s" % (received)

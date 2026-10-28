@@ -11,6 +11,100 @@ _KEYWORD = re.compile(
     re.I,
 )
 _FWS = " \t\r\n"
+_ENVELOPE_MARKERS = {
+    name: re.compile(re.escape(name) + r"\s+<", re.I | re.ASCII)
+    for name in ("envelope-from", "envelope-sender")
+}
+
+
+def _envelope_path_end(value, start):
+    """Find a path's lexical end, visiting each character at most once."""
+    quote = False
+    literal = False
+    comment = 0
+    escaped = False
+    nested = False
+    depth = 1
+    for index in range(start, len(value)):
+        char = value[index]
+        if escaped:
+            escaped = False
+        elif comment:
+            if char == "\\":
+                escaped = True
+            elif char == "(":
+                comment += 1
+            elif char == ")":
+                comment -= 1
+        elif quote or literal:
+            if char == "\\":
+                escaped = True
+            elif quote and char == '"':
+                quote = False
+            elif literal and char == "]":
+                literal = False
+        elif char == '"':
+            quote = True
+        elif char == "[":
+            literal = True
+        elif char == "(":
+            comment = 1
+        elif char == "<":
+            nested = True
+            depth += 1
+        elif char == ">":
+            depth -= 1
+            if not depth:
+                reason = "nested-envelope-address" if nested else None
+                return index, reason
+    return len(value), "unclosed-envelope-address"
+
+
+def extract_envelope_address(value, *, marker=None, defects=None):
+    """Recover the first complete envelope path with bounded scanning.
+
+    Args:
+        value (str): an envelope clause or a containing MTA annotation.
+        marker (str): optional envelope-from/envelope-sender prefix.
+        defects (list): optional destination for recovery diagnostics.
+
+    Returns:
+        str or None: the path contents, preserving quotes and obsolete
+        routes. Empty SMTP paths keep the historical absent-value result.
+
+    This locates lexical paths, not a full SMTP mailbox validator. Quoted
+    delimiters, comments and domain literals remain literal evidence.
+    Nested or unclosed paths cannot select a partial address. A closed bad
+    path can be skipped to recover a later independent annotation. Searches
+    resume after the consumed path, never at each nested opening bracket.
+    At most one diagnostic per reason is emitted for this clause.
+    """
+    position = 0
+    address = None
+    reasons = set()
+    while position < len(value):
+        if marker is None:
+            start = value.find("<", position)
+            if start < 0:
+                break
+        else:
+            match = _ENVELOPE_MARKERS[marker].search(value, position)
+            if match is None:
+                break
+            start = match.end() - 1
+        end, reason = _envelope_path_end(value, start + 1)
+        if reason:
+            reasons.add(reason)
+        elif end > start + 1:
+            address = value[start + 1 : end]
+            break
+        position = end + 1
+    if defects is not None:
+        defects.extend(
+            {"reason": reason, "recovered": address is not None}
+            for reason in sorted(reasons)
+        )
+    return address
 
 
 def helo_argument_spans(value, groups):

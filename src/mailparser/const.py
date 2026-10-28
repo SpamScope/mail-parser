@@ -52,9 +52,6 @@ REGXIP6 = re.compile(
 # analyst would then act on.  Blank the tag before scanning.
 _IPV6_TAG_RE = re.compile(r"IPv6:", re.I)
 
-# Extracts envelope-from email: envelope-from <addr>
-_ENVELOPE_FROM_RE = re.compile(r"<([^>]+)>")
-
 # SendGrid non-standard date format (no semicolon)
 _SENDGRID_DATE_RE = re.compile(
     r"(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{9}\s+\+0000\s+UTC)"
