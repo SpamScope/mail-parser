@@ -18,6 +18,9 @@ limitations under the License.
 
 import re
 
+# Each component stops at a question mark, keeping token scans bounded.
+_ENCODED_WORD_RE = re.compile(r"=\?([^?\s]+)\?([bBqQ])\?([^?\s]*)\?=")
+
 # IPv4 pattern - validates octet range (0-255) per RFC 791
 REGXIP = re.compile(
     r"(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
@@ -48,9 +51,6 @@ REGXIP6 = re.compile(
 # ``6:2a00:1450:4864:20::`` — a different, valid, routable address that an
 # analyst would then act on.  Blank the tag before scanning.
 _IPV6_TAG_RE = re.compile(r"IPv6:", re.I)
-
-# Extracts envelope-from email: envelope-from <addr>
-_ENVELOPE_FROM_RE = re.compile(r"<([^>]+)>")
 
 # SendGrid non-standard date format (no semicolon)
 _SENDGRID_DATE_RE = re.compile(

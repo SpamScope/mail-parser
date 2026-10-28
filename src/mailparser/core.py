@@ -36,12 +36,15 @@ from mailparser.const import (
 from mailparser.dates import date_diagnostics, parse_mail_date
 from mailparser.exceptions import MailParserRecursionError
 from mailparser.received import helo_argument_spans
+from mailparser.serialization import (
+    SerializationBudget,
+    SerializationLimitError,
+)
 from mailparser.utils import (
     _safe_attachment_filename,
     _safe_remove,
     as_string_safe,
     decode_header_part,
-    decode_headers,
     extract_msg_convert,
     find_between,
     get_addresses,
@@ -49,6 +52,8 @@ from mailparser.utils import (
     get_mail_keys,
     get_to_domains,
     group_spans,
+    mime_charset,
+    mime_filename,
     mime_header_view,
     msgconvert,
     ported_string,
@@ -83,6 +88,8 @@ _RESERVED_MAIL_KEYS = frozenset(
         "address_header_defects",
         "received_header_defects",
         "date_header_defects",
+        "header_decoding_defects",
+        "resource_limit_defects",
     }
 )
 
@@ -348,6 +355,9 @@ class MailParser:
         self._has_defects = False
         self._mail = {}
         self._mail_partial = {}
+        self._decoded_headers = {}
+        self._header_decoding_defects = []
+        self._resource_limit_defects = []
         self._header_index = self._build_header_index()
         self._address_header_defects = []
         self._address_headers = {}
@@ -496,7 +506,47 @@ class MailParser:
             ]
 
         # others headers
-        return decode_headers(self._header_index.get(name_header))
+        values = self._decoded_headers.get(name_header, [])
+        if len(values) == 1:
+            return values[0]
+        return values if values else ""
+
+    def _decode_part_headers(self, part, part_index):
+        """Inspect each header occurrence once, retaining literal failures."""
+        occurrences = {}
+        for name, value in part.raw_items():
+            header = name.lower()
+            occurrence = occurrences.get(header, 0)
+            occurrences[header] = occurrence + 1
+            if header in ADDRESSES_HEADERS:
+                continue
+            diagnostics = []
+            decoded = decode_header_part(value, defects=diagnostics)
+            if part_index == 0:
+                self._decoded_headers.setdefault(header, []).append(decoded)
+            for detail in diagnostics:
+                self._header_decoding_defects.append(
+                    {
+                        "reason": "invalid-encoded-word",
+                        "raw": str(value)
+                        .encode("utf-8", "backslashreplace")
+                        .decode("utf-8"),
+                        "header": header,
+                        "occurrence": occurrence,
+                        "part": part_index,
+                        "recovered": True,
+                    }
+                )
+                self._has_defects = True
+                self._defects_categories.add("HeaderDecodeDefect")
+                self._defects.append(
+                    {
+                        "header-decoding": [
+                            f"HeaderDecodeDefect: part {part_index}, "
+                            f"{header}[{occurrence}]: {detail}"
+                        ]
+                    }
+                )
 
     def _append_defects(self, part, part_content_type):
         """
@@ -524,6 +574,28 @@ class MailParser:
 
             # Save all defects
             self._defects.append(part_defects)
+
+    def _record_container_limit(self, part_index, filename):
+        """Diagnose an omitted copy without fabricating an empty attachment."""
+        self._has_defects = True
+        self._defects_categories.add("ResourceLimitDefect")
+        self._resource_limit_defects.append(
+            {
+                "reason": "container-serialization-limit",
+                "part": part_index,
+                "filename": filename,
+                "recovered": False,
+            }
+        )
+        self._defects.append(
+            {
+                "mime-resources": [
+                    f"ResourceLimitDefect: part {part_index}; container "
+                    "representation omitted; original MIME "
+                    "part and child recovery retained"
+                ]
+            }
+        )
 
     def _make_mail(self, complete=True):
         """
@@ -561,6 +633,10 @@ class MailParser:
             mail["received_header_defects"] = self.received_header_defects
         if self.date_header_defects:
             mail["date_header_defects"] = self.date_header_defects
+        if self.header_decoding_defects:
+            mail["header_decoding_defects"] = self.header_decoding_defects
+        if self.resource_limit_defects:
+            mail["resource_limit_defects"] = self.resource_limit_defects
 
         # add defects
         mail["has_defects"] = self.has_defects
@@ -594,7 +670,7 @@ class MailParser:
             # Some Python codecs can produce lone surrogates. Such a
             # value is not Unicode text and breaks UTF-8 JSON/CLI sinks.
             text.encode("utf-8")
-        except (LookupError, UnicodeError):
+        except (LookupError, UnicodeError, ValueError):
             try:
                 text = payload.decode("utf-8")
                 recovery = "decoded with utf-8"
@@ -635,6 +711,7 @@ class MailParser:
             return self
 
         parts = []  # Normal parts plus defects
+        serialization_parts = []
         attachment_descendants = set()
 
         # walk all mail parts to search defects
@@ -643,13 +720,14 @@ class MailParser:
             self._append_defects(p, part_content_type)
             inside_attachment = p in attachment_descendants
             parts.append((p, inside_attachment))
+            serialization_parts.append(p)
             if p.is_multipart():
                 disposition = p.get_content_disposition()
                 # RFC 2183 section 2.9 applies disposition to the entire
                 # container. Do not newly expose named inline children of
                 # attached, unknown-disposition or filename-only containers.
                 blocks_inline = disposition not in (None, "inline") or (
-                    disposition != "inline" and bool(p.get_filename())
+                    disposition != "inline" and bool(mime_filename(p))
                 )
                 if inside_attachment or blocks_inline:
                     attachment_descendants.update(p.get_payload())
@@ -669,15 +747,21 @@ class MailParser:
                     # Recovered epilogues lack reliable nesting context;
                     # retain their existing extraction behavior.
                     parts.append((p, True))
+                    serialization_parts.extend(p.walk())
                 except Exception:
                     log.error("Failed to get epilogue part. Check raw mail.")
 
+        budget = SerializationBudget(serialization_parts)
         # walk all mail parts
         for i, (p, inside_attachment) in enumerate(parts):
+            self._decode_part_headers(p, i)
             metadata, metadata_defects = mime_header_view(p)
             filename = decode_header_part(
-                metadata.get_filename(), defects=metadata_defects
+                mime_filename(metadata, defects=metadata_defects),
+                defects=metadata_defects,
             )
+            charset = mime_charset(metadata, "utf-8", defects=metadata_defects)
+            charset_raw = mime_charset(metadata)
             if metadata_defects:
                 self._has_defects = True
                 self._defects_categories.add("MimeHeaderDefect")
@@ -694,8 +778,6 @@ class MailParser:
                 or ported_string(metadata.get_content_disposition()).lower()
                 == "attachment"
             ):
-                charset = metadata.get_content_charset("utf-8")
-                charset_raw = metadata.get_content_charset()
                 log.debug(f"Charset {charset!r} part {i!r}")
                 content_disposition = ported_string(
                     metadata.get_content_disposition()
@@ -749,9 +831,19 @@ class MailParser:
                     log.debug(f"content-disposition {content_disposition!r} part {i!r}")
 
                     if p.is_multipart():
-                        payload = "".join(
-                            [as_string_safe(m) for m in p.get_payload(decode=False)]
-                        )
+                        try:
+                            budget.check(p)
+                            chunks = [
+                                as_string_safe(m, budget=budget)
+                                for m in p.get_payload(decode=False)
+                            ]
+                            budget.spend(
+                                characters=sum(len(chunk) for chunk in chunks),
+                            )
+                            payload = "".join(chunks)
+                        except (SerializationLimitError, RecursionError):
+                            self._record_container_limit(i, filename)
+                            continue
                         binary = False
                         log.debug(f"Filename {filename!r} part {i!r} is multipart")
                     elif transfer_encoding == "base64":
@@ -1225,6 +1317,16 @@ class MailParser:
         trace clauses for Received dates.
         """
         return self._date_header_defects
+
+    @property
+    def header_decoding_defects(self):
+        """Return decoding evidence with part and occurrence context."""
+        return self._header_decoding_defects
+
+    @property
+    def resource_limit_defects(self):
+        """Return omitted container representations and their MIME indices."""
+        return self._resource_limit_defects
 
     @property
     def defects(self):

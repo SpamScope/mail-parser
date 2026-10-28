@@ -663,30 +663,30 @@
     },
     "mail_test_9/bytes": {
       "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
-      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "headers": "64f691a3828f843540f5a4cf69a75d86b89244c4c8ddf40a7a7150e9c2d579af",
+      "mail": "1c42510f6619b189ebeacf0cc3ef760c8a301f76d6b61c233d7a201fa9ade282",
       "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
-      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "partial": "e3bdca3bc7101986967acf1121e2630f97a901d8b6232e807d8c22e3f504d44f",
       "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
       "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "mail_test_9/file": {
       "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
-      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "headers": "64f691a3828f843540f5a4cf69a75d86b89244c4c8ddf40a7a7150e9c2d579af",
+      "mail": "1c42510f6619b189ebeacf0cc3ef760c8a301f76d6b61c233d7a201fa9ade282",
       "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
-      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "partial": "e3bdca3bc7101986967acf1121e2630f97a901d8b6232e807d8c22e3f504d44f",
       "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
       "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
     "mail_test_9/string": {
       "attachments": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "headers": "16695410194719089934a5753b82a5c295d29a8c22bcfa146c3d2b8206df2c8b",
-      "mail": "b927c7fdc2d483f5de163a8e50e857214f377f84ea69160c00f2202f8ff4d098",
+      "headers": "64f691a3828f843540f5a4cf69a75d86b89244c4c8ddf40a7a7150e9c2d579af",
+      "mail": "1c42510f6619b189ebeacf0cc3ef760c8a301f76d6b61c233d7a201fa9ade282",
       "mime": "2e193f23b5d4411bdbfd69c757cc5b17f885cbadd2e49ac2daa5df09a8677bb8",
-      "partial": "753d6f7dcde31df714756f988eb51cc93e842ffa7a457294d5710642f7bcd868",
+      "partial": "e3bdca3bc7101986967acf1121e2630f97a901d8b6232e807d8c22e3f504d44f",
       "text_html": "087c9ef250274839f35d8e567d3b78a055f0f8c1ddceee228e008c9c47a5d213",
       "text_other": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "text_plain": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
@@ -716,6 +716,7 @@
     "Charset recovery: mail_test_2/6/9 expose replacement markers and diagnostics for formerly discarded octets; mail_test_12/bytes recovers valid UTF-8 mislabeled GB2312.",
     "File input: raw MIME now matches the bytes route, including non-ASCII octets and CRLF; mail_test_17 body/header folding retains original CRLF.",
     "Intentional compatibility change: mail_test_4/file now honors declared windows-1251 like the bytes route. Two UTF-8-looking C3B3 sequences display as Cyrillic characters rather than the old unconditional UTF-8 interpretation; original bytes remain intact.",
-    "mail_outlook_1 is a binary MSG container passed to generic EML APIs in this corpus: raw bytes are preserved, body newline/UTF-8 replacement recovery differs. This is not an Outlook conversion test."
+    "mail_outlook_1 is a binary MSG container passed to generic EML APIs in this corpus: raw bytes are preserved, body newline/UTF-8 replacement recovery differs. This is not an Outlook conversion test.",
+    "Strict header decoding: mail_test_9 contains byte 0x8c invalid for declared gb2312. Subject now retains both original encoded-words and folding with HeaderDecodeDefect and occurrence/part evidence, instead of a lossy UTF-8 fallback. Only mail/partial/headers fingerprints change; MIME and body/attachment hashes remain identical."
   ]
 }
