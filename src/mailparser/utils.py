@@ -42,7 +42,7 @@ from unicodedata import normalize
 
 from mailparser.addresses import parse_address_header
 from mailparser.const import (
-    _ENVELOPE_FROM_RE,
+    _ENCODED_WORD_RE,
     ADDRESSES_HEADERS,
     OTHERS_PARTS,
 )
@@ -52,7 +52,8 @@ from mailparser.exceptions import (
     MailParserPathError,
     MailParserReceivedParsingError,
 )
-from mailparser.received import split_received
+from mailparser.received import extract_envelope_address, split_received
+from mailparser.serialization import bounded_flatten
 
 log = logging.getLogger(__name__)
 
@@ -212,6 +213,24 @@ def ported_string(raw_data, encoding="utf-8", errors="ignore"):
         return str(raw_data, "utf-8", errors)
 
 
+def _header_text_chunks(source):
+    """Decode encoded tokens without recoding their literal Unicode spans."""
+    position = 0
+    for match in _ENCODED_WORD_RE.finditer(source):
+        literal = source[position : match.start()]
+        # Only ASCII folding whitespace between encoded words disappears.
+        if not position or literal.strip(" \t\r\n"):
+            yield literal
+        for data, charset in decode_header(match.group()):
+            if isinstance(data, bytes):
+                # RFC 2231 language metadata is not part of the codec name.
+                encoding = (charset or "utf-8").split("*", 1)[0]
+                data = data.decode(encoding)
+            yield data
+        position = match.end()
+    yield source[position:]
+
+
 def decode_header_part(header, *, defects=None):
     """
     Given a raw header returns a decoded header
@@ -226,25 +245,23 @@ def decode_header_part(header, *, defects=None):
     if not header:
         return str()
 
-    output = str()
-
     try:
-        for d, c in decode_header(header):
-            c = c if c else "utf-8"
-            output += ported_string(d, c, "ignore")
-
-    # Header parsing failed, when header has charset Shift_JIS
-    except (HeaderParseError, UnicodeError):
-        log.error(f"Failed decoding header part: {header}")
-        output += header
-
-    try:
+        source = header
+        if isinstance(source, str):
+            # BytesParser stores valid UTF-8 as surrogateescaped ASCII.
+            # Reconstruct its octets before judging Unicode validity.
+            source = source.encode("utf-8", "surrogateescape").decode("utf-8")
+        elif isinstance(source, email.header.Header):
+            source = source.encode()
+        output = ported_string("".join(_header_text_chunks(source)))
         output.encode("utf-8")
-    except UnicodeEncodeError:
+    except (HeaderParseError, LookupError, UnicodeError, ValueError) as exc:
         if defects is not None:
-            defects.append(f"invalid-encoded-word: non-Unicode scalar; raw={header!r}")
-        # Preserve the literal header when a codec fabricates a surrogate;
-        # it is not a Unicode scalar and cannot reach a UTF-8 output sink.
+            defects.append(
+                f"invalid-encoded-word: {type(exc).__name__}; raw={header!r}"
+            )
+        # Return the whole literal value, never a decoded prefix plus the
+        # original. Escape surrogates so JSON/CLI sinks remain usable.
         return str(header).encode("utf-8", "backslashreplace").decode("utf-8").strip()
     return output.strip()
 
@@ -295,6 +312,51 @@ def mime_header_view(part: Message) -> tuple[Message, list[str]]:
             defects.append(f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}")
         view[name] = value
     return view, defects
+
+
+def mime_filename(part, *, defects=None):
+    """Read a filename while retaining malformed RFC 2231 charset evidence.
+
+    Args:
+        part: MIME part or metadata view.
+        defects: optional destination for charset recovery diagnostics.
+
+    Returns:
+        The filename, its literal parameter text on failure, or None.
+    """
+    try:
+        return part.get_filename()
+    except (LookupError, UnicodeError, ValueError):
+        value = part.get_param("filename", header="content-disposition")
+        if value is None:
+            value = part.get_param("name", header="content-type")
+        if defects is not None:
+            defects.append(
+                f"invalid-filename-charset: raw parameter={value!r}",
+            )
+        if isinstance(value, tuple):
+            return email.utils.unquote(value[2])
+        return value
+
+
+def mime_charset(part, failobj=None, *, defects=None):
+    """Read a MIME charset without crashing on a malformed encoded parameter.
+
+    Args:
+        part: MIME part or metadata view.
+        failobj: value used when the encoded charset cannot be read.
+        defects: optional destination for raw parameter evidence.
+
+    Returns:
+        The charset name or failobj after an explicitly diagnosed failure.
+    """
+    try:
+        return part.get_content_charset(failobj)
+    except (LookupError, UnicodeError, ValueError):
+        if defects is not None:
+            value = part.get_param("charset")
+            defects.append(f"invalid-charset-parameter: raw={value!r}")
+        return failobj
 
 
 def ported_open(file_):
@@ -578,6 +640,7 @@ def parse_received(received, *, defects=None):
     """
 
     values_by_clause = {}
+    envelope_defects = []
 
     clauses, date = split_received(received, defects=defects)
     if date is not None:
@@ -585,10 +648,9 @@ def parse_received(received, *, defects=None):
 
     for keyword, value in clauses:
         if keyword in ("envelope-from", "envelope-sender"):
-            # Extract email from angle brackets
-            m = _ENVELOPE_FROM_RE.search(value)
-            if m:
-                values_by_clause[keyword.replace("-", "_")] = m.group(1)
+            address = extract_envelope_address(value, defects=envelope_defects)
+            if address is not None:
+                values_by_clause[keyword.replace("-", "_")] = address
         elif keyword == "for":
             values_by_clause[keyword] = value
         elif keyword == "from":
@@ -609,13 +671,25 @@ def parse_received(received, *, defects=None):
             ("envelope_from", "envelope-from"),
             ("envelope_sender", "envelope-sender"),
         ):
-            if env_key not in values_by_clause and env_name in clause_val.lower():
-                m = re.search(
-                    r"(?i)" + re.escape(env_name) + r"\s+<([^>]+)>",
-                    clause_val,
+            if env_key not in values_by_clause:
+                address = extract_envelope_address(
+                    clause_val, marker=env_name, defects=envelope_defects
                 )
-                if m:
-                    values_by_clause[env_key] = m.group(1)
+                if address is not None:
+                    values_by_clause[env_key] = address
+
+    if defects is not None:
+        # Each diagnostic will carry the complete raw field. Aggregate
+        # repeated reasons before that evidence is attached/serialized.
+        reasons = {}
+        for diagnostic in envelope_defects:
+            reason = diagnostic["reason"]
+            recovered = diagnostic["recovered"]
+            reasons[reason] = reasons.get(reason, False) or recovered
+        defects.extend(
+            {"reason": reason, "recovered": recovered}
+            for reason, recovered in reasons.items()
+        )
 
     if not values_by_clause:
         msg = "Unable to match any clauses in %s" % (received)
@@ -919,12 +993,12 @@ def raw_payload(part):
     """
     try:
         return part.get_payload(decode=False)
-    except (LookupError, UnicodeError):
+    except (LookupError, UnicodeError, ValueError):
         log.warning("Cannot apply the declared charset, reading raw bytes")
         return part.get_payload(decode=True)
 
 
-def as_string_safe(part):
+def as_string_safe(part, *, budget=None):
     """
     Flatten a part back to its textual form.
 
@@ -936,34 +1010,50 @@ def as_string_safe(part):
 
     Args:
         part (email.message.Message): part to flatten
+        budget: optional per-parse budget for container representations
 
     Returns:
         the flattened part as a string
     """
     try:
-        return part.as_string()
-    except (LookupError, UnicodeError):
+        if budget is None:
+            return part.as_string()
+        return bounded_flatten(part, budget)
+    except (LookupError, UnicodeError, ValueError):
         log.warning("Cannot flatten part with the declared charset")
 
     try:
-        return part.as_bytes().decode("utf-8", "surrogateescape")
-    except (LookupError, UnicodeError):
+        data = (
+            part.as_bytes()
+            if budget is None
+            else bounded_flatten(part, budget, binary=True)
+        )
+        return data.decode("utf-8", "surrogateescape")
+    except (LookupError, UnicodeError, ValueError):
         # BytesGenerator bypasses the charset only for text parts. A part
         # whose type is multipart but which carries no boundary is routed
         # to the generic multipart handler, which decodes with the
         # declared charset just like as_string() did.
         log.warning("Cannot flatten part, using its raw headers and body")
 
-    headers = "".join(f"{k}: {v}\n" for k, v in part.items())
+    header_chunks = []
+    for k, v in part.items():
+        chunk = f"{k}: {v}\n"
+        if budget is not None:
+            budget.spend(characters=len(chunk))
+        header_chunks.append(chunk)
+    headers = "".join(header_chunks)
     body = raw_payload(part)
     if isinstance(body, list):
         # A conforming multipart: flatten each sub-part the same way, since
         # the one that refused its charset may be nested any depth down.
-        body = "".join(as_string_safe(sub) for sub in body)
+        body = "".join(as_string_safe(sub, budget=budget) for sub in body)
     else:
         # The charset was refused above, so raw_payload() fell back to the
         # undecoded bytes.
         body = body.decode("utf-8", "surrogateescape")
+    if budget is not None:
+        budget.spend(characters=len(headers) + len(body) + 1, nodes=1)
     return f"{headers}\n{body}"
 
 

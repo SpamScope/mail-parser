@@ -12,8 +12,9 @@ import re
 from dataclasses import dataclass, field
 from email.header import decode_header
 
+from mailparser.const import _ENCODED_WORD_RE as _ENCODED_WORD
+
 _FOLD = re.compile(r"\r?\n[ \t]+")
-_ENCODED_WORD = re.compile(r"=\?([^?\s]+)\?([bBqQ])\?([^?\s]*)\?=")
 # Anchored grammar checks: atom, quote and delimiter character sets do not
 # overlap. In particular, do not search for bare addresses in arbitrary text
 # or hand long malformed word sequences to headerregistry's quadratic parser.
