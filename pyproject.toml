@@ -30,7 +30,7 @@ maintainers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/SpamScope/mail-parser"
+Homepage = "https://spamscope.ai/en/"
 Source = "https://github.com/SpamScope/mail-parser"
 Issues = "https://github.com/SpamScope/mail-parser/issues"
 Changelog = "https://github.com/SpamScope/mail-parser/releases"
