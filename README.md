@@ -6,6 +6,8 @@
 
 # mail-parser
 
+**Project website:** [spamscope.ai/en/](https://spamscope.ai/en/)
+
 mail-parser is a **production-grade, RFC-compliant email parsing library** that goes far beyond a
 simple wrapper for Python's [email module](https://docs.python.org/2/library/email.message.html).
 It transforms raw email messages into richly structured Python objects with unparalleled precision,
