@@ -186,6 +186,16 @@ This versatile architecture makes mail-parser exceptionally powerful for diverse
 security analysis and forensics to email migration, compliance auditing, and automated processing
 pipelines.
 
+`mail.subject` removes folding CRLF followed by a space or tab, as specified
+by [RFC 5322 §2.2.3](https://www.rfc-editor.org/rfc/rfc5322.html#section-2.2.3),
+before decoding encoded words. LF-only folds are also accepted for local
+message copies; this is a tolerance extension to the CRLF unfolding rule.
+Surrounding spaces and tabs are preserved; bare CR is not unfolded.
+The same value appears in `headers` and parsed mail/JSON output; other headers
+retain their existing behavior. `mail.subject_raw` (a JSON list) and
+`mail.message` preserve the original folding. If encoded-word decoding fails,
+the complete literal Subject is retained with `header_decoding_defects`.
+
 **Standard RFC Headers** (directly accessible as properties):
 
 - `bcc` - Blind carbon copy recipients
