@@ -22,6 +22,7 @@ import importlib.util
 import ipaddress
 import json
 import logging
+import re
 from bisect import bisect_right
 from email.feedparser import BytesFeedParser
 
@@ -521,7 +522,16 @@ class MailParser:
             if header in ADDRESSES_HEADERS:
                 continue
             diagnostics = []
-            decoded = decode_header_part(value, defects=diagnostics)
+            source = value
+            if header == "subject":
+                # RFC 5322 2.2.3, plus LF-only local message copies.
+                # Before decoding: encoded newlines are not wire folds.
+                source = re.sub(r"\r?\n(?=[ \t])", "", value)
+            decoded = decode_header_part(source, defects=diagnostics)
+            if diagnostics and source != value:
+                # Failed decoding retains the complete original evidence.
+                diagnostics.clear()
+                decoded = decode_header_part(value, defects=diagnostics)
             if part_index == 0:
                 self._decoded_headers.setdefault(header, []).append(decoded)
             for detail in diagnostics:

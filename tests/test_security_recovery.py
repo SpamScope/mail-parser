@@ -216,7 +216,7 @@ def test_nul_charset_in_mime_recovers_payload(metadata, factory, tmp_path):
     "value, expected",
     [
         ("=?iso-8859-1?q?caf=E9?=\r\n \t=?utf-8?q?_ok?=", "café ok"),
-        ("one\r\n \r\n two", "one\r\n \r\n two"),
+        ("one\r\n \r\n two", "one  two"),
     ],
     ids=["valid-encoded-fold", "obsolete-consecutive-folds"],
 )
