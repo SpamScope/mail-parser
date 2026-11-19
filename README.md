@@ -732,6 +732,11 @@ This robust defect detection mechanism has made mail-parser the **trusted choice
 platforms like SpamScope**, where identifying malicious intent hidden in structural anomalies can
 mean the difference between a blocked threat and a successful attack.
 
+# Reporting Security Issues
+
+Do not report vulnerabilities in public issues. See [SECURITY.md](SECURITY.md) for supported
+versions, private reporting channels and the disclosure process.
+
 # Authors
 
 ## Main Author
