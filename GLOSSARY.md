@@ -19,3 +19,16 @@ which can overlap the evidence in its child attachments.
 **Partial recovery**:
 A result containing the safely recovered content and explicit diagnostics for
 representations that could not be produced within the analysis budget.
+
+## Security
+
+**Message defect**:
+A violation of email standards found in the analysed message itself; it is
+evidence to report, not a flaw in the library.
+_Avoid_: Bug, vulnerability
+
+**Parser vulnerability**:
+A flaw in the library that lets attacker-controlled message content crash,
+exhaust, mislead or escape the parser, including output that diverges from
+the original evidence.
+_Avoid_: Defect, security bug
