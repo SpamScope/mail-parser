@@ -116,6 +116,7 @@ optional Outlook dependencies are installed with `uv sync --extra outlook`).
 | `addresses.py`  | Forensic address scanner and recovery diagnostics                     |
 | `received.py`   | Context-aware lexical scanning of SMTP trace clauses                  |
 | `dates.py`      | Date semantics, obsolete forms and occurrence-aware diagnostics       |
+| `structure.py`  | Text drawing of the message structure (headers, hops, MIME tree)      |
 | `utils.py`      | Stateless parsing helpers (address, received headers, date, encoding) |
 | `const.py`      | Compiled regexes, header sets, clause splitter                        |
 | `exceptions.py` | Custom exception hierarchy                                            |
@@ -164,6 +165,19 @@ caches address results and recovery diagnostics once per parse, examining every
 header occurrence while retaining first-occurrence semantics for address
 properties. `address_header_defects` is reserved computed metadata; literal
 wire headers with that name remain accessible through `headers`/`message`.
+
+**MIME tree and drawing**: `mime_tree` is a flat list; entry `i` is the `part N` of defect
+messages and names its `parent` (ADR 0002). `parse()` keeps one small `_PartRecord` per part
+(roles, attachment position, size) and the entries are built on first read: most callers never
+read the tree, and the number of parts is chosen by the sender. It is a computed property kept
+out of `mail`/`mail_json`, whose output must not change. Walk, build and draw iteratively
+(`_walk_with_parents()`): nesting depth is chosen by the sender, so never recurse over parts.
+Every string in the tree must encode as UTF-8; a value decoded with a sender-chosen RFC 2231
+charset can hold lone surrogates (`mime_boundary()`). Reading the tree must not change the
+message (`_decoded_size()` discards the defects decoding adds). In `structure.py`
+every value taken from the message reaches the output only through `_visible()`, which escapes
+control, ANSI, bidirectional and zero-width characters and stops at a column limit; never format
+message text into the drawing directly. A warning mark means a recorded defect, never a heuristic.
 
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters

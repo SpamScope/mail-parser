@@ -231,6 +231,28 @@ def _header_text_chunks(source):
     yield source[position:]
 
 
+def literal_text(value):
+    """Return a header value as text that is safe to serialize.
+
+    Octets the email package carries as surrogate escapes are read back as
+    UTF-8.  Octets that are not valid UTF-8 stay visible as ``\\xNN``
+    escapes instead of being dropped or replaced.
+
+    Args:
+        value: raw header value
+
+    Returns:
+        str: text that encodes as UTF-8
+    """
+    text = str(value)
+    try:
+        octets = text.encode("utf-8", "surrogateescape")
+    except UnicodeEncodeError:
+        # A caller parsing a str can supply surrogates that are not octets.
+        return text.encode("utf-8", "backslashreplace").decode("utf-8")
+    return octets.decode("utf-8", "backslashreplace")
+
+
 def decode_header_part(header, *, defects=None):
     """
     Given a raw header returns a decoded header
@@ -337,6 +359,30 @@ def mime_filename(part, *, defects=None):
         if isinstance(value, tuple):
             return email.utils.unquote(value[2])
         return value
+
+
+def mime_boundary(part, *, defects=None):
+    """Read a multipart boundary as text that is safe to serialize.
+
+    An RFC 2231 boundary is decoded with the charset the sender names, and
+    some codecs (``utf-7``, ``unicode_escape``) produce lone surrogates:
+    a value that is not Unicode text and breaks UTF-8 JSON and CLI sinks.
+
+    Args:
+        part: MIME part or metadata view.
+        defects: optional destination for the diagnostic.
+
+    Returns:
+        The boundary, with any surrogate shown as a ``\\udXXX`` escape,
+        or None when the part declares none.
+    """
+    boundary = part.get_boundary()
+    if boundary is None or boundary.isascii():
+        return boundary
+    escaped = boundary.encode("utf-8", "backslashreplace").decode("utf-8")
+    if escaped != boundary and defects is not None:
+        defects.append(f"invalid-boundary-parameter: decoded={escaped!r}")
+    return escaped
 
 
 def mime_charset(part, failobj=None, *, defects=None):

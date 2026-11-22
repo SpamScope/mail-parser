@@ -20,6 +20,32 @@ which can overlap the evidence in its child attachments.
 A result containing the safely recovered content and explicit diagnostics for
 representations that could not be produced within the analysis budget.
 
+## Structure
+
+**MIME part**:
+One entity of the message body as delimited on the wire: either a container
+enclosing other parts or a leaf carrying content.
+
+**MIME tree**:
+The nesting of the MIME parts of a message as found in the original evidence,
+containers included, independent of how each part is later classified.
+_Avoid_: Graph, body structure
+
+**Hop**:
+One transfer of the message between two servers, as declared by a single
+trace header.
+
+**Delivery path**:
+The ordered sequence of hops a message declares, first hop first. It is the
+sender's and relays' claim, not a verified route.
+_Avoid_: Route, graph
+
+**Message structure**:
+The combined view of a message: its main headers, its delivery path and its
+MIME tree. The delivery path and the MIME tree are separate structures with no
+links between them.
+_Avoid_: Graph, email graph
+
 ## Security
 
 **Message defect**:
