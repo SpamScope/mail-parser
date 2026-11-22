@@ -269,6 +269,116 @@ def test_epilogue_recovery_is_marked_and_kept_apart():
     assert "recovered from epilogue" in mailparser.render_structure(mail)
 
 
+def _parse(raw, as_bytes):
+    """Parse ``raw`` through the string or the bytes entry point."""
+    if as_bytes:
+        return mailparser.parse_from_bytes(raw.encode("ascii"))
+    return mailparser.parse_from_string(raw)
+
+
+_BOTH_ENTRY_POINTS = pytest.mark.parametrize(
+    "as_bytes", [False, True], ids=["string", "bytes"]
+)
+_NESTED_WITHOUT_START = (
+    "From: a@b\nContent-Type: multipart/mixed; boundary=A\n\n"
+    "--A\nContent-Type: multipart/alternative; boundary=B\n\nx\n"
+)
+_TREE_KEYS = ("content_type", "roles", "defects", "recovered")
+_NESTED_NODE = (
+    "multipart/alternative",
+    ["body"],
+    ["StartBoundaryNotFoundDefect"],
+    False,
+)
+
+
+@_BOTH_ENTRY_POINTS
+@pytest.mark.parametrize(
+    "raw, epilogue, categories, tree",
+    [
+        pytest.param(
+            _NESTED_WITHOUT_START,
+            None,
+            {"CloseBoundaryNotFoundDefect", "StartBoundaryNotFoundDefect"},
+            [
+                (
+                    "multipart/mixed",
+                    ["container"],
+                    ["CloseBoundaryNotFoundDefect"],
+                    False,
+                ),
+                _NESTED_NODE,
+            ],
+            id="root never closed, no epilogue",
+        ),
+        pytest.param(
+            "From: a@b\nContent-Type: message/rfc822\n\n"
+            "Content-Type: multipart/mixed; boundary=Z\n\nx\n",
+            None,
+            {"StartBoundaryNotFoundDefect"},
+            [
+                ("message/rfc822", ["container"], [], False),
+                (
+                    "multipart/mixed",
+                    ["body"],
+                    ["StartBoundaryNotFoundDefect"],
+                    False,
+                ),
+            ],
+            id="root not multipart, no boundary",
+        ),
+        pytest.param(
+            _NESTED_WITHOUT_START + "--A--",
+            "",
+            {"StartBoundaryNotFoundDefect"},
+            [("multipart/mixed", ["container"], [], False), _NESTED_NODE],
+            id="root closed, empty epilogue",
+        ),
+    ],
+)
+def test_nested_defect_no_epilogue(raw, epilogue, categories, tree, as_bytes):
+    """The root hides nothing: the nested defect parses as it is."""
+    mail = _parse(raw, as_bytes)
+
+    assert mail.message is not None
+    assert mail.message.epilogue == epilogue
+    assert mail.body == "x\n"
+    assert mail.has_defects is True
+    assert mail.defects_categories == categories
+    assert [_pick(node, *_TREE_KEYS) for node in mail.mime_tree] == tree
+    assert "recovered from epilogue" not in mailparser.render_structure(mail)
+
+
+@_BOTH_ENTRY_POINTS
+@pytest.mark.parametrize(
+    "boundary, delimiter",
+    [
+        pytest.param("A", "--A", id="boundary"),
+        # RFC 2046 section 5.1.1 requires one character at least.
+        pytest.param('""', "--", id="empty boundary"),
+    ],
+)
+def test_nested_defect_with_epilogue(boundary, delimiter, as_bytes):
+    """A part hidden after the root's close delimiter is recovered."""
+    mail = _parse(
+        f"From: a@b\nContent-Type: multipart/mixed; boundary={boundary}\n\n"
+        f"{delimiter}\nContent-Type: multipart/alternative; boundary=B\n\n"
+        f"x\n{delimiter}--\n"
+        f"{delimiter}\nContent-Type: text/plain\n\nhidden\n{delimiter}--\n",
+        as_bytes,
+    )
+
+    assert mail.body == "hidden\n--- mail_boundary ---\nx\n"
+    assert mail.has_defects is True
+    assert mail.defects_categories == {"StartBoundaryNotFoundDefect"}
+    assert [_pick(node, "parent", *_TREE_KEYS) for node in mail.mime_tree] == [
+        (None, "multipart/mixed", ["container"], [], False),
+        (0, *_NESTED_NODE),
+        (0, "text/plain", ["body"], [], True),
+    ]
+    assert "recovered from epilogue" in mailparser.render_structure(mail)
+
+
 def test_defects_are_attributed_to_their_part():
     """Two parts of one type stay distinguishable by index."""
     mail = mailparser.parse_from_string(
