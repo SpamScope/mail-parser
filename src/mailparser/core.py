@@ -920,11 +920,16 @@ class MailParser:
         # If defects are in epilogue defects get epilogue
         if self.defects_categories & EPILOGUE_DEFECTS:
             log.debug("Found defects in emails")
-            epilogue = find_between(
-                self.message.epilogue,
-                "{}".format("--" + self.message.get_boundary()),
-                "{}".format("--" + self.message.get_boundary() + "--"),
-            )
+            # Only the root's epilogue is searched.  The defect may sit
+            # on a nested part while the root has no boundary (it is
+            # not a multipart) or no epilogue (it was never closed).
+            boundary = self.message.get_boundary()
+            root_epilogue = self.message.epilogue
+            epilogue = None
+            if boundary is not None and root_epilogue is not None:
+                epilogue = find_between(
+                    root_epilogue, "--" + boundary, "--" + boundary + "--"
+                )
 
             if epilogue is not None:
                 try:
