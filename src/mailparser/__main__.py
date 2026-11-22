@@ -183,6 +183,22 @@ def get_args():
     )
 
     parser.add_argument(
+        "-st",
+        "--structure",
+        dest="structure",
+        action="store_true",
+        help="Draw the message structure: headers, delivery path, MIME tree",
+    )
+
+    # No short form: "-mt" already means "-m -t".
+    parser.add_argument(
+        "--mime-tree",
+        dest="mime_tree",
+        action="store_true",
+        help="Print the MIME tree of mail as JSON",
+    )
+
+    parser.add_argument(
         "-v", "--version", action="version", version=f"%(prog)s {__version__}"
     )
 
@@ -267,6 +283,14 @@ def process_output(args, parser):
     if args.json:
         safe_print(parser.mail_json)
 
+    # Directly after the mail: a caller reading both gets two consecutive
+    # JSON documents.
+    if args.mime_tree:
+        safe_print(parser.mime_tree_json)
+
+    if args.structure:
+        print_structure(parser)
+
     if args.body:
         safe_print(parser.body)
 
@@ -304,6 +328,24 @@ def process_output(args, parser):
     if args.store_attachments:
         log.debug("Store attachments on disk")
         write_attachments(parser.attachments, args.attachments_path)
+
+
+def print_structure(parser):
+    """
+    Print the drawing of the message structure.
+
+    Falls back to ASCII when the output encoding cannot represent the
+    drawing, so a terminal that is not UTF-8 gets text, not an error.
+
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    """
+    drawing = mailparser.render_structure(parser)
+    try:
+        drawing.encode(sys.stdout.encoding or "ascii")
+    except (UnicodeEncodeError, LookupError):
+        drawing = mailparser.render_structure(parser, ascii_only=True)
+    print(drawing)
 
 
 def print_defects(parser):

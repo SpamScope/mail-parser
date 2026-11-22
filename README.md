@@ -478,6 +478,111 @@ individual leaf payloads, or an explicit later `message_as_string` request.
 Applications processing untrusted mail should still bound input size and
 isolate workers according to their own resource constraints.
 
+## Message structure
+
+`mail.mime_tree` describes the MIME tree: one entry per MIME part, in the
+order of the wire, containers included. Entry `i` is part `i`, the number
+defect messages quote as `part N`. Each entry names its enclosing part in
+`parent`, so the list is flat however deeply a sender nests the message.
+
+```python
+import mailparser
+
+mail = mailparser.parse_from_file("example_mail")
+for part in mail.mime_tree:
+    print("  " * part["depth"], part["index"], part["content_type"], part["roles"])
+
+print(mailparser.render_structure(mail))
+```
+
+| Key                         | Meaning                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `index`, `parent`, `depth`  | Position in the list, position of the enclosing part (`None` for the root), nesting level. |
+| `content_type`              | The type the parser acted on. Absent or unusable headers get the RFC 2045/2046 default.    |
+| `content_type_raw`          | The literal `Content-Type` value, `None` when the part has none.                           |
+| `content_transfer_encoding` | Declared encoding, `None` when absent.                                                     |
+| `charset`, `boundary`       | Declared parameters.                                                                       |
+| `content_disposition`       | Declared disposition type.                                                                 |
+| `filename`, `content_id`    | Declared file name (decoded) and `Content-ID`.                                             |
+| `size`                      | Octets of a leaf after transfer decoding; `None` for a container.                          |
+| `roles`                     | How the part was classified: any of `container`, `body`, `attachment`.                     |
+| `attachment`                | Position of the matching entry in `mail.attachments`.                                      |
+| `defects`                   | Defect categories recorded against this part.                                              |
+| `recovered`                 | `True` for a part recovered from an epilogue.                                              |
+| `embedded_headers`          | Literal `from`, `subject` and `date` of a message enclosed in a `message/*` part.          |
+
+The tree is the structure on the wire annotated with the parser's
+interpretation, so the two can be compared: named inline text has the roles
+`attachment` and `body`, an attached multipart has `container` and
+`attachment`, and a leaf with no role was exposed neither as body text nor as
+an attachment. Values are the ones the message declares; apart from
+`content_type`, an absent header is `None`, never a default. A part whose
+container representation was omitted for the
+[resource limit](#resource-limits-for-container-representations) keeps the
+`attachment` role, has `attachment` set to `None` and carries
+`ResourceLimitDefect`.
+
+`mail.mime_tree_json` is the same list as JSON. The tree is not part of
+`mail.mail` or `mail.mail_json`, which are unchanged. `mime_tree` is a
+computed name: a wire header called `Mime-Tree` stays readable through
+`mail.headers`.
+
+The tree is built the first time it is read. It has one entry per part, and
+the number of parts is chosen by the sender: about 400 bytes of JSON per
+entry, so a 2.7 MiB message made of 400,000 empty parts yields a 159 MiB
+tree. Bound the input size, or the number of entries you keep, when the tree
+of untrusted mail is stored or sent on. A boundary that an RFC 2231 charset
+decodes to something that is not text is shown with `\udXXX` escapes and
+reported as `MimeHeaderDefect`.
+
+`mailparser.render_structure(mail)` draws the message structure as text:
+
+```text
+MESSAGE
+  From:         meteo@regione.vda.it
+  Reply-To:     meteo@regione.vda.it
+  Return-Path:  <meteo@regione.vda.it>
+  To:           echo@tu-berlin.de, Porcile, M. <mporcile@server_mail.it>
+  Subject:      Bollettino Meteorologico del 29/11/2015
+  Date:         Sun, 29 Nov 2015 09:45:18 +0100
+  Message-ID:   <4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>
+  Defects:      CharsetDecodeDefect
+
+DELIVERY PATH
+  1  2015-11-29T08:45:17+00:00  WWWGESTIONE3 ([172.30.104.243])       ──▶ aspam2-ravda.regione.vda.it      Microsoft SMTPSVC(6.0.37…
+  │  -3s
+  2  2015-11-29T08:45:14+00:00  aspam2-ravda.regione.vda.it (unknown… ──▶ Websense Email Security Gateway  ESMTP
+  │  +48s
+  3  2015-11-29T08:46:02+00:00  smtp2.regione.vda.it (217.76.210.112… ──▶ smtp.customers.net               SMTP
+  │  +0s
+  4  2015-11-29T08:46:02+00:00  (no from or by clause)
+
+MIME TREE
+  0 multipart/mixed              [container]
+  ├─ 1 multipart/related         [container]
+  │  ├─ 2 multipart/alternative  [container]
+  │  │  ├─ 3 text/plain          quoted-printable  iso-8859-1  2.2 KB  [body]
+  │  │  └─ 4 text/html           8bit  4.0 KB  [body]
+  │  │        ⚠ CharsetDecodeDefect
+  │  ├─ 5 image/jpeg             base64  9.7 KB  [attachment]  disposition:inline  "intestazione.jpg"
+  │  └─ 6 image/jpeg             base64  7.1 KB  [attachment]  disposition:inline  "logometeo.jpg"
+  └─ 7 application/octet-stream  base64  1.0 MB  [attachment]  disposition:attachment  "Bollettino.pdf"
+```
+
+A warning mark means a defect the parser recorded for that hop or part; a
+delay is printed as a number and never judged. Parts nested deeper than 32
+levels are counted on one line instead of being drawn. Pass `ascii_only=True`
+for ASCII connectors.
+
+The drawing is safe to print: text taken from the message is cut to a bounded
+width, and control characters, ANSI escapes, bidirectional and zero-width
+formatting characters, and characters that draw nothing, are shown as visible
+escapes such as `\x1b`. Letters of different scripts that merely look alike
+are not detected. The values
+in `mime_tree`, `headers` and `received` are not escaped. They are untrusted
+text chosen by the sender: escape them before putting them in HTML, a terminal
+or a diagram language.
+
 ## Defects and Their Critical Role in Email Security
 
 ### Inspecting defects and recovered evidence
@@ -824,6 +929,7 @@ mail.mail                     # Fully tokenized mail object
 mail.message                  # Underlying email.message.Message object
 mail.message_as_string        # Reconstructed message as string
 mail.message_id               # Unique message identifier
+mail.mime_tree                # One entry per MIME part, with its enclosing part
 mail.received                 # Parsed routing information (hop-by-hop)
 mail.subject                  # Email subject
 mail.text_plain               # Plain text body parts (list)
@@ -867,7 +973,8 @@ email analysis, batch processing, or integration with shell scripts and pipeline
 usage: mailparser [-h] (-f FILE | -s STRING | -k)
                    [-l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}] [-j] [-b]
                    [-a] [-r] [-t] [-dt] [-m] [-u] [-c] [-d] [-o]
-                   [-i Trust mail server string] [-p] [-z] [-v]
+                   [-i Trust mail server string] [-p] [-z] [-sa]
+                   [-ap ATTACHMENTS_PATH] [-st] [--mime-tree] [-v]
 
 Wrapper for email Python Standard Library
 
@@ -901,6 +1008,9 @@ optional arguments:
                         Store attachments on disk (default: False)
   -ap ATTACHMENTS_PATH, --attachments-path ATTACHMENTS_PATH
                         Path where store attachments (default: /tmp)
+  -st, --structure      Draw the message structure: headers, delivery path,
+                        MIME tree (default: False)
+  --mime-tree           Print the MIME tree of mail as JSON (default: False)
   -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
@@ -924,6 +1034,18 @@ Analyze an Outlook .msg file with defect detection:
 
 ```shell
 mailparser -f email.msg -o -d -j
+```
+
+Draw the message structure: main headers, delivery path and MIME tree:
+
+```shell
+mailparser -f example_mail -st
+```
+
+Print the parsed mail and its MIME tree as two consecutive JSON documents:
+
+```shell
+mailparser -f example_mail -j --mime-tree
 ```
 
 Parse from stdin (useful for pipelines):
