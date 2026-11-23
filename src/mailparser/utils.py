@@ -157,7 +157,8 @@ def get_addresses(
 
 def custom_log(level="WARNING", name=None):  # pragma: no cover
     """
-    This function returns a custom logger.
+    This function returns a custom logger that writes to standard error,
+    so that standard output holds only what the caller asked to print.
     :param level: logging level
     :type level: str
     :param name: logger name
@@ -169,7 +170,7 @@ def custom_log(level="WARNING", name=None):  # pragma: no cover
     else:
         log = logging.getLogger()
     log.setLevel(level)
-    ch = logging.StreamHandler(sys.stdout)
+    ch = logging.StreamHandler(sys.stderr)
     formatter = logging.Formatter(
         "%(asctime)s | "
         "%(name)s | "

@@ -1064,6 +1064,13 @@ Print the parsed mail and its MIME tree as two consecutive JSON documents:
 mailparser -f example_mail -j --mime-tree
 ```
 
+Log messages go to standard error, so standard output holds only the output
+you asked for and can be read as JSON:
+
+```shell
+mailparser -f example_mail -j > example_mail.json
+```
+
 Parse from stdin (useful for pipelines):
 
 ```shell
