@@ -18,6 +18,7 @@ limitations under the License.
 
 import base64
 import email
+import functools
 import importlib.util
 import ipaddress
 import json
@@ -25,6 +26,7 @@ import logging
 import re
 from bisect import bisect_right
 from email.feedparser import BytesFeedParser
+from itertools import islice
 
 from mailparser.const import (
     _IPV6_TAG_RE,
@@ -42,6 +44,9 @@ from mailparser.serialization import (
     SerializationLimitError,
 )
 from mailparser.utils import (
+    _CHARSET_ERRORS,
+    RecoveringMessage,
+    _read_params,
     _safe_attachment_filename,
     _safe_remove,
     as_string_safe,
@@ -112,6 +117,30 @@ def _walk_with_parents(message):
         yield child, parent
         if child.is_multipart():
             pending.append((iter(child.get_payload()), index))
+
+
+def _forgets_parameters(function):
+    """Empty the cache of decoded parameters when a function ends.
+
+    The cache of ``utils._read_params()`` holds header values of the
+    message, and must not keep them alive once the work that reads
+    them is over, whether it returns or raises.
+
+    Args:
+        function (callable): a function that reads MIME parameters
+
+    Returns:
+        callable: the function, followed by the emptying of the cache
+    """
+
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _read_params.cache_clear()
+
+    return wrapper
 
 
 def _in_sorted_spans(position, spans):
@@ -237,6 +266,7 @@ class MailParser:
             return str()
 
     @classmethod
+    @_forgets_parameters
     def _parse_guarded(cls, build_message):
         """
         Build the email message and parse it, converting a ``RecursionError``
@@ -311,7 +341,7 @@ class MailParser:
                 # BytesParser.parse() would still translate CR/LF through
                 # its text wrapper. Feed bytes directly in bounded chunks.
                 with open(fp, "rb") as f:
-                    parser = BytesFeedParser()
+                    parser = BytesFeedParser(_factory=RecoveringMessage)
                     while chunk := f.read(8192):
                         parser.feed(chunk)
                     return parser.close()
@@ -372,7 +402,9 @@ class MailParser:
         """
 
         log.debug("Parsing email from string")
-        return cls._parse_guarded(lambda: email.message_from_string(s))
+        return cls._parse_guarded(
+            lambda: email.message_from_string(s, _class=RecoveringMessage)
+        )
 
     @classmethod
     def from_bytes(cls, bt):
@@ -386,7 +418,9 @@ class MailParser:
             Instance of MailParser
         """
         log.debug("Parsing email from bytes")
-        return cls._parse_guarded(lambda: email.message_from_bytes(bt))
+        return cls._parse_guarded(
+            lambda: email.message_from_bytes(bt, _class=RecoveringMessage)
+        )
 
     def _reset(self):
         """
@@ -744,7 +778,7 @@ class MailParser:
             # Some Python codecs can produce lone surrogates. Such a
             # value is not Unicode text and breaks UTF-8 JSON/CLI sinks.
             text.encode("utf-8")
-        except (LookupError, UnicodeError, ValueError):
+        except _CHARSET_ERRORS:
             try:
                 text = payload.decode("utf-8")
                 recovery = "decoded with utf-8"
@@ -803,6 +837,7 @@ class MailParser:
         del part.defects[known_defects:]
         return len(octets or b"")
 
+    @_forgets_parameters
     def _build_mime_tree(self):
         """Describe every MIME part as declared on the wire.
 
@@ -872,6 +907,7 @@ class MailParser:
             )
         return tree
 
+    @_forgets_parameters
     def parse(self):
         """
         This method parses the raw email and makes the tokens.
@@ -923,7 +959,8 @@ class MailParser:
             # Only the root's epilogue is searched.  The defect may sit
             # on a nested part while the root has no boundary (it is
             # not a multipart) or no epilogue (it was never closed).
-            boundary = self.message.get_boundary()
+            root = RecoveringMessage.reading(self.message)
+            boundary = root.get_boundary()
             root_epilogue = self.message.epilogue
             epilogue = None
             if boundary is not None and root_epilogue is not None:
@@ -933,7 +970,10 @@ class MailParser:
 
             if epilogue is not None:
                 try:
-                    p = email.message_from_string(epilogue)
+                    p = email.message_from_string(
+                        epilogue,
+                        _class=RecoveringMessage,
+                    )
                     # Recovered epilogues lack reliable nesting context;
                     # retain their existing extraction behavior.
                     parts.append((p, True))
@@ -957,6 +997,18 @@ class MailParser:
             if p.get_content_maintype() == "multipart":
                 # Read only to diagnose a boundary that is not text.
                 mime_boundary(metadata, defects=metadata_defects)
+            if i >= self._structural_parts:
+                # The sub-parts of a part rebuilt from the epilogue
+                # are no entries of the tree: they are read as parts
+                # are, and reported on that part.
+                subs = islice(_walk_with_parents(p), 1, None)
+                for number, (sub, _) in enumerate(subs, 1):
+                    view, details = mime_header_view(sub)
+                    if sub.get_content_maintype() == "multipart":
+                        mime_boundary(view, defects=details)
+                    metadata_defects.extend(
+                        f"sub-part {number}: {detail}" for detail in details
+                    )
             if metadata_defects:
                 self._has_defects = True
                 self._record_part_category(i, "MimeHeaderDefect")
@@ -1581,6 +1633,7 @@ class MailParser:
         return self._message
 
     @property
+    @_forgets_parameters
     def message_as_string(self):
         """
         Return the entire message flattened as a string.

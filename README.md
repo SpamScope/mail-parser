@@ -431,6 +431,21 @@ decoder that produces a non-Unicode scalar also triggers recovery: names retain
 their literal encoded form and text retains a safe byte-derived view, keeping
 JSON and CLI output encodable as UTF-8.
 
+A malformed RFC 2231 parameter does not stop the parse, whatever Python's
+`email` package does with it. A multipart boundary whose charset refuses the
+octets (`boundary*=undefined''%41%42`) is read as the package reads a value
+with an unknown charset, the percent-decoded octets as Latin-1 (`AB`), so its
+parts are still found. A parameter with numbered and unnumbered sections
+(`filename*0=report; filename*=utf-8''evil.exe; filename*1=.pdf`), or with a
+section given twice (`filename*0=b.exe; filename*0=a`), is read on every
+Python as the current releases read it: an unnumbered section is section 0,
+or is dropped when section 0 exists (`report.pdf`), and equal sections keep
+the order of the header (`b.exea`). A section number too long to be a number
+leaves that parameter under its literal name.
+The other parameters of the header are read as usual. Each case is a
+`MimeHeaderDefect` of that MIME part, with the value as evidence:
+`invalid-boundary-parameter` or `invalid-parameter-continuation`.
+
 Header decoding is strict. An unknown charset, invalid byte sequence or
 non-Unicode scalar leaves the complete original header value literal instead
 of dropping bytes or mixing a decoded prefix with the original. A
@@ -533,7 +548,8 @@ entry, so a 2.7 MiB message made of 400,000 empty parts yields a 159 MiB
 tree. Bound the input size, or the number of entries you keep, when the tree
 of untrusted mail is stored or sent on. A boundary that an RFC 2231 charset
 decodes to something that is not text is shown with `\udXXX` escapes and
-reported as `MimeHeaderDefect`.
+reported as `MimeHeaderDefect`; one the charset cannot decode at all is shown
+as its percent-decoded octets read as Latin-1, with the same defect.
 
 `mailparser.render_structure(mail)` draws the message structure as text:
 

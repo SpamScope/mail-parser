@@ -21,6 +21,7 @@ from __future__ import annotations
 import base64
 import email
 import email.header
+import email.message
 import email.utils
 import functools
 import hashlib
@@ -60,6 +61,18 @@ log = logging.getLogger(__name__)
 # Upper bound (seconds) for the external ``msgconvert`` conversion.  Without it
 # a hung or malicious helper would block the calling worker indefinitely.
 _MSGCONVERT_TIMEOUT = 60
+
+# What a codec named by the sender raises when it cannot be applied: an
+# unknown or non-text codec, an octet it refuses, a NUL in its name.
+_CHARSET_ERRORS = (LookupError, UnicodeError, ValueError)
+
+# The headers whose parameters the parser reads.
+_PARAMETER_HEADERS = ("content-type", "content-disposition")
+
+# Header values whose decoded parameters are kept while a message is
+# parsed.  A part is asked for the same two values by several accessors
+# in a row, and by the email package itself.
+_PARAMS_CACHE_SIZE = 8
 
 
 # The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
@@ -288,6 +301,230 @@ def decode_header_part(header, *, defects=None):
     return output.strip()
 
 
+def _renumbered(pairs):
+    """Give the sections of malformed parameters numbers to sort by.
+
+    RFC 2231 section 3 numbers the sections of a continued parameter
+    from 0, each number once.  A parameter is malformed, on every
+    Python, when its sections come with and without a number
+    (``name*`` next to ``name*1``), repeat a number, or come more than
+    once without one.  ``email.utils.decode_params`` raises on the
+    first before Python 3.13.18, 3.14.10 and 3.15.2, and sorts equal
+    numbers by value before those versions.
+
+    Such a parameter is read as those versions read it: its unnumbered
+    sections are section 0, or are dropped when it has a section 0, and
+    equal numbers keep the order of the header.  Its sections are then
+    numbered again from 0, which every version sorts the same way.
+
+    A number with more digits than ``int()`` converts belongs to no
+    section: that parameter keeps its literal name.
+
+    Args:
+        pairs (list): ``(name, value)`` pairs of a parameter list.
+
+    Returns:
+        tuple: the pairs to decode and the decoded literal pairs, or
+        None when no parameter of the list is malformed
+    """
+    section = email.utils.rfc2231_continuation  # type: ignore[attr-defined]
+    decodable, literal, sections = [], [], {}
+    for name, text in pairs:
+        match = section.match(name) if "*" in name else None
+        if not match:
+            decodable.append((name, text))
+            continue
+        try:
+            number = int(match["num"]) if match["num"] else None
+        except ValueError:
+            text = email.utils.quote(email.utils.unquote(text))
+            literal.append((name, f'"{text}"'))
+        else:
+            found = sections.setdefault(match["name"], [])
+            found.append((number, name, text))
+    malformed = bool(literal)
+    for base, found in sections.items():
+        numbers = {number for number, _, _ in found}
+        repeated = len(numbers) < len(found)
+        mixed = None in numbers and len(numbers) > 1
+        if not (repeated or mixed):
+            decodable.extend((name, text) for _, name, text in found)
+            continue
+        malformed = True
+        if 0 in numbers:
+            found = [item for item in found if item[0] is not None]
+        found.sort(key=lambda item: item[0] or 0)
+        for number, (_, name, text) in enumerate(found):
+            encoded = "*" if name.endswith("*") else ""
+            decodable.append((f"{base}*{number}{encoded}", text))
+    return (decodable, literal) if malformed else None
+
+
+@functools.lru_cache(maxsize=_PARAMS_CACHE_SIZE)
+def _read_params(value):
+    """Split and decode the parameters of a header value.
+
+    The same steps as ``Message._get_params_preserve()``, so a well
+    formed list is read as the email package reads it.  A malformed
+    one is repaired first by ``_renumbered()``.
+
+    The split and the syntax of a section name are the undocumented
+    ones of the email package: a second splitter would be a second
+    interpretation of the neighbours of a malformed parameter.
+
+    The cache spares the split, quadratic in some Python releases, to
+    the accessors that read the same value one after the other.  It is
+    no memo of a message: a value read again after eight others is
+    split again, and ``MailParser`` empties the cache when a parse
+    ends, so that no header of a message outlives its parser here.
+
+    Args:
+        value (str): value of a header that carries parameters.
+
+    Returns:
+        tuple: the ``(name, value)`` pairs as ``decode_params`` returns
+        them, in a tuple, and whether the list is malformed
+    """
+    split = email.message._parseparam  # type: ignore[attr-defined]
+    first, *pairs = (
+        (name.strip(), text.strip())
+        for name, _, text in (item.partition("=") for item in split(value))
+    )
+    repaired = _renumbered(pairs) if "*" in value else None
+    if repaired is None:
+        return tuple(email.utils.decode_params([first, *pairs])), False
+    pairs, literal = repaired
+    return tuple(email.utils.decode_params([first, *pairs]) + literal), True
+
+
+def _decoded_boundary(part, failobj=None, *, defects=None):
+    """Read a boundary whose charset may be unable to decode it.
+
+    ``Message.get_boundary()`` decodes an RFC 2231 value with the
+    charset the sender names and guards only against an unknown one,
+    for which it returns the percent-decoded octets as Latin-1 text.
+    The same text is returned here for a charset that refuses them.
+
+    Args:
+        part (RecoveringMessage): MIME part or metadata view.
+        failobj: value returned when the part declares no boundary.
+        defects: optional destination for raw parameter evidence.
+
+    Returns:
+        The boundary, or failobj.
+    """
+    try:
+        return Message.get_boundary(part, failobj)
+    except _CHARSET_ERRORS:
+        value = part.get_param("boundary")
+        if defects is not None:
+            defects.append(f"invalid-boundary-parameter: raw={value!r}")
+        return email.utils.unquote(value[2]).rstrip()
+
+
+class RecoveringMessage(Message):
+    """Message whose parameters the email package can always use.
+
+    The email package reads parameters on its own: ``get_boundary()``
+    while it parses a multipart, ``get_boundary()``, ``get_param()`` and
+    ``get_payload()`` while it flattens one.  No caller can catch what
+    they raise there on an RFC 2231 value, so every message the parser
+    builds is of this class.  A well formed value is read as
+    ``Message`` reads it, a malformed one as ``Message`` of Python
+    3.13.18, 3.14.10 and 3.15.2 reads it; it is diagnosed by
+    ``mime_header_view()`` and ``mime_boundary()``, never recorded on
+    the message.
+    """
+
+    @classmethod
+    def reading(cls, part):
+        """Return a message of this class with the parameters of a part.
+
+        Args:
+            part (email.message.Message): a part of any message class.
+
+        Returns:
+            RecoveringMessage: the part itself, or for a plain message
+            of the caller a copy of its headers that carry parameters
+        """
+        if isinstance(part, cls):
+            return part
+        copy = cls()
+        for name, value in part.raw_items():
+            if name.lower() in _PARAMETER_HEADERS:
+                copy[name] = value
+        return copy
+
+    def _get_params_preserve(self, failobj, header):
+        # Not public, but the one method every parameter accessor of
+        # Message reads through, on every supported Python.
+        missing = object()
+        value = self.get(header, missing)
+        if value is missing:
+            return failobj
+        return list(_read_params(str(value))[0])
+
+    def get_boundary(self, failobj=None):
+        """Return the boundary, also when its charset cannot decode it.
+
+        Args:
+            failobj: value returned when the part declares no boundary.
+
+        Returns:
+            The boundary, or failobj.
+        """
+        return _decoded_boundary(self, failobj)
+
+    def get_payload(self, i=None, decode=False):  # type: ignore[override]
+        """Return the payload, also for an RFC 2231 charset.
+
+        Up to Python 3.11 the text of an 8-bit payload is decoded with
+        what ``get_param()`` returns, a tuple for an RFC 2231 charset:
+        ``TypeError``.  Later versions use ``get_content_charset()``.
+
+        Args:
+            i: index of a sub-part.
+            decode: decode the transfer encoding.
+
+        Returns:
+            The payload, as ``Message.get_payload()`` returns it.
+        """
+        try:
+            return super().get_payload(i, decode)
+        except TypeError:
+            if i is not None or decode:
+                raise
+            payload = self._payload  # type: ignore[attr-defined]
+            octets = payload.encode("ascii", "surrogateescape")
+            try:
+                charset = self.get_content_charset("ascii")
+                return octets.decode(charset, "replace")
+            except LookupError:
+                return octets.decode("ascii", "replace")
+
+    def set_payload(self, payload, charset=None):
+        """Set the payload, also for an RFC 2231 charset.
+
+        The generator passes the charset ``get_param()`` returned to the
+        copy of a part with an 8-bit body.  ``Message.set_payload()``
+        needs the name of the codec, which is the charset of that copy.
+
+        Args:
+            payload: the new payload.
+            charset: a charset, its name, or its RFC 2231 tuple.
+
+        Raises:
+            LookupError: if the tuple names no codec.
+        """
+        if isinstance(charset, tuple):
+            charset = self.get_content_charset()
+            if charset is None:
+                # Without a charset the payload would be stored as it
+                # is, and written with an empty transfer encoding.
+                raise LookupError("RFC 2231 charset is not a codec name")
+        super().set_payload(payload, charset)
+
+
 def mime_header_view(part: Message) -> tuple[Message, list[str]]:
     """Return a UTF-8 MIME metadata view without changing the raw part.
 
@@ -299,8 +536,10 @@ def mime_header_view(part: Message) -> tuple[Message, list[str]]:
         metadata, including each header occurrence and its raw octets.
         Invalid bytes appear as replacement characters in the display
         view; exact evidence remains in the descriptions and original.
+        A malformed parameter list is described too, with the header
+        value.
     """
-    view = Message()
+    view = RecoveringMessage()
     view.set_default_type(part.get_default_type())
     defects = []
     occurrences: Counter[str] = Counter()
@@ -333,6 +572,12 @@ def mime_header_view(part: Message) -> tuple[Message, list[str]]:
         if evidence is not None:
             defects.append(f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}")
         view[name] = value
+        if occurrence or header not in _PARAMETER_HEADERS:
+            continue
+        if _read_params(value)[1]:
+            defects.append(
+                f"{header}[0]: invalid-parameter-continuation; raw={value!r}"
+            )
     return view, defects
 
 
@@ -346,9 +591,10 @@ def mime_filename(part, *, defects=None):
     Returns:
         The filename, its literal parameter text on failure, or None.
     """
+    part = RecoveringMessage.reading(part)
     try:
         return part.get_filename()
-    except (LookupError, UnicodeError, ValueError):
+    except _CHARSET_ERRORS:
         value = part.get_param("filename", header="content-disposition")
         if value is None:
             value = part.get_param("name", header="content-type")
@@ -374,9 +620,11 @@ def mime_boundary(part, *, defects=None):
 
     Returns:
         The boundary, with any surrogate shown as a ``\\udXXX`` escape,
-        or None when the part declares none.
+        its percent-decoded octets as Latin-1 text when the charset
+        cannot decode them, or None when the part declares none.
     """
-    boundary = part.get_boundary()
+    part = RecoveringMessage.reading(part)
+    boundary = _decoded_boundary(part, defects=defects)
     if boundary is None or boundary.isascii():
         return boundary
     escaped = boundary.encode("utf-8", "backslashreplace").decode("utf-8")
@@ -396,9 +644,10 @@ def mime_charset(part, failobj=None, *, defects=None):
     Returns:
         The charset name or failobj after an explicitly diagnosed failure.
     """
+    part = RecoveringMessage.reading(part)
     try:
         return part.get_content_charset(failobj)
-    except (LookupError, UnicodeError, ValueError):
+    except _CHARSET_ERRORS:
         if defects is not None:
             value = part.get_param("charset")
             defects.append(f"invalid-charset-parameter: raw={value!r}")
@@ -1030,6 +1279,12 @@ def raw_payload(part):
     outright: ``charset="undefined"`` raises a bare ``UnicodeError``, which
     would abort the parse of the whole message.
 
+    ``TypeError`` is caught for a plain ``Message`` of the caller only;
+    a ``RecoveringMessage`` does not raise it.  Up to Python 3.11 the
+    charset comes from ``get_param()``, a tuple for an RFC 2231 value,
+    and before 3.13.18, 3.14.10 and 3.15.2 reading the parameters at all
+    raises it for sections with and without a number.
+
     Args:
         part (email.message.Message): part to read
 
@@ -1039,7 +1294,7 @@ def raw_payload(part):
     """
     try:
         return part.get_payload(decode=False)
-    except (LookupError, UnicodeError, ValueError):
+    except (*_CHARSET_ERRORS, TypeError):
         log.warning("Cannot apply the declared charset, reading raw bytes")
         return part.get_payload(decode=True)
 
@@ -1065,7 +1320,7 @@ def as_string_safe(part, *, budget=None):
         if budget is None:
             return part.as_string()
         return bounded_flatten(part, budget)
-    except (LookupError, UnicodeError, ValueError):
+    except _CHARSET_ERRORS:
         log.warning("Cannot flatten part with the declared charset")
 
     try:
@@ -1075,7 +1330,7 @@ def as_string_safe(part, *, budget=None):
             else bounded_flatten(part, budget, binary=True)
         )
         return data.decode("utf-8", "surrogateescape")
-    except (LookupError, UnicodeError, ValueError):
+    except _CHARSET_ERRORS:
         # BytesGenerator bypasses the charset only for text parts. A part
         # whose type is multipart but which carries no boundary is routed
         # to the generic multipart handler, which decodes with the
