@@ -179,6 +179,53 @@ every value taken from the message reaches the output only through `_visible()`,
 control, ANSI, bidirectional and zero-width characters and stops at a column limit; never format
 message text into the drawing directly. A warning mark means a recorded defect, never a heuristic.
 
+**Parameter recovery**: every message the parser builds is a `utils.RecoveringMessage`, never a
+plain `Message`: `from_string()`, `from_bytes()`, `from_file()` (Outlook included), the epilogue
+recovery and `mime_header_view()`. The email package uses parameters on its own, where no caller
+can catch what an RFC 2231 value raises: `get_boundary()` in the feed parser, `get_boundary()`,
+`get_param()`, `get_payload()` and `set_payload()` in the generator. Four values raise: a charset
+that refuses the octets (`boundary*=undefined''x`), sections with and without a number (`name*`
+next to `name*1`, before 3.13.18, 3.14.10 and 3.15.2), a section number longer than `int()`
+converts, and the `(charset, language, value)` tuple of an RFC 2231 charset where a codec name
+is expected. The class overrides `get_boundary()`, `get_payload()`, `set_payload()` and
+`_get_params_preserve()`; the last is private, but it is the one method every parameter accessor
+reads through, and a test fails if a Python release changes that. A well formed value is read
+as `Message` reads it, a malformed one as `Message` of 3.13.18, 3.14.10 and 3.15.2 reads it.
+`set_payload()` raises `LookupError` when the tuple names no codec, so that `as_string_safe()`
+falls back to bytes instead of writing a lossy body under an empty transfer encoding.
+
+A parameter is malformed, on every Python, when its RFC 2231 sections come with and without a
+number, repeat a number, or come more than once without one: releases differ in what they
+raise and in how they order equal numbers. `_renumbered()` orders the sections as the fixed
+releases do and numbers them again from 0, which every release reads the same way. The defect
+must not depend on the Python version either: `mime_header_view()` reports
+`invalid-parameter-continuation` from the structure of the list, `mime_boundary()` reports
+`invalid-boundary-parameter`, both as the `MimeHeaderDefect` of that part, never recorded on
+the message. An undecodable boundary is the percent-decoded value read as Latin-1, which is
+what the email package returns for a charset it does not know. The sub-parts of a part rebuilt
+from the epilogue are no entries of the tree: `parse()` reads each through the same two
+helpers and reports it on that part as `sub-part N: ...`, `N` being its position in the walk.
+
+All parameter lists go through `_read_params()`, behind a cache of 8 header values. The cache
+spares the split, which is quadratic in some Python releases, to accessors that read one value
+in a row: the feed parser, the helpers of one `parse()` iteration, the generator. It does not
+make a value split once per message: an entry is evicted when 8 other values are read in
+between, and a message with many containers splits a value again in a later phase. Never
+return the cached tuple itself. The cache holds text of the message, so `_forgets_parameters`
+empties it when `_parse_guarded()`, `parse()`, `_build_mime_tree()` or `message_as_string`
+ends, whether it returns or raises; an accessor the caller runs later on `mail.message` fills
+it again, with at most 8 values.
+
+Read a filename, charset or boundary through `mime_filename()`, `mime_charset()` and
+`mime_boundary()`: `get_filename()` and `get_content_charset()` still raise on an undecodable
+value, which is how the helpers detect it. The helpers accept a plain `Message` from
+`MailParser(message)` and read it through `RecoveringMessage.reading()`; the caller's parts are
+not replaced. Reading or flattening the payload of such a part therefore still runs the plain
+accessors, which raise `TypeError` for an RFC 2231 charset on an 8-bit body and, before
+3.13.18, for sections with and without a number. `raw_payload()` catches it and returns the
+bytes. `as_string_safe()` must not: its raw-bytes fallback is not text, and a charset that
+could have been applied must never reach it.
+
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
 inside comments, quoted strings, domain literals and angle addresses are not

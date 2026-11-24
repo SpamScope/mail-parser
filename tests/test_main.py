@@ -16,6 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 
+import json
+import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -365,3 +368,21 @@ class TestMain:
             result = get_parser(args)
             assert result is not None
             assert result.subject == "Stdin Test"
+
+    def test_log_messages_leave_stdout_as_json(self):
+        """A warning goes to standard error, not before the JSON."""
+        raw = (
+            b"Content-Type: multipart/mixed; boundary=a\r\n\r\n--a\r\n"
+            b"Content-Type: multipart/mixed; boundary=b\r\n\r\nx\r\n--a--\r\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-m", "mailparser", "--stdin", "--json"],
+            input=raw,
+            capture_output=True,
+            check=True,
+            timeout=10,
+        )
+
+        assert json.loads(result.stdout)["body"] == "x\r\n"
+        assert b"WARNING" in result.stderr
+        assert b"WARNING" not in result.stdout
