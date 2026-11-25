@@ -1637,8 +1637,25 @@ class MailParser:
     def message_as_string(self):
         """
         Return the entire message flattened as a string.
+
+        The generator of the ``email`` package recurses once per MIME
+        nesting level, and it runs out of stack well before the parser
+        does: a message can parse cleanly and still be too deep to
+        flatten.  The original tree stays readable through ``message``
+        and ``mime_tree``.
+
+        Raises:
+            MailParserRecursionError: if the message is nested too
+                deeply to flatten.
         """
-        return as_string_safe(self.message) if self.message else ""
+        if not self.message:
+            return ""
+        try:
+            return as_string_safe(self.message)
+        except RecursionError as exc:
+            raise MailParserRecursionError(
+                "Message nesting too deep to flatten"
+            ) from exc
 
     @property
     def to_domains(self):

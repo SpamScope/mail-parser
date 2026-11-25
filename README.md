@@ -493,6 +493,13 @@ individual leaf payloads, or an explicit later `message_as_string` request.
 Applications processing untrusted mail should still bound input size and
 isolate workers according to their own resource constraints.
 
+`message_as_string` raises `MailParserRecursionError` when the message is
+nested too deeply to flatten. Flattening needs more stack per MIME nesting
+level than parsing, so this can happen for a message that parsed without
+error: with the default interpreter recursion limit, at roughly 250 levels.
+Deep nesting is not a MIME syntax violation and sets no defect. `mail.message`
+and `mail.mime_tree` still expose the original tree.
+
 ## Message structure
 
 `mail.mime_tree` describes the MIME tree: one entry per MIME part, in the
@@ -1103,7 +1110,7 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 |
-\── MailParserRecursionError: Raised when a message is nested too deeply to parse
+\── MailParserRecursionError: Raised when a message is nested too deeply to parse or flatten
 ```
 
 # Docker Deployment

@@ -81,13 +81,17 @@ class MailParserReceivedParsingError(MailParserError):
 
 class MailParserRecursionError(MailParserError):
     """
-    Raised when a message is nested too deeply to parse.
+    Raised when a message is nested too deeply to parse or to flatten.
 
     Deeply nested ``multipart/*`` structures make Python's ``email`` parser
     exceed the interpreter recursion limit.  Converting the resulting
     ``RecursionError`` into this ``MailParserError`` subclass keeps the crash
     inside the documented exception hierarchy so callers can handle a hostile
     "multipart bomb" instead of the worker dying on an unexpected exception.
+
+    The generator behind ``message_as_string`` recurses more per nesting
+    level than the parser, so a message that parsed can still raise this
+    error when it is flattened.
     """
 
     pass
