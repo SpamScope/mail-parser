@@ -1,12 +1,13 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/mail-parser)](https://pypi.org/project/mail-parser/)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/mail-parser?color=blue)](https://pypistats.org/packages/mail-parser)
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/SpamScope/mail-parser#support-mail-parser)
 
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
 
-**Project website:** [spamscope.ai/en/](https://spamscope.ai/en/)
+**Project website:** [spamscope.ai/en/mail-parser/](https://spamscope.ai/en/mail-parser/)
 
 mail-parser is a **production-grade, RFC-compliant email parsing library** that goes far beyond a
 simple wrapper for Python's [email module](https://docs.python.org/2/library/email.message.html).
@@ -81,43 +82,36 @@ previous `msgconvert`-only behavior. Downstream code asserting on exact
 
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-# Support the Future of mail-parser
+# Support mail-parser
 
-mail-parser is a **labor of love and commitment to the open-source community**. Thousands of
-developers and security professionals worldwide rely on this library for critical email processing
-and threat analysis. Your support directly fuels continued innovation and excellence.
+<p align="center">
+  <a href="https://github.com/sponsors/fedelemantuano"><img
+    src="https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white"
+    alt="Sponsor on GitHub"></a>
+  <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=VEPXYP745KJF2"><img
+    src="https://img.shields.io/badge/PayPal-003087?style=for-the-badge&logo=paypal&logoColor=white"
+    alt="Donate with PayPal"></a>
+  <a href="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"><img
+    src="https://img.shields.io/badge/Bitcoin-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white"
+    alt="Donate with Bitcoin"></a>
+</p>
 
-## Invest in Innovation
+mail-parser is free and open source. Thousands of developers and security professionals rely on it
+for email processing and threat analysis. Every donation, whether $5 or $500, funds development
+time and infrastructure: detection of new evasion techniques, RFC compliance, performance, and
+tested releases you can trust in production.
 
-Your contribution—no matter the size—makes a real difference. By supporting mail-parser, you enable us to:
+**Bitcoin address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
 
-- **Advance Security Capabilities**: Develop cutting-edge detection mechanisms for emerging email
-  threats and attack vectors.
-- **Expand Format Support**: Add compatibility with new email formats and standards as they evolve.
-- **Enhance Performance**: Optimize parsing speed and memory efficiency for large-scale deployments.
-- **Maintain Excellence**: Ensure comprehensive testing, documentation, and bug-free releases that
-  you can trust in production.
-- **Foster Community**: Respond to issues, review contributions, and build a thriving ecosystem
-  around email security.
-- **Stay RFC-Compliant**: Keep pace with evolving email standards and specifications to ensure
-  maximum compatibility.
+<details>
+<summary>Show Bitcoin QR code</summary>
 
-Every donation, whether $5 or $500, directly funds development time and infrastructure costs. Join
-the community of supporters who believe in **accessible, reliable, and secure email parsing for
-everyone**.
+<img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"
+alt="Bitcoin QR code" width="200">
 
-[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+</details>
 
-Or contribute with Bitcoin:
-
-<a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
-  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"
-       alt="Bitcoin" width="200">
-</a>
-
-**Bitcoin Address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
-
-Thank you for supporting the evolution of mail-parser!
+Thank you for supporting mail-parser!
 
 # mail-parser in the ecosystem
 
@@ -964,13 +958,13 @@ treated this way: it raises `MailParserPathError` and stops the batch.
 
 # Usage from Command Line
 
-After installing mail-parser with pip, you can use the `mailparser` command-line tool for quick
+After installing mail-parser with pip, you can use the `mail-parser` command-line tool for quick
 email analysis, batch processing, or integration with shell scripts and pipelines.
 
 ## Command-Line Options
 
 ```text
-usage: mailparser [-h] (-f FILE | -s STRING | -k)
+usage: mail-parser [-h] (-f FILE | -s STRING | -k)
                    [-l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}] [-j] [-b]
                    [-a] [-r] [-t] [-dt] [-m] [-u] [-c] [-d] [-o]
                    [-i Trust mail server string] [-p] [-z] [-sa]
@@ -978,13 +972,12 @@ usage: mailparser [-h] (-f FILE | -s STRING | -k)
 
 Wrapper for email Python Standard Library
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -f FILE, --file FILE  Raw email file (default: None)
-  -s STRING, --string STRING
-                        Raw email string (default: None)
+  -f, --file FILE       Raw email file (default: None)
+  -s, --string STRING   Raw email string (default: None)
   -k, --stdin           Enable parsing from stdin (default: False)
-  -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
+  -l, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Set log level (default: WARNING)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
@@ -997,7 +990,7 @@ optional arguments:
   -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -o, --outlook         Analyze Outlook msg (default: False)
-  -i Trust mail server string, --senderip Trust mail server string
+  -i, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
                         (default: None)
   -p, --mail-hash       Print mail fingerprints without headers (default:
@@ -1006,7 +999,7 @@ optional arguments:
                         Print attachments with fingerprints (default: False)
   -sa, --store-attachments
                         Store attachments on disk (default: False)
-  -ap ATTACHMENTS_PATH, --attachments-path ATTACHMENTS_PATH
+  -ap, --attachments-path ATTACHMENTS_PATH
                         Path where store attachments (default: /tmp)
   -st, --structure      Draw the message structure: headers, delivery path,
                         MIME tree (default: False)
@@ -1021,37 +1014,37 @@ It takes as input a raw mail and generates a parsed object.
 Parse an email file and output as formatted JSON:
 
 ```shell
-mailparser -f example_mail -j
+mail-parser -f example_mail -j
 ```
 
 Extract only the subject and sender:
 
 ```shell
-mailparser -f example_mail -u -m
+mail-parser -f example_mail -u -m
 ```
 
 Analyze an Outlook .msg file with defect detection:
 
 ```shell
-mailparser -f email.msg -o -d -j
+mail-parser -f email.msg -o -d -j
 ```
 
 Draw the message structure: main headers, delivery path and MIME tree:
 
 ```shell
-mailparser -f example_mail -st
+mail-parser -f example_mail -st
 ```
 
 Print the parsed mail and its MIME tree as two consecutive JSON documents:
 
 ```shell
-mailparser -f example_mail -j --mime-tree
+mail-parser -f example_mail -j --mime-tree
 ```
 
 Parse from stdin (useful for pipelines):
 
 ```shell
-cat raw_email.eml | mailparser -k -j
+cat raw_email.eml | mail-parser -k -j
 ```
 
 See the transformation from [raw email](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e)
