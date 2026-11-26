@@ -18,6 +18,8 @@ limitations under the License.
 
 import base64
 import datetime
+import email
+import email.policy
 import hashlib
 import json
 import logging
@@ -26,6 +28,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from email.generator import Generator
 from email.message import Message
 from unittest.mock import patch
 
@@ -39,10 +42,12 @@ from mailparser.exceptions import (
     MailParserPathError,
     MailParserRecursionError,
 )
+from mailparser.serialization import SerializationBudget
 from mailparser.utils import (
     _deduplicate_filename,
     _safe_attachment_filename,
     _truncate_filename,
+    as_string_safe,
     convert_mail_date,
     extract_msg_convert,
     fingerprints,
@@ -2163,6 +2168,451 @@ def _walk_iteratively(message):
         yield part
         if part.is_multipart():
             pending.extend(part.get_payload())
+
+
+# A part both generators refuse: its type says multipart, it has no
+# boundary, and ``undefined`` is a codec that decodes nothing.
+_REFUSED_PART = (
+    'Content-Type: multipart/report; charset="undefined"\r\n'
+    "Content-Transfer-Encoding: 8bit\r\n\r\n\udcff\udcfe refused\r\n"
+)
+# A part ``as_string()`` refuses and ``as_bytes()`` writes as it is.
+_REFUSED_TEXT = (
+    'Content-Type: text/plain; charset="undefined"\r\n'
+    "Content-Transfer-Encoding: 8bit\r\n\r\n\udcff\udcfe text\r\n"
+)
+_PLAIN_TEXT = "Content-Type: text/plain\r\n\r\n{}\r\n"
+
+
+def _multipart(boundary, *entities, preamble="", epilogue=""):
+    """A multipart entity around the given entities."""
+    return (
+        f'Content-Type: multipart/mixed; boundary="{boundary}"\r\n\r\n'
+        + preamble
+        + "".join(f"--{boundary}\r\n{entity}" for entity in entities)
+        + f"--{boundary}--\r\n"
+        + epilogue
+    )
+
+
+def _around(leaf, depth):
+    """``leaf`` under ``depth`` multiparts, with a sibling on each side."""
+    entity = leaf
+    for level in range(depth):
+        entity = _multipart(
+            f"N{level}",
+            _PLAIN_TEXT.format("before"),
+            entity,
+            _PLAIN_TEXT.format("after"),
+        )
+    return "From: a@b.example\r\n" + entity
+
+
+def _refusing_multiparts(depth):
+    return _around(_REFUSED_PART, depth)
+
+
+def _refusing_rfc822(depth):
+    return (
+        "From: a@b.example\r\n"
+        + "Content-Type: message/rfc822\r\n\r\n" * depth
+        + _REFUSED_PART
+    )
+
+
+def _refusing_container(depth):
+    """
+    A multipart whose boundary ``as_bytes()`` cannot write, around a part
+    ``as_string()`` refuses: no part refuses both, the container does.
+    """
+    return _around(_multipart("\xe9", _REFUSED_TEXT), depth)
+
+
+def _refused_by_as_string_only(depth):
+    return _around(_REFUSED_TEXT, depth)
+
+
+def _conforming_multiparts(depth):
+    return _around(_PLAIN_TEXT.format("leaf"), depth)
+
+
+def _from_octets(text):
+    return mailparser.parse_from_bytes(text.encode("ascii", "surrogateescape"))
+
+
+@pytest.fixture
+def flattened(monkeypatch):
+    """Every part a generator flattens, once for each time it does."""
+    parts = []
+    flatten = Generator.flatten
+
+    def counting(self, msg, *args, **kwargs):
+        parts.append(msg)
+        return flatten(self, msg, *args, **kwargs)
+
+    monkeypatch.setattr(Generator, "flatten", counting)
+    return parts
+
+
+@pytest.mark.parametrize(
+    ("parse", "build", "passes"),
+    [
+        (_from_octets, _refusing_multiparts, 3),
+        (_from_octets, _refusing_rfc822, 3),
+        (mailparser.parse_from_string, _refusing_container, 3),
+        (_from_octets, _refused_by_as_string_only, 2),
+        (_from_octets, _conforming_multiparts, 1),
+    ],
+)
+@pytest.mark.parametrize("depth", [1, 10, 40])
+def test_message_as_string_flattens_each_part_a_bounded_number_of_times(
+    parse, build, passes, depth, flattened
+):
+    """
+    Regression: the fallback flattened a container again for every level
+    between it and the part that refused, so a refusing part under
+    ``depth`` containers cost the size of the message times ``depth``.
+    Each part is now flattened at most three times: by a pass of
+    ``as_string()`` that fails, by one of ``as_bytes()`` that fails,
+    and by the pass that writes it.
+    """
+    mail = parse(build(depth))
+    parts = len(mail.mime_tree)
+    assert parts > depth
+    del flattened[:]
+
+    text = mail.message_as_string
+
+    assert isinstance(text, str)
+    assert len(flattened) <= passes * parts
+    if build is _conforming_multiparts:
+        assert len(flattened) == parts
+
+
+_FALLBACK_TREE = (
+    "From: a@b.example\r\n"
+    + _multipart(
+        "A",
+        _PLAIN_TEXT.format("before A"),
+        _multipart(
+            "B",
+            _PLAIN_TEXT.format("before B"),
+            _REFUSED_PART,
+            _REFUSED_TEXT,
+        ),
+        _multipart("C", _PLAIN_TEXT.format("after A")),
+        preamble="preamble A\r\n",
+        epilogue="epilogue A\r\n",
+    )
+).encode("ascii", "surrogateescape")
+
+_FALLBACK_RFC822 = (
+    "From: a@b.example\r\n"
+    "Content-Type: message/rfc822\r\n\r\n"
+    "Subject: one\r\nContent-Type: message/rfc822\r\n\r\n"
+    "Subject: two\r\n" + _REFUSED_PART
+).encode("ascii", "surrogateescape")
+
+_NO_BOUNDARY = (
+    "NoBoundaryInMultipartDefect: A message claimed to be a multipart but "
+    "had no boundary parameter."
+)
+_NO_SUBPARTS = (
+    "MultipartInvariantViolationDefect: A message claimed to be a multipart "
+    "but no subparts were found."
+)
+
+
+def _charset_defect(part):
+    return (
+        f"CharsetDecodeDefect: part {part}, charset 'undefined' failed; "
+        "decoded with utf-8 replacement characters. Original bytes remain "
+        "in the MIME part."
+    )
+
+
+@pytest.mark.parametrize(
+    ("parse", "raw", "expected", "body", "defects", "tree"),
+    [
+        pytest.param(
+            mailparser.parse_from_bytes,
+            _FALLBACK_TREE,
+            # A and B are written from their raw headers and their
+            # sub-parts, without delimiters, preamble or epilogue; the
+            # parts that flatten are written by the generator.
+            "From: a@b.example\n"
+            'Content-Type: multipart/mixed; boundary="A"\n\n'
+            "Content-Type: text/plain\n\nbefore A"
+            'Content-Type: multipart/mixed; boundary="B"\n\n'
+            "Content-Type: text/plain\n\nbefore B"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n"
+            'Content-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text"
+            'Content-Type: multipart/mixed; boundary="C"\n\n'
+            "--C\nContent-Type: text/plain\n\nafter A\n--C--\n",
+            "before A\n--- mail_boundary ---\nbefore B\n"
+            "--- mail_boundary ---\n\ufffd\ufffd text\n"
+            "--- mail_boundary ---\nafter A\n"
+            "--- mail_boundary ---\n\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                {"multipart/report": [_charset_defect(4)]},
+                {"text/plain": [_charset_defect(5)]},
+            ],
+            [
+                ("multipart/mixed", None),
+                ("text/plain", 0),
+                ("multipart/mixed", 0),
+                ("text/plain", 2),
+                ("multipart/report", 2),
+                ("text/plain", 2),
+                ("multipart/mixed", 0),
+                ("text/plain", 6),
+            ],
+            id="multiparts",
+        ),
+        pytest.param(
+            mailparser.parse_from_bytes,
+            _FALLBACK_RFC822,
+            "From: a@b.example\nContent-Type: message/rfc822\n\n"
+            "Subject: one\nContent-Type: message/rfc822\n\n"
+            "Subject: two\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            "\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                {"multipart/report": [_charset_defect(2)]},
+            ],
+            [
+                ("message/rfc822", None),
+                ("message/rfc822", 0),
+                ("multipart/report", 1),
+            ],
+            id="rfc822",
+        ),
+        pytest.param(
+            mailparser.parse_from_bytes,
+            ("From: a@b.example\r\n" + _REFUSED_PART).encode(
+                "ascii", "surrogateescape"
+            ),
+            "From: a@b.example\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            "\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY, _NO_SUBPARTS]},
+                {"multipart/report": [_charset_defect(0)]},
+            ],
+            [("multipart/report", None)],
+            id="no-boundary-root",
+        ),
+        pytest.param(
+            mailparser.parse_from_string,
+            "From: a@b.example\r\n"
+            + _multipart(
+                "A",
+                _PLAIN_TEXT.format("before A"),
+                _multipart(
+                    "\xe9",
+                    _PLAIN_TEXT.format("before B"),
+                    _REFUSED_TEXT,
+                ),
+                _PLAIN_TEXT.format("after A"),
+            ),
+            # No part refuses as_bytes() here: the container does, at
+            # its own boundary, after its sub-parts were written.
+            "From: a@b.example\n"
+            'Content-Type: multipart/mixed; boundary="A"\n\n'
+            "Content-Type: text/plain\n\nbefore A"
+            'Content-Type: multipart/mixed; boundary="\xe9"\n\n'
+            "Content-Type: text/plain\n\nbefore B"
+            'Content-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text"
+            "Content-Type: text/plain\n\nafter A",
+            "before A\n--- mail_boundary ---\nbefore B\n"
+            "--- mail_boundary ---\n\ufffd\ufffd text\n"
+            "--- mail_boundary ---\nafter A",
+            [{"text/plain": [_charset_defect(4)]}],
+            [
+                ("multipart/mixed", None),
+                ("text/plain", 0),
+                ("multipart/mixed", 0),
+                ("text/plain", 2),
+                ("text/plain", 2),
+                ("text/plain", 0),
+            ],
+            id="container-refuses-as-bytes",
+        ),
+    ],
+)
+def test_message_as_string_fallback_output_is_unchanged(
+    parse, raw, expected, body, defects, tree
+):
+    """
+    The strings are the ones the fallback produced before it stopped
+    flattening a refusing part twice.  What the parse recovered and the
+    defects it recorded are the same before and after the export.
+    """
+    mail = parse(raw)
+
+    for _ in range(2):
+        assert mail.body == body
+        assert mail.defects == defects
+        assert mail.has_defects is True
+        assert mail.attachments == []
+        assert mail.resource_limit_defects == []
+        assert mail.from_ == [("", "a@b.example")]
+        assert [
+            (entry["content_type"], entry["parent"]) for entry in mail.mime_tree
+        ] == tree
+        assert mail.message_as_string == expected
+
+
+def test_message_as_string_flattens_again_under_another_policy():
+    """
+    A part is known to refuse only when flattening it alone repeats what
+    the failed pass did.  Here the root has a policy of its own, under
+    which ``as_bytes()`` applies the charset; the inner multipart has
+    not, and is still flattened: its delimiters are in the output.
+    """
+    message = email.message_from_bytes(
+        (
+            "From: a@b.example\r\n" + _multipart("A", _multipart("B", _REFUSED_TEXT))
+        ).encode("ascii", "surrogateescape")
+    )
+    message.policy = email.policy.compat32.clone(cte_type="7bit")
+
+    assert mailparser.MailParser(message).message_as_string == (
+        "From: a@b.example\n"
+        'Content-Type: multipart/mixed; boundary="A"\n\n'
+        'Content-Type: multipart/mixed; boundary="B"\n\n'
+        '--B\nContent-Type: text/plain; charset="undefined"\n'
+        "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text\n--B--\n"
+    )
+
+
+class _RefusesUnfoldedHeader(email.policy.EmailPolicy):
+    """Refuses to write ``X-Long`` when lines have no length limit."""
+
+    def fold_binary(self, name, value):
+        if name == "X-Long" and self.max_line_length == 0:
+            raise UnicodeEncodeError("ascii", value, 0, 1, "unfolded")
+        return super().fold_binary(name, value)
+
+
+def test_message_as_string_flattens_again_below_a_signed_part():
+    """
+    Below ``multipart/signed`` the generator writes headers without a
+    line length limit, which is not how it writes the same part alone.
+    Container C refuses ``as_bytes()`` in the pass over the root only
+    for that reason: alone it flattens, and its delimiters are written.
+    """
+    signed = (
+        'Content-Type: multipart/signed; boundary="S"\r\n\r\n'
+        "--S\r\nX-Long: value\r\n" + _multipart("C", _REFUSED_TEXT) + "--S--\r\n"
+    )
+    message = email.message_from_bytes(
+        ("From: a@b.example\r\n" + _multipart("A", signed)).encode(
+            "ascii", "surrogateescape"
+        ),
+        policy=_RefusesUnfoldedHeader(),
+    )
+
+    text = mailparser.MailParser(message).message_as_string
+
+    assert "--C\n" in text
+    assert "--C--\n" in text
+    assert "--S" not in text
+
+
+def test_message_as_string_with_a_wrapped_generator(monkeypatch):
+    """
+    A tool that wrapped ``Generator.flatten`` before the parser was
+    imported leaves frames with the code the fallback looks for and
+    none of the locals it reads.  No part is named then: the export
+    costs more passes and gives the same string.
+    """
+    mail = _from_octets(_refusing_multiparts(3))
+    expected = mail.message_as_string
+    flatten = Generator.flatten
+
+    def wrapper(self, *args, **kwargs):
+        return flatten(self, *args, **kwargs)
+
+    monkeypatch.setattr(Generator, "flatten", wrapper)
+    monkeypatch.setattr("mailparser.utils._FLATTEN_CODE", wrapper.__code__)
+
+    assert mail.message_as_string == expected
+
+
+class _FlattensItself(Message):
+    """A part with a text of its own, whatever its charset."""
+
+    def as_string(self, unixfrom=False, maxheaderlen=0, policy=None):
+        return "written by the part itself\n"
+
+
+def test_message_as_string_flattens_again_a_part_of_another_class():
+    """
+    The pass over the root never calls ``as_string()`` of a sub-part,
+    so it says nothing about a sub-part whose class overrides it.
+    """
+    message = email.message_from_bytes(
+        ("From: a@b.example\r\n" + _multipart("A", _PLAIN_TEXT.format("x"))).encode()
+    )
+    message.set_payload(
+        [
+            email.message_from_bytes(
+                _REFUSED_PART.encode("ascii", "surrogateescape"),
+                _class=_FlattensItself,
+            )
+        ]
+    )
+
+    text = mailparser.MailParser(message).message_as_string
+
+    assert text.endswith("written by the part itself\n")
+
+
+def test_message_as_string_too_deep_beside_a_refusing_part():
+    """
+    The refusing part ends both passes over the root early, and the
+    fallback reaches the deep sibling on its own: the ``RecursionError``
+    of that pass is not a charset error and still reaches the guard.
+    """
+    depth = sys.getrecursionlimit() // 3
+    deep = _nested_multipart(depth).partition("\r\n")[2]
+    mail = mailparser.parse_from_string(
+        "From: a@b.example\r\n" + _multipart("A", _REFUSED_PART, deep)
+    )
+
+    with pytest.raises(MailParserRecursionError) as raised:
+        mail.message_as_string
+    assert isinstance(raised.value.__cause__, RecursionError)
+    assert len(mail.mime_tree) == depth + 3
+
+
+def test_as_string_safe_with_a_budget_debits_every_pass(flattened):
+    """
+    At parse time every pass is debited, also one that fails, and the
+    debit decides which containers reach the resource limit: with a
+    budget no pass is skipped and the amounts stay what they were.
+    """
+    mail = _from_octets(_refusing_multiparts(6))
+    assert mail.message is not None
+    unbounded = mail.message_as_string
+    budget = SerializationBudget(list(mail.message.walk()))
+    characters, nodes = budget.characters, budget.nodes
+    del flattened[:]
+
+    text = as_string_safe(mail.message, budget=budget)
+
+    assert text == unbounded
+    assert characters - budget.characters == 5398
+    assert nodes - budget.nodes == 117
+    assert len(flattened) == 110
 
 
 def _text_message_returning(undecoded_payload):

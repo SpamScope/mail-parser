@@ -35,10 +35,13 @@ import string
 import subprocess
 import sys
 import tempfile
+import traceback
 from collections import Counter, namedtuple
 from email.errors import HeaderParseError
+from email.generator import Generator
 from email.header import decode_header
 from email.message import Message
+from email.policy import Compat32
 from unicodedata import normalize
 
 from mailparser.addresses import parse_address_header
@@ -65,6 +68,11 @@ _MSGCONVERT_TIMEOUT = 60
 # What a codec named by the sender raises when it cannot be applied: an
 # unknown or non-text codec, an octet it refuses, a NUL in its name.
 _CHARSET_ERRORS = (LookupError, UnicodeError, ValueError)
+
+# The code of the call that flattens one part: the generator runs it for
+# the message and, nested, for every sub-part.  ``msg`` is its part and
+# ``policy`` the policy it writes that part under.
+_FLATTEN_CODE = Generator.flatten.__code__
 
 # The headers whose parameters the parser reads.
 _PARAMETER_HEADERS = ("content-type", "content-disposition")
@@ -1300,7 +1308,53 @@ def raw_payload(part):
         return part.get_payload(decode=True)
 
 
-def as_string_safe(part, *, budget=None):
+def _refusing_parts(error, root):
+    """
+    Name the parts whose flattening a charset error ended.
+
+    The generator flattens every sub-part with a nested ``flatten()``
+    call, so the error leaves one frame for each part it passed
+    through: the part that refused its charset and every container
+    around it.  Flattening one of them alone ends in the same error
+    only if it repeats the same steps, so a part is named when it has
+    the class and the policy of ``root`` and was written with the line
+    length ``root`` was.  Below ``multipart/signed`` the generator
+    writes headers without a length limit, and a policy may refuse a
+    header there that it folds when the part is flattened alone;
+    ``compat32`` writes or refuses a header whatever the limit is.
+
+    A frame without the expected locals names no part, and that part
+    is flattened again: the cost of a pass, never another output.
+
+    Args:
+        error (Exception): charset error raised while flattening root
+        root (email.message.Message): part the flattening started from
+
+    Returns:
+        set of the parts that raise the same error when flattened alone
+    """
+    passes = [
+        (
+            frame.f_locals.get("msg"),
+            getattr(frame.f_locals.get("policy"), "max_line_length", None),
+        )
+        for frame, _ in traceback.walk_tb(error.__traceback__)
+        if frame.f_code is _FLATTEN_CODE
+    ]
+    if not passes:
+        return set()
+    any_length = type(root.policy) is Compat32
+    root_length = passes[0][1]
+    return {
+        part
+        for part, length in passes
+        if type(part) is type(root)
+        and getattr(part, "policy", None) is root.policy
+        and (any_length or (length is not None and length == root_length))
+    }
+
+
+def as_string_safe(part, *, budget=None, _known=None):
     """
     Flatten a part back to its textual form.
 
@@ -1313,31 +1367,51 @@ def as_string_safe(part, *, budget=None):
     Args:
         part (email.message.Message): part to flatten
         budget: optional per-parse budget for container representations
+        _known: private, for the calls this function makes to itself
+            on the sub-parts: the parts already known to refuse
+            ``as_string()`` and the ones known to refuse
+            ``as_bytes()``, as a pair of sets
 
     Returns:
         the flattened part as a string
     """
-    try:
-        if budget is None:
-            return part.as_string()
-        return bounded_flatten(part, budget)
-    except _CHARSET_ERRORS:
-        log.warning("Cannot flatten part with the declared charset")
+    if _known is None:
+        _known = (set(), set())
+    text_refusing, bytes_refusing = _known
 
-    try:
-        data = (
-            part.as_bytes()
-            if budget is None
-            else bounded_flatten(part, budget, binary=True)
-        )
-        return data.decode("utf-8", "surrogateescape")
-    except _CHARSET_ERRORS:
-        # BytesGenerator bypasses the charset only for text parts. A part
-        # whose type is multipart but which carries no boundary is routed
-        # to the generic multipart handler, which decodes with the
-        # declared charset just like as_string() did.
-        log.warning("Cannot flatten part, using its raw headers and body")
+    # The part that refuses its charset fails every container around
+    # it.  Flattened alone, each of them would flatten all that comes
+    # before that part only to fail again: size times depth.  The first
+    # failure names them, and none is flattened a second time.  With a
+    # budget every pass is debited, also one that fails, so none is
+    # skipped there: that would move the resource limit.
+    if part not in text_refusing:
+        try:
+            if budget is None:
+                return part.as_string()
+            return bounded_flatten(part, budget)
+        except _CHARSET_ERRORS as error:
+            log.warning("Cannot flatten part with the declared charset")
+            if budget is None:
+                text_refusing.update(_refusing_parts(error, part))
 
+    if part not in bytes_refusing:
+        try:
+            data = (
+                part.as_bytes()
+                if budget is None
+                else bounded_flatten(part, budget, binary=True)
+            )
+            return data.decode("utf-8", "surrogateescape")
+        except _CHARSET_ERRORS as error:
+            # BytesGenerator bypasses the charset only for text parts. A
+            # part whose type is multipart but which carries no boundary
+            # is routed to the generic multipart handler, which decodes
+            # with the declared charset just like as_string() did.
+            if budget is None:
+                bytes_refusing.update(_refusing_parts(error, part))
+
+    log.warning("Cannot flatten part, using its raw headers and body")
     header_chunks = []
     for k, v in part.items():
         chunk = f"{k}: {v}\n"
@@ -1349,7 +1423,9 @@ def as_string_safe(part, *, budget=None):
     if isinstance(body, list):
         # A conforming multipart: flatten each sub-part the same way, since
         # the one that refused its charset may be nested any depth down.
-        body = "".join(as_string_safe(sub, budget=budget) for sub in body)
+        body = "".join(
+            as_string_safe(sub, budget=budget, _known=_known) for sub in body
+        )
     else:
         # The charset was refused above, so raw_payload() fell back to the
         # undecoded bytes.

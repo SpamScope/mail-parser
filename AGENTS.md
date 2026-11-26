@@ -226,6 +226,23 @@ accessors, which raise `TypeError` for an RFC 2231 charset on an 8-bit body and,
 bytes. `as_string_safe()` must not: its raw-bytes fallback is not text, and a charset that
 could have been applied must never reach it.
 
+**Flattening fallback**: when a part refuses its charset, `as_string_safe()` writes the containers
+around it by hand and flattens their sub-parts one by one. A pass that fails must not be repeated
+at every level: that cost the size of the message times its depth on `message_as_string`.
+`_refusing_parts()` reads the parts a failed pass went through from the frames of
+`Generator.flatten` in the traceback (locals `msg` and `policy`), and those parts skip the pass.
+Three rules keep the output what it was:
+
+- A part is named only when flattening it alone repeats the failed pass: same class and same
+  policy object as the part the pass started from, and the same line length. Below
+  `multipart/signed` the generator drops the length limit, and a policy other than `compat32` may
+  refuse there a header it folds when the part is flattened alone.
+- Nothing is skipped when a `SerializationBudget` is passed: at parse time every pass is debited,
+  also one that fails, and the debit decides which containers reach the resource limit.
+- Add no stack frame per nesting level and catch no `RecursionError` there: the depth at which
+  `message_as_string` raises `MailParserRecursionError` must not move. A frame without the
+  expected locals names no part; it costs a pass, never another output.
+
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
 inside comments, quoted strings, domain literals and angle addresses are not
