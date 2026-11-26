@@ -2679,6 +2679,291 @@ def test_as_string_safe_with_a_budget_debits_every_pass(flattened):
     assert len(flattened) == 110
 
 
+def _empty_boundary(declared='boundary=""'):
+    """A multipart entity whose boundary is empty: ``--`` and ``----``."""
+    return (
+        f"Content-Type: multipart/mixed; {declared}\r\n\r\n"
+        "--\r\n" + _PLAIN_TEXT.format("inside") + "----\r\n"
+    )
+
+
+def _raw_headers(message):
+    """The headers of every part, as the message stores them."""
+    return [
+        [(name, str(value)) for name, value in part.raw_items()]
+        for part in _walk_iteratively(message)
+    ]
+
+
+def _tree_shape(mail):
+    return [
+        (entry["content_type"], entry["parent"], entry["boundary"])
+        for entry in mail.mime_tree
+    ]
+
+
+@pytest.mark.parametrize(
+    ("declared", "defects"),
+    [
+        ('boundary=""', []),
+        ("boundary=", []),
+        ('boundary=" "', []),
+        ("boundary*=utf-8''", []),
+        ("boundary*=utf-8''%20", []),
+        ('boundary*0=""; boundary*1=""', []),
+        ('boundary=""; boundary="evidence"', []),
+        (
+            "boundary*=undefined''%20",
+            ["invalid-boundary-parameter: raw=('undefined', '', ' ')"],
+        ),
+        (
+            "boundary*=utf-8''; boundary*1=\"\"",
+            [
+                "content-type[0]: invalid-parameter-continuation; raw="
+                + repr("multipart/mixed; boundary*=utf-8''; boundary*1=\"\"")
+            ],
+        ),
+    ],
+)
+@pytest.mark.parametrize("tree_first", [True, False])
+def test_message_as_string_keeps_an_empty_boundary(declared, defects, tree_first):
+    """
+    Regression: the generator takes an empty boundary for a missing one,
+    invents another and writes it into the part.  Reading
+    ``message_as_string`` rewrote ``mail.message``, erased the anomaly
+    (RFC 2046 section 5.1.1 requires one character) and made what
+    ``mime_tree`` reports depend on which property was read first.
+    """
+    raw = "From: a@b.example\r\n" + _empty_boundary(declared)
+    expected_defects = [
+        {"mime-headers": [f"MimeHeaderDefect: part 0, {detail}" for detail in defects]}
+    ] * bool(defects)
+    mail = mailparser.parse_from_string(raw)
+    untouched = mailparser.parse_from_string(raw)
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    assert headers[0][1] == ("Content-Type", f"multipart/mixed; {declared}")
+    if tree_first:
+        assert mail.mime_tree == untouched.mime_tree
+
+    text = mail.message_as_string
+
+    assert text == (
+        f"From: a@b.example\nContent-Type: multipart/mixed; {declared}\n\n"
+        "--\nContent-Type: text/plain\n\ninside\n----\n"
+    )
+    assert mail.message_as_string == text
+    assert mailparser.parse_from_string(raw).message_as_string == text
+    assert _raw_headers(mail.message) == headers
+    assert mail.mime_tree == untouched.mime_tree
+    assert _tree_shape(mail) == [("multipart/mixed", None, ""), ("text/plain", 0, None)]
+    json.dumps(mail.mime_tree).encode("utf-8")
+    assert mail.body == "inside"
+    assert mail.defects == untouched.defects == expected_defects
+    assert mail.has_defects is bool(defects)
+    # Outside a generator pass the accessor answers as Message does.
+    boundary = mail.message.get_boundary()
+    assert type(boundary) is str
+    assert not boundary
+
+
+def test_parse_keeps_an_empty_boundary_below_an_attached_container():
+    """
+    Regression: ``parse()`` flattens the sub-parts of an attached
+    container, so the parse itself rewrote the empty boundary below it,
+    and the payload of the attachment held a boundary that differed
+    from one parse to the next.
+    """
+    raw = "From: a@b.example\r\n" + _multipart(
+        "A",
+        'Content-Type: multipart/mixed; boundary="T"\r\n'
+        "Content-Disposition: attachment\r\n\r\n"
+        "--T\r\n" + _empty_boundary("boundary*=utf-8''") + "--T--\r\n",
+    )
+    wire_headers = [
+        [("From", "a@b.example"), ("Content-Type", 'multipart/mixed; boundary="A"')],
+        [
+            ("Content-Type", 'multipart/mixed; boundary="T"'),
+            ("Content-Disposition", "attachment"),
+        ],
+        [("Content-Type", "multipart/mixed; boundary*=utf-8''")],
+        [("Content-Type", "text/plain")],
+    ]
+
+    mail = mailparser.parse_from_string(raw)
+
+    assert mail.message is not None
+    assert _raw_headers(mail.message) == wire_headers
+    assert _tree_shape(mail) == [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, "T"),
+        ("multipart/mixed", 1, ""),
+        ("text/plain", 2, None),
+    ]
+    payloads = [attachment["payload"] for attachment in mail.attachments]
+    assert payloads == [
+        "Content-Type: multipart/mixed; boundary*=utf-8''\n\n"
+        "--\nContent-Type: text/plain\n\ninside\n----\n"
+    ]
+    again = mailparser.parse_from_string(raw)
+    assert [attachment["payload"] for attachment in again.attachments] == payloads
+    assert mail.defects == []
+    assert mail.has_defects is False
+    assert mail.resource_limit_defects == []
+    mail.message_as_string
+    assert _raw_headers(mail.message) == wire_headers
+    assert mail.mime_tree == again.mime_tree
+
+
+def test_message_as_string_keeps_the_boundary_of_a_conforming_sibling():
+    """
+    A conforming multipart beside the one with an empty boundary is
+    written with its own boundary, and the text parses back to the same
+    tree.
+    """
+    raw = "From: a@b.example\r\n" + _multipart(
+        "A", _empty_boundary(), _multipart("C", _PLAIN_TEXT.format("sibling"))
+    )
+    mail = mailparser.parse_from_string(raw)
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    tree = [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, ""),
+        ("text/plain", 1, None),
+        ("multipart/mixed", 0, "C"),
+        ("text/plain", 3, None),
+    ]
+
+    text = mail.message_as_string
+
+    assert text == (
+        'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n\n'
+        '--A\nContent-Type: multipart/mixed; boundary=""\n\n'
+        "--\nContent-Type: text/plain\n\ninside\n----\n\n"
+        '--A\nContent-Type: multipart/mixed; boundary="C"\n\n'
+        "--C\nContent-Type: text/plain\n\nsibling\n--C--\n\n"
+        "--A--\n"
+    )
+    assert _raw_headers(mail.message) == headers
+    assert _tree_shape(mail) == tree
+    assert _tree_shape(mailparser.parse_from_string(text)) == tree
+    assert mail.defects == []
+    assert mail.has_defects is False
+
+
+@pytest.mark.parametrize(
+    ("refusing", "content_type", "expected", "defects"),
+    [
+        pytest.param(
+            _REFUSED_PART,
+            "multipart/report",
+            # Both generators refuse the part: the container is written
+            # by hand, the multipart before it by the generator.
+            'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n\n'
+            'Content-Type: multipart/mixed; boundary=""\n\n'
+            "--\nContent-Type: text/plain\n\ninside\n----\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                {"multipart/report": [_charset_defect(3)]},
+            ],
+            id="written-by-hand",
+        ),
+        pytest.param(
+            _REFUSED_TEXT,
+            "text/plain",
+            # as_bytes() writes the whole message.
+            'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n\n'
+            '--A\nContent-Type: multipart/mixed; boundary=""\n\n'
+            "--\nContent-Type: text/plain\n\ninside\n----\n\n"
+            '--A\nContent-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text\n--A--\n",
+            [{"text/plain": [_charset_defect(3)]}],
+            id="written-as-bytes",
+        ),
+    ],
+)
+def test_message_as_string_keeps_an_empty_boundary_beside_a_refusing_part(
+    refusing, content_type, expected, defects
+):
+    """
+    The pass a refusing part ends has already written the multipart
+    before it, and with it the boundary the generator invented.  The
+    passes of the fallback go through that multipart again.
+    """
+    mail = _from_octets(
+        "From: a@b.example\r\n" + _multipart("A", _empty_boundary(), refusing)
+    )
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    assert mail.defects == defects
+
+    text = mail.message_as_string
+
+    assert text == expected
+    assert mail.message_as_string == text
+    assert _raw_headers(mail.message) == headers
+    assert _tree_shape(mail) == [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, ""),
+        ("text/plain", 1, None),
+        (content_type, 0, None),
+    ]
+    assert mail.defects == defects
+    assert not mail.message.get_payload(0).get_boundary()
+
+
+def test_empty_boundary_is_false_again_after_a_too_deep_message():
+    """
+    The generator is given an empty boundary that is true only while a
+    pass runs, also when the pass ends in a ``RecursionError``.
+    """
+    deep = _nested_multipart(sys.getrecursionlimit() // 3).partition("\r\n")[2]
+    mail = mailparser.parse_from_string(
+        "From: a@b.example\r\n"
+        'Content-Type: multipart/mixed; boundary=""\r\n\r\n'
+        "--\r\n" + deep + "----\r\n"
+    )
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+
+    with pytest.raises(MailParserRecursionError):
+        mail.message_as_string
+
+    boundary = mail.message.get_boundary()
+    assert type(boundary) is str
+    assert not boundary
+    assert _raw_headers(mail.message) == headers
+
+
+def test_message_as_string_gives_a_caller_built_multipart_a_boundary():
+    """
+    A multipart the caller builds without a boundary, as a plain
+    ``MIMEMultipart()`` is, has no delimiter to keep: the generator
+    must invent one to write it, and stores it in the message of the
+    caller.  The next read uses that boundary.
+    """
+    message = Message()
+    message["Content-Type"] = "multipart/mixed"
+    part = Message()
+    part.set_payload("inside")
+    message.attach(part)
+    mail = mailparser.MailParser(message)
+    assert message.get_boundary() is None
+
+    text = mail.message_as_string
+
+    boundary = message.get_boundary()
+    assert boundary
+    assert text == (
+        f'Content-Type: multipart/mixed; boundary="{boundary}"\n\n'
+        f"--{boundary}\n\ninside\n--{boundary}--\n"
+    )
+    assert mail.message_as_string == text
+
+
 def _text_message_returning(undecoded_payload):
     """
     A text/plain iso-8859-1 message whose ``get_payload(decode=False)`` returns

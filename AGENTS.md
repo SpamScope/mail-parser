@@ -243,6 +243,16 @@ Three rules keep the output what it was:
   `message_as_string` raises `MailParserRecursionError` must not move. A frame without the
   expected locals names no part; it costs a pass, never another output.
 
+A pass must not rewrite the message: the generator takes an empty boundary (`boundary=""`,
+`boundary*=utf-8''`, only whitespace) for a missing one, invents another and stores it with
+`set_boundary()`, which changed `mail.message` on a read and during `parse()` below an attached
+container. Run every generator pass inside `_keeping_empty_boundaries()`: there
+`RecoveringMessage.get_boundary()` returns the empty boundary as a string that is true, so the
+delimiters written are the `--` and `----` the message has, and outside a pass it returns the
+plain `""`. Do not save and restore headers around a pass instead (finding the parts is a scan
+of the subtree at every call, and the text holds a random boundary); a plain `Message` of the
+caller has no such accessor and is still rewritten.
+
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
 inside comments, quoted strings, domain literals and angle addresses are not

@@ -19,6 +19,8 @@ limitations under the License.
 from __future__ import annotations
 
 import base64
+import contextlib
+import contextvars
 import email
 import email.header
 import email.message
@@ -83,6 +85,9 @@ _PARAMETER_HEADERS = ("content-type", "content-disposition")
 # parsed.  A part is asked for the same two values by several accessors
 # in a row, and by the email package itself.
 _PARAMS_CACHE_SIZE = 8
+
+# True while ``as_string_safe()`` runs a generator over a part.
+_FLATTENING = contextvars.ContextVar("mailparser_flattening", default=False)
 
 
 # The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
@@ -433,6 +438,34 @@ def _decoded_boundary(part, failobj=None, *, defects=None):
         return email.utils.unquote(value[2]).rstrip()
 
 
+class _DeclaredEmptyBoundary(str):
+    """Empty boundary that a message declares: not a missing one.
+
+    ``Generator._handle_multipart()`` tests the boundary for truth.  A
+    false one it replaces with a boundary it invents, which it writes
+    into the message with ``set_boundary()``.  This one is true: the
+    generator writes the delimiters the message has, ``--`` and
+    ``----``, and leaves the header as it is.
+    """
+
+    def __bool__(self):
+        return True
+
+
+@contextlib.contextmanager
+def _keeping_empty_boundaries():
+    """Have the generator write an empty boundary instead of replacing it.
+
+    The pass runs in the frame of the caller: entering and leaving
+    add no stack frame to it.
+    """
+    token = _FLATTENING.set(True)
+    try:
+        yield
+    finally:
+        _FLATTENING.reset(token)
+
+
 class RecoveringMessage(Message):
     """Message whose parameters the email package can always use.
 
@@ -478,13 +511,20 @@ class RecoveringMessage(Message):
     def get_boundary(self, failobj=None):
         """Return the boundary, also when its charset cannot decode it.
 
+        While ``as_string_safe()`` flattens the message, an empty
+        boundary is returned as a string that is true: the generator
+        would otherwise replace it in the header of the part.
+
         Args:
             failobj: value returned when the part declares no boundary.
 
         Returns:
             The boundary, or failobj.
         """
-        return _decoded_boundary(self, failobj)
+        boundary = _decoded_boundary(self, failobj)
+        if boundary == "" and _FLATTENING.get():
+            return _DeclaredEmptyBoundary()
+        return boundary
 
     def get_payload(self, i=None, decode=False):  # type: ignore[override]
         """Return the payload, also for an RFC 2231 charset.
@@ -1413,9 +1453,10 @@ def as_string_safe(part, *, budget=None, _known=None):
     # skipped there: that would move the resource limit.
     if part not in text_refusing:
         try:
-            if budget is None:
-                return part.as_string()
-            return bounded_flatten(part, budget)
+            with _keeping_empty_boundaries():
+                if budget is None:
+                    return part.as_string()
+                return bounded_flatten(part, budget)
         except _CHARSET_ERRORS as error:
             log.warning("Cannot flatten part with the declared charset")
             if budget is None:
@@ -1423,11 +1464,12 @@ def as_string_safe(part, *, budget=None, _known=None):
 
     if part not in bytes_refusing:
         try:
-            data = (
-                part.as_bytes()
-                if budget is None
-                else bounded_flatten(part, budget, binary=True)
-            )
+            with _keeping_empty_boundaries():
+                data = (
+                    part.as_bytes()
+                    if budget is None
+                    else bounded_flatten(part, budget, binary=True)
+                )
             return data.decode("utf-8", "surrogateescape")
         except _CHARSET_ERRORS as error:
             # BytesGenerator bypasses the charset only for text parts. A
