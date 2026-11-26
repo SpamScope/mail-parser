@@ -214,8 +214,9 @@ def parse_from_file_msg(fp):
             the file is not a convertible email message
         MailParserOutlookError: if the ``extract-msg`` backend finds the
             file malformed; the library error is ``__cause__``
-        FileNotFoundError, IsADirectoryError, PermissionError: if ``fp``
-            cannot be opened
+        MailParserRecursionError: if the message, or the ``.msg``
+            itself, is nested too deeply
+        OSError: if ``fp`` cannot be opened
     """
     return MailParser.from_file_msg(fp)
 
@@ -389,8 +390,9 @@ class MailParser:
                 the file is not a convertible email message
             MailParserOutlookError: if the ``extract-msg`` backend finds
                 the file malformed; the library error is ``__cause__``
-            FileNotFoundError, IsADirectoryError, PermissionError: if
-                ``fp`` cannot be opened
+            MailParserRecursionError: if the message, or the ``.msg``
+                itself, is nested too deeply
+            OSError: if ``fp`` cannot be opened
         """
         log.debug("Parsing email from file Outlook")
 

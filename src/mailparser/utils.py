@@ -59,6 +59,7 @@ from mailparser.exceptions import (
     MailParserOutlookError,
     MailParserPathError,
     MailParserReceivedParsingError,
+    MailParserRecursionError,
 )
 from mailparser.received import extract_envelope_address, split_received
 from mailparser.serialization import bounded_flatten
@@ -832,12 +833,18 @@ def extract_msg_convert(fp):
             message (e.g. a contact or calendar item)
         MailParserOutlookError: if the ``.msg`` is malformed or the
             library fails on it; the library error is ``__cause__``
-        FileNotFoundError, IsADirectoryError, PermissionError: if
-            ``fp`` cannot be opened; this is the caller's mistake
+        MailParserRecursionError: if the ``.msg`` is nested too deeply
+            to convert
+        OSError: if ``fp`` cannot be opened; this is the caller's
+            mistake
     """
     import extract_msg  # lazy: keep package import stdlib-only
 
     log.debug("Started converting Outlook email with extract-msg")
+    # The path is the caller's: opened here, its errors stay what they
+    # are, and every error below is about the content of the file.
+    with open(fp, "rb"):
+        pass
     try:
         msg = extract_msg.openMsg(fp)
         try:
@@ -856,20 +863,21 @@ def extract_msg_convert(fp):
             data = eml.as_bytes()
         finally:
             msg.close()
-    except (
-        MailParserError,
-        FileNotFoundError,
-        IsADirectoryError,
-        PermissionError,
-    ):
-        # Not a malformed file: our own errors, or the caller's path.
+    except (MailParserError, MemoryError):
+        # Not a malformed file: our own errors, or the machine's.
         raise
+    except RecursionError as e:
+        raise MailParserRecursionError(
+            "Outlook file nesting too deep to convert"
+        ) from e
     except Exception as e:
         # The .msg is attacker-controlled and the libraries raise a wide,
         # unstable set (extract_msg, olefile.OleFileError which is an
         # OSError, ValueError, IndexError, ...), so no narrow tuple holds.
+        # The message names the class only: the text of a decoding error
+        # holds the whole stream it could not decode.
         raise MailParserOutlookError(
-            f"Cannot convert Outlook file {fp!r}: {e!r}"
+            f"Cannot convert Outlook file {fp!r}: {type(e).__name__}"
         ) from e
 
     temp = _new_outlook_tempfile()

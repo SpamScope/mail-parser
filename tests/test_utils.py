@@ -146,7 +146,8 @@ class TestUtils(unittest.TestCase):
 
         with patch.dict("sys.modules", {"extract_msg": fake_extract_msg}):
             with self.assertRaises(MailParserOSError) as context:
-                extract_msg_convert("dummy.msg")
+                # The path is opened before the conversion: any file.
+                extract_msg_convert(__file__)
         self.assertIn("not a convertible email", str(context.exception))
         fake_msg.close.assert_called_once()
 

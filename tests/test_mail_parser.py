@@ -3878,6 +3878,71 @@ def test_from_file_msg_missing_file_stays_file_not_found(
         mailparser.parse_from_file_msg(str(tmp_path / "missing.msg"))
 
 
+@pytest.mark.parametrize(
+    ("build", "error"),
+    [
+        pytest.param(lambda d: d, IsADirectoryError, id="a directory"),
+        pytest.param(
+            lambda d: d / "file" / "x.msg",
+            NotADirectoryError,
+            id="a path through a file",
+        ),
+    ],
+)
+def test_from_file_msg_path_error_is_not_a_malformed_file(
+    extract_msg_lib, tmp_path, build, error
+):
+    """
+    Regression: only three ``OSError`` classes were let through, so a
+    path the caller got wrong was reported as a malformed ``.msg``.
+    """
+    (tmp_path / "file").write_bytes(b"x")
+
+    with pytest.raises(error):
+        mailparser.parse_from_file_msg(str(build(tmp_path)))
+
+
+def test_from_file_msg_error_does_not_carry_the_stream(
+    extract_msg_lib, mocker
+):
+    """
+    Regression: the message held ``repr()`` of the library error, and
+    that of a ``UnicodeDecodeError`` holds the whole stream that could
+    not be decoded, four characters for each octet of the sender.
+    """
+    stream = b"\xff" * 1_000_001
+    error = UnicodeDecodeError("utf-16-le", stream, 0, 1, "truncated data")
+    mocker.patch.object(extract_msg_lib, "openMsg", side_effect=error)
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert exc.value.__cause__ is error
+    assert "UnicodeDecodeError" in str(exc.value)
+    assert len(str(exc.value)) < 1024
+
+
+def test_from_file_msg_too_deep_raises_recursion_error(
+    extract_msg_lib, mocker
+):
+    """A ``.msg`` too deep to convert is not reported as malformed."""
+    mocker.patch.object(
+        extract_msg_lib, "openMsg", side_effect=RecursionError("deep")
+    )
+
+    with pytest.raises(MailParserRecursionError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert isinstance(exc.value.__cause__, RecursionError)
+
+
+def test_from_file_msg_memory_error_stays_what_it_is(extract_msg_lib, mocker):
+    mocker.patch.object(extract_msg_lib, "openMsg", side_effect=MemoryError())
+
+    with pytest.raises(MemoryError):
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+
 def test_from_file_msg_non_email_stays_os_error(extract_msg_lib, mocker):
     contact = mocker.Mock(spec=["close"])
     mocker.patch.object(extract_msg_lib, "openMsg", return_value=contact)
