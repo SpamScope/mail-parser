@@ -2075,6 +2075,96 @@ def test_deeply_nested_multipart_raises_controlled_error():
         mailparser.parse_from_bytes(raw.encode())
 
 
+def _nested_multipart(depth, closed=True):
+    """
+    A text leaf under ``depth`` nested multiparts; ``closed=False`` leaves
+    out every close delimiter.
+    """
+    opening = "".join(
+        f'Content-Type: multipart/mixed; boundary="B{i}"\r\n\r\n--B{i}\r\n'
+        for i in range(depth)
+    )
+    closing = "".join(f"--B{i}--\r\n" for i in reversed(range(depth)))
+    return (
+        "From: a@b.example\r\n"
+        + opening
+        + "Content-Type: text/plain\r\n\r\nleaf\r\n"
+        + (closing if closed else "")
+    )
+
+
+def _nested_rfc822(depth):
+    """A text leaf under ``depth`` nested ``message/rfc822`` parts."""
+    return (
+        "From: a@b.example\r\n"
+        + "Content-Type: message/rfc822\r\n\r\n" * depth
+        + "Content-Type: text/plain\r\n\r\nleaf\r\n"
+    )
+
+
+def _unterminated_multipart(depth):
+    return _nested_multipart(depth, closed=False)
+
+
+NESTED_SHAPES = pytest.mark.parametrize(
+    ("build", "defects_categories"),
+    [
+        (_nested_multipart, set()),
+        (_nested_rfc822, set()),
+        (_unterminated_multipart, {"CloseBoundaryNotFoundDefect"}),
+    ],
+)
+
+
+@NESTED_SHAPES
+def test_message_as_string_too_deep_raises_controlled_error(build, defects_categories):
+    """
+    Regression (GHSA-j23h-c3w8-q63p): the generator recurses four frames
+    per nesting level, so a message the parser accepts can be too deep to
+    flatten.  The export must fail inside the MailParser* hierarchy, and
+    everything the parse recovered must stay readable.
+    """
+    depth = sys.getrecursionlimit() // 3
+    mail = mailparser.parse_from_string(build(depth))
+
+    with pytest.raises(MailParserRecursionError) as raised:
+        mail.message_as_string
+    assert isinstance(raised.value.__cause__, RecursionError)
+
+    # Nesting depth is not a MIME violation: no defect is invented, and
+    # the ones the message does have are kept.
+    assert mail.defects_categories == defects_categories
+    assert mail.from_ == [("", "a@b.example")]
+    assert mail.body.strip() == "leaf"
+    assert len(mail.mime_tree) == depth + 1
+    assert len(list(_walk_iteratively(mail.message))) == depth + 1
+
+
+@NESTED_SHAPES
+def test_message_as_string_flattens_shallow_nesting(build, defects_categories):
+    """A nesting the generator can walk is flattened and parses back."""
+    depth = 5
+    mail = mailparser.parse_from_string(build(depth))
+
+    flattened = mail.message_as_string
+
+    assert mail.defects_categories == defects_categories
+    reparsed = mailparser.parse_from_string(flattened)
+    assert reparsed.from_ == [("", "a@b.example")]
+    assert reparsed.body.strip() == "leaf"
+    assert len(reparsed.mime_tree) == depth + 1
+
+
+def _walk_iteratively(message):
+    """Yield every part without recursing: ``Message.walk()`` recurses."""
+    pending = [message]
+    while pending:
+        part = pending.pop()
+        yield part
+        if part.is_multipart():
+            pending.extend(part.get_payload())
+
+
 def _text_message_returning(undecoded_payload):
     """
     A text/plain iso-8859-1 message whose ``get_payload(decode=False)`` returns
