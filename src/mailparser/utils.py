@@ -1439,8 +1439,16 @@ def as_string_safe(part, *, budget=None, _known=None):
 
     log.warning("Cannot flatten part, using its raw headers and body")
     header_chunks = []
-    for k, v in part.items():
-        chunk = f"{k}: {v}\n"
+    for k, v in part.raw_items():
+        try:
+            chunk = f"{k}: {part.policy.header_fetch_parse(k, v)}\n"
+        except UnicodeEncodeError:
+            # A value with surrogates comes back as an unknown-8bit Header,
+            # whose str() reads them as escaped octets. A lone surrogate
+            # outside that range, or a non-ASCII character next to one,
+            # can only come from a str: write the value as it was parsed,
+            # as the body is.
+            chunk = f"{k}: {v}\n"
         if budget is not None:
             budget.spend(characters=len(chunk))
         header_chunks.append(chunk)
@@ -1452,9 +1460,9 @@ def as_string_safe(part, *, budget=None, _known=None):
         body = "".join(
             as_string_safe(sub, budget=budget, _known=_known) for sub in body
         )
-    else:
+    elif isinstance(body, bytes):
         # The charset was refused above, so raw_payload() fell back to the
-        # undecoded bytes.
+        # undecoded bytes.  A part refused for a header keeps its text.
         body = body.decode("utf-8", "surrogateescape")
     if budget is not None:
         budget.spend(characters=len(headers) + len(body) + 1, nodes=1)

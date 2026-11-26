@@ -2596,6 +2596,68 @@ def test_message_as_string_too_deep_beside_a_refusing_part():
     assert len(mail.mime_tree) == depth + 3
 
 
+@pytest.mark.parametrize("value", ["\ud800", "a\udfffb", "é\udcff"])
+def test_message_as_string_writes_a_header_with_a_lone_surrogate(value):
+    """
+    A str, from JSON for one, can hold a surrogate no octet escapes to.
+    Both generators refuse it and the email package cannot read it as
+    octets: the hand-built text writes it as it was parsed.
+    """
+    mail = mailparser.parse_from_string(
+        f"From: a@b.example\r\nX-A: {value}\r\nSubject: hello\r\n"
+        "Content-Type: text/plain\r\n\r\nbody\r\n"
+    )
+
+    assert mail.message_as_string == (
+        f"From: a@b.example\nX-A: {value}\nSubject: hello\n"
+        "Content-Type: text/plain\n\nbody\r\n"
+    )
+    assert mail.subject == "hello"
+    assert mail.body == "body\r\n"
+
+
+def test_parse_keeps_an_attachment_with_a_lone_surrogate_header():
+    """The parse flattens an attached container without a generator."""
+    mail = mailparser.parse_from_string(
+        'From: a@b.example\r\nContent-Type: multipart/mixed; boundary="R"\r\n\r\n'
+        "--R\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+        '--R\r\nContent-Type: multipart/mixed; boundary="I"\r\n'
+        'Content-Disposition: attachment; filename="a.bin"\r\n\r\n'
+        "--I\r\nContent-Type: text/plain\r\nX-H: \ud800\r\nX-B: kept\r\n\r\n"
+        "inner\r\n--I--\r\n--R--\r\n"
+    )
+
+    [attachment] = mail.attachments
+    assert attachment["filename"] == "a.bin"
+    assert attachment["mail_content_type"] == "multipart/mixed"
+    assert attachment["payload"] == (
+        "Content-Type: text/plain\nX-H: \ud800\nX-B: kept\n\ninner"
+    )
+    assert mail.text_plain == ["body", "inner"]
+    assert "\nX-H: \ud800\nX-B: kept\n\ninner" in mail.message_as_string
+
+
+def test_message_as_string_keeps_an_escaped_octet_in_a_header():
+    """An octet escaped by surrogateescape is written as it always was."""
+    header = "X-A: x\udcffy\r\n"
+    plain = mailparser.parse_from_string(
+        f"From: a@b.example\r\n{header}Content-Type: text/plain\r\n\r\nbody\r\n"
+    )
+    refused = mailparser.parse_from_string(
+        f"From: a@b.example\r\n{header}" + _REFUSED_PART
+    )
+
+    assert plain.message_as_string == (
+        "From: a@b.example\nX-A: =?unknown-8bit?b?eP95?=\n"
+        "Content-Type: text/plain\n\nbody\n"
+    )
+    assert refused.message_as_string == (
+        "From: a@b.example\nX-A: x�y\n"
+        'Content-Type: multipart/report; charset="undefined"\n'
+        "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n"
+    )
+
+
 def test_as_string_safe_with_a_budget_debits_every_pass(flattened):
     """
     At parse time every pass is debited, also one that fails, and the
