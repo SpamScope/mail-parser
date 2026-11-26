@@ -22,6 +22,7 @@ import base64
 import contextlib
 import contextvars
 import email
+import email.errors
 import email.header
 import email.message
 import email.utils
@@ -39,7 +40,7 @@ import sys
 import tempfile
 import traceback
 from collections import Counter, namedtuple
-from email.errors import HeaderParseError
+from email.errors import HeaderParseError, MessageError
 from email.generator import Generator
 from email.header import decode_header
 from email.message import Message
@@ -73,6 +74,16 @@ _MSGCONVERT_TIMEOUT = 60
 # What a codec named by the sender raises when it cannot be applied: an
 # unknown or non-text codec, an octet it refuses, a NUL in its name.
 _CHARSET_ERRORS = (LookupError, UnicodeError, ValueError)
+# What a generator raises for a part it cannot write: a charset that
+# refuses the octets, or a header it will not fold. ``Header.encode()``
+# takes a form feed for a line break, which the feed parser does not.
+_FLATTEN_ERRORS = (*_CHARSET_ERRORS, MessageError)
+# The two a header is refused with. ``HeaderWriteError`` came with the
+# fix of CVE-2024-6923, which a release may lack.
+_HEADER_ERRORS = (
+    HeaderParseError,
+    getattr(email.errors, "HeaderWriteError", HeaderParseError),
+)
 
 # The code of the call that flattens one part: the generator runs it for
 # the message and, nested, for every sub-part.  ``msg`` is its part and
@@ -1482,18 +1493,26 @@ def as_string_safe(part, *, budget=None, _known=None):
     # failure names them, and none is flattened a second time.  With a
     # budget every pass is debited, also one that fails, so none is
     # skipped there: that would move the resource limit.
+    header_refused = False
     if part not in text_refusing:
         try:
             with _keeping_empty_boundaries():
                 if budget is None:
                     return part.as_string()
                 return bounded_flatten(part, budget)
-        except _CHARSET_ERRORS as error:
+        except _FLATTEN_ERRORS as error:
             log.warning("Cannot flatten part with the declared charset")
+            # The bytes generator of some releases writes a header the
+            # text generator refuses, line break included: a part
+            # refused for a header is not given to it.
+            header_refused = isinstance(error, _HEADER_ERRORS)
             if budget is None:
-                text_refusing.update(_refusing_parts(error, part))
+                refusing = _refusing_parts(error, part)
+                text_refusing.update(refusing)
+                if header_refused:
+                    bytes_refusing.update(refusing)
 
-    if part not in bytes_refusing:
+    if not header_refused and part not in bytes_refusing:
         try:
             with _keeping_empty_boundaries():
                 data = (
@@ -1502,7 +1521,7 @@ def as_string_safe(part, *, budget=None, _known=None):
                     else bounded_flatten(part, budget, binary=True)
                 )
             return data.decode("utf-8", "surrogateescape")
-        except _CHARSET_ERRORS as error:
+        except _FLATTEN_ERRORS as error:
             # BytesGenerator bypasses the charset only for text parts. A
             # part whose type is multipart but which carries no boundary
             # is routed to the generic multipart handler, which decodes

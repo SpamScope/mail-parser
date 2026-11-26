@@ -235,6 +235,12 @@ around it by hand and flattens their sub-parts one by one. A pass that fails mus
 at every level: that cost the size of the message times its depth on `message_as_string`.
 `_refusing_parts()` reads the parts a failed pass went through from the frames of
 `Generator.flatten` in the traceback (locals `msg` and `policy`), and those parts skip the pass.
+A header the generator will not fold is refused the same way, and is no charset error:
+`Header.encode()` takes a form feed for a line break, which the feed parser does not
+(`HeaderWriteError`, `HeaderParseError`). Catch `_FLATTEN_ERRORS` around a pass, never the
+charset errors alone: the error left `parse_from_bytes()` below an attached container. A part
+refused for a header skips the bytes pass too: before its own fix the bytes generator writes
+that header with the line break, which a sender can make a delimiter.
 Three rules keep the output what it was:
 
 - A part is named only when flattening it alone repeats the failed pass: same class and same

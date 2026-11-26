@@ -19,6 +19,7 @@ limitations under the License.
 import base64
 import datetime
 import email
+import email.errors
 import email.policy
 import glob
 import hashlib
@@ -2768,6 +2769,110 @@ def test_message_as_string_keeps_an_escaped_octet_in_a_header():
         'Content-Type: multipart/report; charset="undefined"\n'
         "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n"
     )
+
+
+def _with_inner_header(header, attached):
+    """A container, attached or not, whose text part has ``header``."""
+    disposition = (
+        'Content-Disposition: attachment; filename="c.eml"\r\n'
+        if attached
+        else ""
+    )
+    return (
+        "From: a@b.example\r\nSubject: kept\r\n"
+        'Content-Type: multipart/mixed; boundary="A"\r\n\r\n'
+        "--A\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+        '--A\r\nContent-Type: multipart/mixed; boundary="B"\r\n'
+        f"{disposition}\r\n"
+        f"--B\r\nContent-Type: text/plain\r\n{header}\r\n"
+        "X-After: kept\r\n\r\ninner\r\n--B--\r\n--A--\r\n"
+    ).encode("latin-1")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "a\x0cb",
+        "a\x0cB: c",
+        "a\x0b--A",
+        "a\x1cb",
+        "a\x1d--B--",
+        "a\x1e\x0cX-Forged: yes",
+    ],
+)
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_does_not_stop_the_parse(value, attached):
+    """
+    Regression: ``Header.encode()`` takes a form feed, and the other
+    characters ``str.splitlines()`` breaks at, for a line break.  The
+    generator then refuses the header with ``HeaderWriteError`` or
+    ``HeaderParseError``, which are no charset errors: they left
+    ``parse_from_bytes()`` when the part was below an attached
+    container, and ``message_as_string`` wherever it was.  RFC 5322
+    section 4.1 accepts these characters in a field body as obsolete
+    syntax (``obs-NO-WS-CTL``), so no defect is reported.
+    """
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header(f"X-A: {value}", attached)
+    )
+
+    assert mail.message is not None
+    inner = mail.message.get_payload(1).get_payload(0)
+    assert inner["X-A"] == value
+    assert inner["X-After"] == "kept"
+    assert mail.subject == "kept"
+    assert mail.has_defects is False
+    assert mail.resource_limit_defects == []
+    filenames = [attachment["filename"] for attachment in mail.attachments]
+    assert filenames == (["c.eml"] if attached else [])
+    reparsed = mailparser.parse_from_string(mail.message_as_string)
+    assert reparsed.subject == "kept"
+    assert "X-Forged" not in reparsed.headers
+
+
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_is_written_as_it_was_parsed(attached):
+    """
+    The value below is refused by every Python release, as an embedded
+    header.  The part is written by hand with the value as it was
+    parsed, on one line: nothing is dropped and no header is forged.
+    """
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header("X-A: a\x0cB: c", attached)
+    )
+    written = (
+        "Content-Type: text/plain\nX-A: a\x0cB: c\nX-After: kept\n\ninner"
+    )
+
+    assert written in mail.message_as_string
+    payloads = [attachment["payload"] for attachment in mail.attachments]
+    assert payloads == ([written] if attached else [])
+
+
+@pytest.mark.skipif(
+    not hasattr(email.errors, "HeaderWriteError"),
+    reason="this Python lacks the fix of CVE-2024-6923",
+)
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_is_not_given_to_the_bytes_pass(attached):
+    """
+    The text generator refuses the header below, and the bytes
+    generator of some releases writes it, with a line break for each
+    form feed: a line ``--B`` the sender chose, which a second parse
+    reads as a delimiter.  The part is written by hand instead.
+    """
+    value = "a\x0c--B\x0cforged"
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header(f"X-A: {value}", attached)
+    )
+
+    text = mail.message_as_string
+
+    assert f"X-A: {value}\nX-After: kept\n\ninner" in text
+    assert "\nforged\n" not in text
+    for attachment in mail.attachments:
+        assert f"X-A: {value}\nX-After: kept" in attachment["payload"]
+        assert "\nforged\n" not in attachment["payload"]
 
 
 def test_as_string_safe_with_a_budget_debits_every_pass(flattened):
