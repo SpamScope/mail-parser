@@ -26,14 +26,19 @@ from mailparser.const import ADDRESSES_HEADERS
         ("e\u0301@example.com", [("", "e\u0301@example.com")]),
         ("\u00a0user@example.com", [("", "\u00a0user@example.com")]),
         ("user@example.com\u00a0", [("", "user@example.com\u00a0")]),
-        ("J. Doe <@例え.jp:josé@example.com>", [("J. Doe", "josé@example.com")]),
+        (
+            "J. Doe <@例え.jp:josé@example.com>",
+            [("J. Doe", "josé@example.com")],
+        ),
         (
             "チーム: josé@example.com, bob@example.com;",
             [("", "josé@example.com"), ("", "bob@example.com")],
         ),
     ],
 )
-def test_international_mailboxes_are_not_defects(header, value, expected, as_bytes):
+def test_international_mailboxes_are_not_defects(
+    header, value, expected, as_bytes
+):
     raw = f"{header}: {value}\r\nSubject: s\r\n\r\nb\r\n"
     mail = (
         mailparser.parse_from_bytes(raw.encode())
@@ -42,7 +47,9 @@ def test_international_mailboxes_are_not_defects(header, value, expected, as_byt
     )
     assert mail.headers[header] == expected
     assert mail.mail[header] == expected
-    assert json.loads(mail.mail_json)[header] == [list(pair) for pair in expected]
+    assert json.loads(mail.mail_json)[header] == [
+        list(pair) for pair in expected
+    ]
     assert mail.address_header_defects == []
     assert not mail.has_defects
 
@@ -64,7 +71,10 @@ def test_unicode_spoof_label_keeps_defect_and_structural_mailbox(as_bytes):
             "raw": value,
             "recovered": True,
             "candidates": [
-                {"display_name": "josé@trusted.example", "address": "用户@例え.jp"}
+                {
+                    "display_name": "josé@trusted.example",
+                    "address": "用户@例え.jp",
+                }
             ],
             "header": "from",
             "occurrence": 0,
@@ -74,7 +84,9 @@ def test_unicode_spoof_label_keeps_defect_and_structural_mailbox(as_bytes):
 
 def test_ambiguous_unicode_candidates_and_valid_neighbour_survive():
     value = "Label <josé@example.com> <用户@例え.jp>"
-    mail = mailparser.parse_from_bytes(f"To: {value}, bob@example.com\r\n\r\n".encode())
+    mail = mailparser.parse_from_bytes(
+        f"To: {value}, bob@example.com\r\n\r\n".encode()
+    )
     assert mail.to == [("", "bob@example.com")]
     assert mail.has_defects
     defect = mail.address_header_defects[0]
@@ -147,7 +159,10 @@ def test_utf8_scalar_range_boundaries(char):
     mail = mailparser.parse_from_bytes(
         f"To: {char}@example.com, user@{char}.example\r\n\r\n".encode()
     )
-    assert mail.to == [("", f"{char}@example.com"), ("", f"user@{char}.example")]
+    assert mail.to == [
+        ("", f"{char}@example.com"),
+        ("", f"user@{char}.example"),
+    ]
     assert not mail.has_defects
 
 
@@ -161,7 +176,10 @@ def test_utf8_scalar_range_boundaries(char):
 def test_international_display_evidence_is_not_promoted(label):
     value = f"{label} <用户@例え.jp>, bad@label < réel@example.com >"
     mail = mailparser.parse_from_bytes(f"To: {value}\r\n\r\n".encode())
-    assert [addr for _, addr in mail.to] == ["用户@例え.jp", "réel@example.com"]
+    assert [addr for _, addr in mail.to] == [
+        "用户@例え.jp",
+        "réel@example.com",
+    ]
     assert mail.has_defects
     assert mail.address_header_defects[-1]["reason"] == "invalid-display-name"
 

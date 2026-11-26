@@ -20,7 +20,9 @@ def _mail(value, extra=""):
     return mailparser.parse_from_bytes(
         (
             f"Date: {value}\r\nFrom: alice@sender.example\r\n"
-            "To: bob@recipient.example\r\nSubject: intact\r\n" + extra + "\r\nbody"
+            "To: bob@recipient.example\r\nSubject: intact\r\n"
+            + extra
+            + "\r\nbody"
         ).encode("utf-8", "surrogateescape")
     )
 
@@ -63,7 +65,10 @@ def test_invalid_date_is_not_normalized(value, reason):
     assert mail.to == [("", "bob@recipient.example")]
     assert mail.body == "body"
     for output in (mail.mail_json, mail.mail_partial_json):
-        assert json.loads(output)["date_header_defects"] == mail.date_header_defects
+        assert (
+            json.loads(output)["date_header_defects"]
+            == mail.date_header_defects
+        )
     assert mail.message is not None
     assert mail.message.get_all("Date") == [value]
 
@@ -98,15 +103,31 @@ def test_weekday_mismatch_retains_numeric_date_and_reports_defect():
         ("Thu, 01 Oct 2026 12:00:00 A", EXPECTED, "+0.0"),
         ("Thu, 01 Oct 2026 12:00:00 XYZ", EXPECTED, "+0.0"),
         ("Thu, 01 Oct 2026 12:00:00 EST", "2026-10-01T17:00:00+00:00", "-5.0"),
-        ("Thu, 01 Oct 2026 12:00:00 +9959", "2026-09-27T08:01:00+00:00", "+100.0"),
-        ("Sat, 31 Dec 2016 23:59:60 +0000", "2017-01-01T00:00:00+00:00", "+0.0"),
-        ("Thu, 29 Feb 2024 12:00:00 +0000", "2024-02-29T12:00:00+00:00", "+0.0"),
+        (
+            "Thu, 01 Oct 2026 12:00:00 +9959",
+            "2026-09-27T08:01:00+00:00",
+            "+100.0",
+        ),
+        (
+            "Sat, 31 Dec 2016 23:59:60 +0000",
+            "2017-01-01T00:00:00+00:00",
+            "+0.0",
+        ),
+        (
+            "Thu, 29 Feb 2024 12:00:00 +0000",
+            "2024-02-29T12:00:00+00:00",
+            "+0.0",
+        ),
         (
             "(a (b)) Thu (day), 01 (d) Oct (m) 2026 12 (h): 00 (n): 00 GMT",
             EXPECTED,
             "+0.0",
         ),
-        (r"Thu, 01 Oct 2026 12:00:00 GMT (escaped\) comment)", EXPECTED, "+0.0"),
+        (
+            r"Thu, 01 Oct 2026 12:00:00 GMT (escaped\) comment)",
+            EXPECTED,
+            "+0.0",
+        ),
         ("Thu,\r\n\t01 Oct 2026 12:00:00 GMT", EXPECTED, "+0.0"),
     ],
 )
@@ -128,12 +149,14 @@ def test_date_occurrences_are_checked_without_changing_first_value():
     mismatch = "Wed, 01 Oct 2026 12:00:00 +0000"
     bad = "Thu, 31 Feb 2026 12:00:00 +0000"
     mail = _mail(
-        VALID, f"Date: {bad}\r\nResent-Date: {VALID}\r\nResent-Date: {mismatch}\r\n"
+        VALID,
+        f"Date: {bad}\r\nResent-Date: {VALID}\r\nResent-Date: {mismatch}\r\n",
     )
     assert mail.date is not None
     assert mail.date.isoformat() == EXPECTED
     observed = [
-        (d["header"], d["occurrence"], d["raw"]) for d in mail.date_header_defects
+        (d["header"], d["occurrence"], d["raw"])
+        for d in mail.date_header_defects
     ]
     assert observed == [("date", 1, bad), ("resent-date", 1, mismatch)]
     before = list(mail.defects)
@@ -147,7 +170,9 @@ def test_date_occurrences_are_checked_without_changing_first_value():
 def test_received_date_defects_are_separate_from_lexical_defects():
     """Bad timestamps keep trace clauses and never create false delays."""
     newest = "from relay.example by mx.example; " + VALID
-    oldest = "from sender.example by relay.example; Thu, 31 Feb 2026 12:00:00 +0000"
+    oldest = (
+        "from sender.example by relay.example; Thu, 31 Feb 2026 12:00:00 +0000"
+    )
     mail = _mail(VALID, f"Received: {newest}\r\nReceived: {oldest}\r\n")
     assert mail.received[0]["date_utc"] is None
     assert mail.received[1]["date_utc"] == EXPECTED
@@ -208,7 +233,8 @@ def test_invalid_date_octets_remain_in_diagnostics():
     mail = _mail(value)
     assert mail.date is None
     assert (
-        mail.date_header_defects[0]["raw"] == r"Thu, 01 Oct 2026 12:00:00 +0000\udcff"
+        mail.date_header_defects[0]["raw"]
+        == r"Thu, 01 Oct 2026 12:00:00 +0000\udcff"
     )
     assert mail.message is not None
     original = dict(mail.message.raw_items())["Date"]
@@ -231,7 +257,8 @@ def test_all_input_factories_share_date_validation(tmp_path):
     ]
     assert all(mail.date is None for mail in mails)
     assert all(
-        mail.date_header_defects == mails[0].date_header_defects for mail in mails
+        mail.date_header_defects == mails[0].date_header_defects
+        for mail in mails
     )
 
 
@@ -240,7 +267,9 @@ def test_converter_raises_on_unrecoverable_date():
     with pytest.raises(ValueError):
         convert_mail_date("Thu, 31 Feb 2026 12:00:00 +0000")
     date, zone = convert_mail_date("Wed, 01 Oct 2026 12:00:00 +0000")
-    assert date == datetime.datetime(2026, 10, 1, 12, tzinfo=datetime.timezone.utc)
+    assert date == datetime.datetime(
+        2026, 10, 1, 12, tzinfo=datetime.timezone.utc
+    )
     assert zone == "+0.0"
 
 
@@ -263,7 +292,9 @@ def test_reserved_military_zone_j_is_not_accepted():
 
 def test_received_weekday_mismatch_recovers_timestamp():
     """Received dates retain a safe UTC value with explicit evidence."""
-    received = "from sender.example by mx.example; Wed, 01 Oct 2026 12:00:00 +0000"
+    received = (
+        "from sender.example by mx.example; Wed, 01 Oct 2026 12:00:00 +0000"
+    )
     mail = _mail(VALID, "Received: " + received + "\r\n")
     assert mail.received[0]["date_utc"] == EXPECTED
     assert mail.received_header_defects == []
@@ -306,4 +337,7 @@ def test_date_comment_octets_are_checked_after_recovery(comment):
         assert mail.date_header_defects == []
     assert mail.mail_json.encode("utf-8")
     assert mail.message is not None
-    assert next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape") == raw
+    assert (
+        next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape")
+        == raw
+    )

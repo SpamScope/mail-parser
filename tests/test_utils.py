@@ -87,7 +87,9 @@ class TestUtils(unittest.TestCase):
 
         try:
             # Mock subprocess.Popen to raise OSError
-            with patch("subprocess.Popen", side_effect=OSError("Command not found")):
+            with patch(
+                "subprocess.Popen", side_effect=OSError("Command not found")
+            ):
                 with self.assertRaises(MailParserOSError) as context:
                     msgconvert(tmp_name)
                 self.assertIn("msgconvert", str(context.exception))
@@ -123,14 +125,17 @@ class TestUtils(unittest.TestCase):
         """_safe_remove swallows OSError when the file is already gone."""
         from mailparser.utils import _safe_remove
 
-        missing = os.path.join(tempfile.gettempdir(), "mailparser-nonexistent-xyz")
+        missing = os.path.join(
+            tempfile.gettempdir(), "mailparser-nonexistent-xyz"
+        )
         if os.path.exists(missing):  # pragma: no cover
             os.unlink(missing)
         # Must not raise even though the path does not exist.
         _safe_remove(missing)
 
     def test_extract_msg_convert_non_email(self):
-        """extract_msg_convert raises MailParserOSError for a non-email .msg."""
+        """extract_msg_convert raises MailParserOSError for a non-email
+        .msg."""
         from mailparser.utils import extract_msg_convert
 
         # A MSGFile that is not an email (contact/calendar) has no
@@ -141,12 +146,14 @@ class TestUtils(unittest.TestCase):
 
         with patch.dict("sys.modules", {"extract_msg": fake_extract_msg}):
             with self.assertRaises(MailParserOSError) as context:
-                extract_msg_convert("dummy.msg")
+                # The path is opened before the conversion: any file.
+                extract_msg_convert(__file__)
         self.assertIn("not a convertible email", str(context.exception))
         fake_msg.close.assert_called_once()
 
     def test_msgconvert_timeout(self):
-        """msgconvert aborts and cleans up if the helper exceeds the timeout."""
+        """msgconvert aborts and cleans up if the helper exceeds the
+        timeout."""
         with tempfile.NamedTemporaryFile(suffix=".msg", delete=False) as tmp:
             tmp_name = tmp.name
 
@@ -170,7 +177,11 @@ class TestUtils(unittest.TestCase):
 
     def test_parse_received_space_padding_is_linear(self):
         """Padding must be traversed with linear scanning work."""
-        received = "from host " + " " * 20000 + "nope; Mon, 10 Aug 2026 09:00:00 +0000"
+        received = (
+            "from host "
+            + " " * 20000
+            + "nope; Mon, 10 Aug 2026 09:00:00 +0000"
+        )
         with bounded_text_work(utils, ("split_received",), len(received)):
             result = parse_received(received)
         self.assertIsInstance(result, dict)
@@ -186,12 +197,15 @@ class TestUtils(unittest.TestCase):
         self.assertIn("Unable to match any clauses", str(context.exception))
 
     def test_parse_received_multiple_matches(self):
-        """Test parse_received with header that has multiple matches for one pattern"""
+        """Test parse_received with header that has multiple matches for
+        one pattern"""
         # This is a complex edge case - create header with duplicate clause
-        # Note: This is hard to trigger with real data, but tests the error handling
+        # Note: This is hard to trigger with real data, but tests the error
+        # handling
         received = "from server1 from server2 by mail.example.com"
 
-        # The function should handle this, might raise error or process normally
+        # The function should handle this, might raise error or process
+        # normally
         # depending on the regex patterns
         try:
             result = parse_received(received)
@@ -215,7 +229,9 @@ class TestUtils(unittest.TestCase):
 
     def test_ported_open_python3(self):
         """Test ported_open in Python 3"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".txt", delete=False
+        ) as tmp:
             tmp.write("test content")
             tmp_name = tmp.name
 
@@ -231,7 +247,9 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_parse_received_with_junk_pattern(self):
         """Test receiveds_parsing removes junk patterns"""
         # Test that JUNK_PATTERN is properly applied
-        receiveds = ["Received: from server.example.com\n\tby mail.example.com"]
+        receiveds = [
+            "Received: from server.example.com\n\tby mail.example.com"
+        ]
 
         result = receiveds_parsing(receiveds)
         self.assertIsInstance(result, list)
@@ -240,7 +258,9 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_decode_header_part_unicode_error(self):
         """Test decode_header_part with UnicodeError"""
         # Mock decode_header to raise UnicodeError
-        with patch("mailparser.utils.decode_header", side_effect=UnicodeError()):
+        with patch(
+            "mailparser.utils.decode_header", side_effect=UnicodeError()
+        ):
             result = decode_header_part("test_header")
             self.assertEqual(result, "test_header")
 
@@ -310,9 +330,11 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(len(result.sha512), 128)
 
     def test_parse_received_with_multiple_from_clauses(self):
-        """parse_received keeps only first 'from' clause (RFC 5321 one-from rule)"""
+        """parse_received keeps only first 'from' clause (RFC 5321
+        one-from rule)"""
         received = (
-            "from server.example.com from server2.example.com by mail.example.com"
+            "from server.example.com from server2.example.com by "
+            "mail.example.com"
         )
         result = parse_received(received)
         self.assertIsInstance(result, dict)
@@ -535,7 +557,10 @@ class TestUtilsEdgeCases(unittest.TestCase):
             # Test binary file
             payload = base64.b64encode(b"test binary content").decode()
             write_sample(
-                binary=True, payload=payload, path=temp_dir, filename="test_binary.bin"
+                binary=True,
+                payload=payload,
+                path=temp_dir,
+                filename="test_binary.bin",
             )
 
             file_path = os.path.join(temp_dir, "test_binary.bin")
@@ -580,7 +605,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
             shutil.rmtree(temp_dir)
 
     def test_write_sample_strips_untrusted_path_components(self):
-        """Attachment filenames cannot escape the requested output directory."""
+        """Attachment filenames cannot escape the requested output
+        directory."""
         from mailparser.utils import write_sample
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -608,9 +634,15 @@ class TestUtilsEdgeCases(unittest.TestCase):
                 sorted(os.listdir(output_dir)),
                 ["absolute.txt", "relative.txt", "windows.txt"],
             )
-            self.assertFalse(os.path.exists(os.path.join(temp_dir, "relative.txt")))
-            self.assertFalse(os.path.exists(os.path.join(temp_dir, "absolute.txt")))
-            self.assertFalse(os.path.exists(os.path.join(temp_dir, "windows.txt")))
+            self.assertFalse(
+                os.path.exists(os.path.join(temp_dir, "relative.txt"))
+            )
+            self.assertFalse(
+                os.path.exists(os.path.join(temp_dir, "absolute.txt"))
+            )
+            self.assertFalse(
+                os.path.exists(os.path.join(temp_dir, "windows.txt"))
+            )
 
     def test_write_sample_rejects_invalid_filenames(self):
         """Empty, dot-only, and NUL-containing filenames are rejected."""
@@ -659,7 +691,10 @@ class TestUtilsEdgeCases(unittest.TestCase):
         )
 
         self.assertEqual(
-            [_deduplicate_filename(filename, used_filenames) for filename in filenames],
+            [
+                _deduplicate_filename(filename, used_filenames)
+                for filename in filenames
+            ],
             [
                 "report.tar.gz",
                 "report_1.tar.gz",
@@ -684,7 +719,10 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
     def test_deduplicate_long_names_scale_linearly(self):
         """Names sharing a clamped stem must not rescan the whole range."""
-        from mailparser.utils import _deduplicate_filename, _safe_attachment_filename
+        from mailparser.utils import (
+            _deduplicate_filename,
+            _safe_attachment_filename,
+        )
 
         used_filenames = CountedNames(8000)
         generated = []
@@ -735,7 +773,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertIn("date", result)
 
     def test_receiveds_format_delay_no_previous_date(self):
-        """Test receiveds_format delay calculation when first entry has no valid date"""
+        """Test receiveds_format delay calculation when first entry has
+        no valid date"""
         from mailparser.utils import receiveds_format
 
         # NOTE: receiveds_format processes the list in REVERSE order ([::-1])
@@ -760,7 +799,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         # After reversal, result[0] (hop 1) should have None date
         self.assertIsNone(result[0].get("date_utc"))
-        # result[1] (hop 2) should have delay=0 because before date is None (line 432)
+        # result[1] (hop 2) should have delay=0 because before date is None
+        # (line 432)
         self.assertEqual(result[1]["delay"], 0)
         # But should have a valid date itself
         self.assertIsNotNone(result[1].get("date_utc"))
@@ -866,7 +906,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
 
         raw_email = (
             b"From: Sender <sender@example.com>\r\n"
-            b"To: =?unknown-8bit?b?w4FscMOhbSBMb25nc29t?= <recipient@example.com>\r\n"
+            b"To: =?unknown-8bit?b?w4FscMOhbSBMb25nc29t?= "
+            b"<recipient@example.com>\r\n"
             b"Subject: Test\r\n"
             b"Date: Tue, 12 May 2026 18:00:00 +0000\r\n"
             b"Content-Type: text/plain; charset=utf-8\r\n"
@@ -878,7 +919,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(mail.to, [("Álpám Longsom", "recipient@example.com")])
 
     def test_parse_received_envelope_from_with_angle_brackets(self):
-        """Test utils.py:294-296 — envelope-from clause with angle-bracket match"""
+        """Test utils.py:294-296 — envelope-from clause with
+        angle-bracket match"""
         # When envelope-from keyword is present AND its value has angle
         # brackets, _ENVELOPE_FROM_RE.search() succeeds and line 296 runs.
         received = (
@@ -891,7 +933,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertEqual(result.get("envelope_from"), "sender@example.com")
 
     def test_parse_received_envelope_from_no_angle_brackets(self):
-        """Test utils.py:294-296 — envelope-from clause with no angle-bracket match"""
+        """Test utils.py:294-296 — envelope-from clause with no
+        angle-bracket match"""
         # When the envelope-from keyword is present but its value has no
         # angle brackets, _ENVELOPE_FROM_RE.search() returns None and the
         # if-branch (line 295) is skipped, leaving no envelope_from key.
@@ -907,7 +950,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         self.assertNotIn("envelope_from", result)
 
     def test_parse_received_envelope_from_in_clause_no_angle_brackets(self):
-        """Test utils.py:322->313 — inline envelope-from without angle brackets"""
+        """Test utils.py:322->313 — inline envelope-from without angle
+        brackets"""
         # Step 3 of parse_received searches clause values for "envelope-from"
         # text, then applies _ENVELOPE_FROM_RE.  When the keyword appears but
         # has no <…>, the inner `if m:` at line 322 is False and the key is
@@ -930,7 +974,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_get_addresses_fallback_regex_bare_email(self):
         """fallback regex matches bare email (utils.py:149-150)"""
         with patch(
-            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+            "mailparser.utils.email.utils.getaddresses",
+            return_value=[("", "")],
         ):
             result = get_addresses("user@example.com")
         self.assertEqual(result, [("", "user@example.com")])
@@ -938,7 +983,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_get_addresses_fallback_regex_quoted_name(self):
         """fallback regex matches quoted-name format (utils.py:145-146)"""
         with patch(
-            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+            "mailparser.utils.email.utils.getaddresses",
+            return_value=[("", "")],
         ):
             result = get_addresses('"Quoted Name" <user@example.com>')
         self.assertEqual(result, [("Quoted Name", "user@example.com")])
@@ -946,7 +992,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_get_addresses_fallback_regex_any_name(self):
         """fallback regex matches any-name format (utils.py:147-148)"""
         with patch(
-            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+            "mailparser.utils.email.utils.getaddresses",
+            return_value=[("", "")],
         ):
             result = get_addresses("Any Name <user@example.com>")
         self.assertEqual(result, [("Any Name", "user@example.com")])
@@ -954,7 +1001,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_get_addresses_fallback_regex_no_matches(self):
         """fallback regex finds no addresses, falls through to return parsed"""
         with patch(
-            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+            "mailparser.utils.email.utils.getaddresses",
+            return_value=[("", "")],
         ):
             result = get_addresses("not an email address at all")
         self.assertEqual(result, [("", "")])
@@ -962,12 +1010,15 @@ class TestUtilsEdgeCases(unittest.TestCase):
     def test_get_addresses_fallback_quoted_name_with_comma(self):
         """Fallback keeps a comma that lives inside a quoted display name."""
         with patch(
-            "mailparser.utils.email.utils.getaddresses", return_value=[("", "")]
+            "mailparser.utils.email.utils.getaddresses",
+            return_value=[("", "")],
         ):
             result = get_addresses('"Last, First" <user@example.com>')
         self.assertEqual(result, [("Last, First", "user@example.com")])
 
-    def test_get_addresses_fallback_email_as_name_space_padding_is_linear(self):
+    def test_get_addresses_fallback_email_as_name_space_padding_is_linear(
+        self,
+    ):
         """Structural recovery must scan padded display names linearly."""
         header = "alice@example.com <bob@example.com>" + " " * 2000
         with bounded_address_work(len(header)):
@@ -990,7 +1041,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         3.9-3.12). mail-parser targets Python 3.9 and later, so on
         an earlier patch release (e.g. CPython 3.11.3) the call raised::
 
-            TypeError: getaddresses() got an unexpected keyword argument 'strict'
+            TypeError: getaddresses() got an unexpected keyword
+            argument 'strict'
 
         Here we simulate a pre-3.13 interpreter: the feature-detection flag
         is forced off and ``getaddresses`` is replaced by a function whose
@@ -1025,7 +1077,8 @@ class TestUtilsEdgeCases(unittest.TestCase):
         )
 
     def test_parse_received_sendgrid_date(self):
-        """parse_received extracts SendGrid non-standard date (utils.py:389-390)"""
+        """parse_received extracts SendGrid non-standard date
+        (utils.py:389-390)"""
         received = (
             "from sendgrid.net by mx.example.com with SMTP"
             " 2024-01-15 10:30:45.123456789 +0000 UTC m=+1234.567890123"

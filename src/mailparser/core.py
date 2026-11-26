@@ -106,7 +106,9 @@ def _walk_with_parents(message):
     """
     yield message, None
     index = 0
-    pending = [(iter(message.get_payload()), 0)] if message.is_multipart() else []
+    pending = (
+        [(iter(message.get_payload()), 0)] if message.is_multipart() else []
+    )
     while pending:
         children, parent = pending[-1]
         child = next(children, None)
@@ -206,6 +208,15 @@ def parse_from_file_msg(fp):
 
     Returns:
         Instance of MailParser with raw email parsed
+
+    Raises:
+        MailParserOSError: if no conversion backend is available, or
+            the file is not a convertible email message
+        MailParserOutlookError: if the ``extract-msg`` backend finds the
+            file malformed; the library error is ``__cause__``
+        MailParserRecursionError: if the message, or the ``.msg``
+            itself, is nested too deeply
+        OSError: if ``fp`` cannot be opened
     """
     return MailParser.from_file_msg(fp)
 
@@ -256,7 +267,9 @@ class MailParser:
         # raising AttributeError, which would recurse.
         self._header_index = {}
         if message is not None:
-            log.debug("All headers of emails: {}".format(", ".join(message.keys())))
+            log.debug(
+                "All headers of emails: {}".format(", ".join(message.keys()))
+            )
         self.parse()
 
     def __str__(self) -> str:
@@ -373,7 +386,13 @@ class MailParser:
             Instance of MailParser
 
         Raises:
-            MailParserOSError: if no conversion backend is available
+            MailParserOSError: if no conversion backend is available, or
+                the file is not a convertible email message
+            MailParserOutlookError: if the ``extract-msg`` backend finds
+                the file malformed; the library error is ``__cause__``
+            MailParserRecursionError: if the message, or the ``.msg``
+                itself, is nested too deeply
+            OSError: if ``fp`` cannot be opened
         """
         log.debug("Parsing email from file Outlook")
 
@@ -448,9 +467,13 @@ class MailParser:
         self._address_header_defects = []
         self._address_headers = {}
         for header in sorted(ADDRESSES_HEADERS):
-            for occurrence, value in enumerate(self._header_index.get(header, [])):
+            for occurrence, value in enumerate(
+                self._header_index.get(header, [])
+            ):
                 diagnostics = []
-                addresses = get_addresses(value, defects=diagnostics, decode_names=True)
+                addresses = get_addresses(
+                    value, defects=diagnostics, decode_names=True
+                )
                 if occurrence == 0:
                     self._address_headers[header] = addresses
                 for defect in diagnostics:
@@ -462,7 +485,8 @@ class MailParser:
             self._defects.append(
                 {
                     "address-headers": [
-                        f"AddressHeaderDefect: {d['header']}[{d['occurrence']}]: "
+                        f"AddressHeaderDefect: "
+                        f"{d['header']}[{d['occurrence']}]: "
                         f"{d['reason']}"
                         for d in self._address_header_defects
                     ]
@@ -729,7 +753,11 @@ class MailParser:
             # Only the computed parts are our own names and may be reached
             # through attribute access; every other key is a header name
             # chosen by the sender — see _header_value().
-            value = getattr(self, i) if i in COMPUTED_PARTS else self._header_value(i)
+            value = (
+                getattr(self, i)
+                if i in COMPUTED_PARTS
+                else self._header_value(i)
+            )
             if value:
                 mail[i] = value
 
@@ -757,7 +785,11 @@ class MailParser:
 
         ``payload`` is the part's content after transfer decoding.
         """
-        cte = ported_string(part.get("Content-Transfer-Encoding", "")).strip().lower()
+        cte = (
+            ported_string(part.get("Content-Transfer-Encoding", ""))
+            .strip()
+            .lower()
+        )
         if not cte or cte in ("7bit", "8bit"):
             # get_payload(False) already applies a lossy charset decode.
             # The stored payload distinguishes Unicode string input from
@@ -888,8 +920,10 @@ class MailParser:
                     or None,
                     "charset": mime_charset(metadata),
                     "content_disposition": metadata.get_content_disposition(),
-                    "filename": decode_header_part(mime_filename(metadata)) or None,
-                    "content_id": ported_string(metadata.get("content-id")) or None,
+                    "filename": decode_header_part(mime_filename(metadata))
+                    or None,
+                    "content_id": ported_string(metadata.get("content-id"))
+                    or None,
                     "boundary": mime_boundary(metadata)
                     if part.get_content_maintype() == "multipart"
                     else None,
@@ -1029,7 +1063,9 @@ class MailParser:
                 content_disposition = ported_string(
                     metadata.get_content_disposition()
                 ).lower()
-                log.debug(f"content-disposition {content_disposition!r} part {i!r}")
+                log.debug(
+                    f"content-disposition {content_disposition!r} part {i!r}"
+                )
                 content_id = ported_string(metadata.get("content-id"))
                 log.debug(f"content-id {content_id!r} part {i!r}")
                 content_subtype = ported_string(metadata.get_content_subtype())
@@ -1061,22 +1097,33 @@ class MailParser:
                     log.debug(f"Email part {i!r} is an attachment")
                     log.debug(f"Filename {filename!r} part {i!r}")
                     binary = False
-                    mail_content_type = ported_string(metadata.get_content_type())
-                    log.debug(f"Mail content type {mail_content_type!r} part {i!r}")
+                    mail_content_type = ported_string(
+                        metadata.get_content_type()
+                    )
+                    log.debug(
+                        f"Mail content type {mail_content_type!r} part {i!r}"
+                    )
                     # Strip before comparing, exactly as email's own
                     # get_payload() does: a trailing space made every
                     # encoding branch below miss and the raw bytes fall
                     # through the text path, which drops the non-UTF-8 ones.
                     transfer_encoding = (
-                        ported_string(metadata.get("content-transfer-encoding", ""))
+                        ported_string(
+                            metadata.get("content-transfer-encoding", "")
+                        )
                         .strip()
                         .lower()
                     )
-                    log.debug(f"Transfer encoding {transfer_encoding!r} part {i!r}")
+                    log.debug(
+                        f"Transfer encoding {transfer_encoding!r} part {i!r}"
+                    )
                     content_disposition = ported_string(
                         metadata.get("content-disposition")
                     )
-                    log.debug(f"content-disposition {content_disposition!r} part {i!r}")
+                    log.debug(
+                        f"content-disposition {content_disposition!r} part "
+                        f"{i!r}"
+                    )
 
                     if p.is_multipart():
                         try:
@@ -1093,7 +1140,9 @@ class MailParser:
                             self._record_container_limit(i, filename)
                             continue
                         binary = False
-                        log.debug(f"Filename {filename!r} part {i!r} is multipart")
+                        log.debug(
+                            f"Filename {filename!r} part {i!r} is multipart"
+                        )
                     elif transfer_encoding == "base64":
                         payload = raw_payload(p)
                         if not isinstance(payload, str):
@@ -1102,7 +1151,9 @@ class MailParser:
                             # decoded bytes to keep the payload base64.
                             payload = base64.b64encode(payload).decode("ascii")
                         binary = True
-                        log.debug(f"Filename {filename!r} part {i!r} is binary")
+                        log.debug(
+                            f"Filename {filename!r} part {i!r} is binary"
+                        )
                     else:
                         # Every other encoding — uuencode, quoted-printable,
                         # 7bit, 8bit, binary — is re-encoded to base64 from
@@ -1157,7 +1208,8 @@ class MailParser:
                             self._text_plain.append(payload)
                         else:
                             log.warning(
-                                f"Email content {p.get_content_subtype()!r} not handled"
+                                f"Email content {p.get_content_subtype()!r} "
+                                f"not handled"
                             )
                             self._text_not_managed.append(payload)
 
@@ -1289,15 +1341,19 @@ class MailParser:
         # family let one private literal at EHLO suppress the IPv6 scan and
         # hide the real sender.
         matches = sorted(
-            list(REGXIP.finditer(from_part)) + list(REGXIP6.finditer(from_part)),
+            list(REGXIP.finditer(from_part))
+            + list(REGXIP6.finditer(from_part)),
             key=lambda m: m.start(),
         )
-        matches = [m for m in matches if not _in_sorted_spans(m.start(), helo_spans)]
+        matches = [
+            m for m in matches if not _in_sorted_spans(m.start(), helo_spans)
+        ]
 
         candidates = [
             m.group()
             for m in matches
-            if m.start() >= first_token_end and _in_sorted_spans(m.start(), groups)
+            if m.start() >= first_token_end
+            and _in_sorted_spans(m.start(), groups)
         ]
         if candidates:
             return candidates
@@ -1384,7 +1440,9 @@ class MailParser:
             # Values are ``email.header.Header`` when the header carries
             # 8-bit bytes (the from_bytes path); dumping one raises
             # TypeError and kills the parse, so coerce to str first.
-            return json.dumps([ported_string(i) for i in raw], ensure_ascii=False)
+            return json.dumps(
+                [ported_string(i) for i in raw], ensure_ascii=False
+            )
 
         return self._header_value(name.replace("_", "-"))
 
@@ -1396,7 +1454,8 @@ class MailParser:
         The ``filename`` value is decoded from untrusted email metadata and
         must not be used directly to construct filesystem paths. Use
         ``write_attachments()`` when saving attachments. ``safe_filename``
-        contains a sanitized basename, or ``None`` if no usable basename exists.
+        contains a sanitized basename, or ``None`` if no usable basename
+        exists.
         """
         return self._attachments
 

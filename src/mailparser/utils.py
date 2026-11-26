@@ -19,7 +19,10 @@ limitations under the License.
 from __future__ import annotations
 
 import base64
+import contextlib
+import contextvars
 import email
+import email.errors
 import email.header
 import email.message
 import email.utils
@@ -35,10 +38,13 @@ import string
 import subprocess
 import sys
 import tempfile
+import traceback
 from collections import Counter, namedtuple
-from email.errors import HeaderParseError
+from email.errors import HeaderParseError, MessageError
+from email.generator import Generator
 from email.header import decode_header
 from email.message import Message
+from email.policy import Compat32
 from unicodedata import normalize
 
 from mailparser.addresses import parse_address_header
@@ -49,9 +55,12 @@ from mailparser.const import (
 )
 from mailparser.dates import date_diagnostics, parse_mail_date
 from mailparser.exceptions import (
+    MailParserError,
     MailParserOSError,
+    MailParserOutlookError,
     MailParserPathError,
     MailParserReceivedParsingError,
+    MailParserRecursionError,
 )
 from mailparser.received import extract_envelope_address, split_received
 from mailparser.serialization import bounded_flatten
@@ -65,6 +74,21 @@ _MSGCONVERT_TIMEOUT = 60
 # What a codec named by the sender raises when it cannot be applied: an
 # unknown or non-text codec, an octet it refuses, a NUL in its name.
 _CHARSET_ERRORS = (LookupError, UnicodeError, ValueError)
+# What a generator raises for a part it cannot write: a charset that
+# refuses the octets, or a header it will not fold. ``Header.encode()``
+# takes a form feed for a line break, which the feed parser does not.
+_FLATTEN_ERRORS = (*_CHARSET_ERRORS, MessageError)
+# The two a header is refused with. ``HeaderWriteError`` came with the
+# fix of CVE-2024-6923, which a release may lack.
+_HEADER_ERRORS = (
+    HeaderParseError,
+    getattr(email.errors, "HeaderWriteError", HeaderParseError),
+)
+
+# The code of the call that flattens one part: the generator runs it for
+# the message and, nested, for every sub-part.  ``msg`` is its part and
+# ``policy`` the policy it writes that part under.
+_FLATTEN_CODE = Generator.flatten.__code__
 
 # The headers whose parameters the parser reads.
 _PARAMETER_HEADERS = ("content-type", "content-disposition")
@@ -73,6 +97,9 @@ _PARAMETER_HEADERS = ("content-type", "content-disposition")
 # parsed.  A part is asked for the same two values by several accessors
 # in a row, and by the email package itself.
 _PARAMS_CACHE_SIZE = 8
+
+# True while ``as_string_safe()`` runs a generator over a part.
+_FLATTENING = contextvars.ContextVar("mailparser_flattening", default=False)
 
 
 # The ``strict`` keyword was added to ``email.utils.getaddresses`` in Python
@@ -298,7 +325,12 @@ def decode_header_part(header, *, defects=None):
             )
         # Return the whole literal value, never a decoded prefix plus the
         # original. Escape surrogates so JSON/CLI sinks remain usable.
-        return str(header).encode("utf-8", "backslashreplace").decode("utf-8").strip()
+        return (
+            str(header)
+            .encode("utf-8", "backslashreplace")
+            .decode("utf-8")
+            .strip()
+        )
     return output.strip()
 
 
@@ -423,6 +455,34 @@ def _decoded_boundary(part, failobj=None, *, defects=None):
         return email.utils.unquote(value[2]).rstrip()
 
 
+class _DeclaredEmptyBoundary(str):
+    """Empty boundary that a message declares: not a missing one.
+
+    ``Generator._handle_multipart()`` tests the boundary for truth.  A
+    false one it replaces with a boundary it invents, which it writes
+    into the message with ``set_boundary()``.  This one is true: the
+    generator writes the delimiters the message has, ``--`` and
+    ``----``, and leaves the header as it is.
+    """
+
+    def __bool__(self):
+        return True
+
+
+@contextlib.contextmanager
+def _keeping_empty_boundaries():
+    """Have the generator write an empty boundary instead of replacing it.
+
+    The pass runs in the frame of the caller: entering and leaving
+    add no stack frame to it.
+    """
+    token = _FLATTENING.set(True)
+    try:
+        yield
+    finally:
+        _FLATTENING.reset(token)
+
+
 class RecoveringMessage(Message):
     """Message whose parameters the email package can always use.
 
@@ -468,13 +528,20 @@ class RecoveringMessage(Message):
     def get_boundary(self, failobj=None):
         """Return the boundary, also when its charset cannot decode it.
 
+        While ``as_string_safe()`` flattens the message, an empty
+        boundary is returned as a string that is true: the generator
+        would otherwise replace it in the header of the part.
+
         Args:
             failobj: value returned when the part declares no boundary.
 
         Returns:
             The boundary, or failobj.
         """
-        return _decoded_boundary(self, failobj)
+        boundary = _decoded_boundary(self, failobj)
+        if boundary == "" and _FLATTENING.get():
+            return _DeclaredEmptyBoundary()
+        return boundary
 
     def get_payload(self, i=None, decode=False):  # type: ignore[override]
         """Return the payload, also for an RFC 2231 charset.
@@ -571,7 +638,9 @@ def mime_header_view(part: Message) -> tuple[Message, list[str]]:
             else:
                 evidence = None
         if evidence is not None:
-            defects.append(f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}")
+            defects.append(
+                f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}"
+            )
         view[name] = value
         if occurrence or header not in _PARAMETER_HEADERS:
             continue
@@ -614,6 +683,7 @@ def mime_boundary(part, *, defects=None):
     An RFC 2231 boundary is decoded with the charset the sender names, and
     some codecs (``utf-7``, ``unicode_escape``) produce lone surrogates:
     a value that is not Unicode text and breaks UTF-8 JSON and CLI sinks.
+    An empty boundary is returned as it is and reported as a defect.
 
     Args:
         part: MIME part or metadata view.
@@ -626,6 +696,10 @@ def mime_boundary(part, *, defects=None):
     """
     part = RecoveringMessage.reading(part)
     boundary = _decoded_boundary(part, defects=defects)
+    if boundary == "" and defects is not None:
+        # RFC 2046 section 5.1.1: a boundary is 1 to 70 characters.
+        raw = part.get_param("boundary")
+        defects.append(f"invalid-boundary-parameter: empty; raw={raw!r}")
     if boundary is None or boundary.isascii():
         return boundary
     escaped = boundary.encode("utf-8", "backslashreplace").decode("utf-8")
@@ -768,28 +842,59 @@ def extract_msg_convert(fp):
         ImportError: if the ``extract-msg`` library is not installed
         MailParserOSError: if the ``.msg`` is not a convertible email
             message (e.g. a contact or calendar item)
+        MailParserOutlookError: if the ``.msg`` is malformed or the
+            library fails on it; the library error is ``__cause__``
+        MailParserRecursionError: if the ``.msg`` is nested too deeply
+            to convert
+        OSError: if ``fp`` cannot be opened; this is the caller's
+            mistake
     """
     import extract_msg  # lazy: keep package import stdlib-only
 
     log.debug("Started converting Outlook email with extract-msg")
-    msg = extract_msg.openMsg(fp)
+    # The path is the caller's: opened here, its errors stay what they
+    # are, and every error below is about the content of the file.
+    with open(fp, "rb"):
+        pass
     try:
-        # openMsg() may return a non-email MSGFile (contact, calendar,
-        # task...) which cannot be rendered as an email message.
-        as_email_message = getattr(msg, "asEmailMessage", None)
-        if as_email_message is None:
-            raise MailParserOSError(
-                f"Outlook file {fp!r} is not a convertible email "
-                f"message (type {type(msg).__name__})"
-            )
-        eml = as_email_message()
-        info = f"{eml.get('From', '')} | {eml.get('Subject', '')}".strip()
-        temp = _new_outlook_tempfile()
-        with open(temp, "wb") as f:
-            f.write(eml.as_bytes())
-        return temp, info
-    finally:
-        msg.close()
+        msg = extract_msg.openMsg(fp)
+        try:
+            # openMsg() may return a non-email MSGFile (contact, calendar,
+            # task...) which cannot be rendered as an email message.
+            as_email_message = getattr(msg, "asEmailMessage", None)
+            if as_email_message is None:
+                raise MailParserOSError(
+                    f"Outlook file {fp!r} is not a convertible email "
+                    f"message (type {type(msg).__name__})"
+                )
+            eml = as_email_message()
+            info = f"{eml.get('From', '')} | {eml.get('Subject', '')}".strip()
+            # Serialize before the temp file exists: a failure here must
+            # not leave an empty ``.eml`` behind.
+            data = eml.as_bytes()
+        finally:
+            msg.close()
+    except (MailParserError, MemoryError):
+        # Not a malformed file: our own errors, or the machine's.
+        raise
+    except RecursionError as e:
+        raise MailParserRecursionError(
+            "Outlook file nesting too deep to convert"
+        ) from e
+    except Exception as e:
+        # The .msg is attacker-controlled and the libraries raise a wide,
+        # unstable set (extract_msg, olefile.OleFileError which is an
+        # OSError, ValueError, IndexError, ...), so no narrow tuple holds.
+        # The message names the class only: the text of a decoding error
+        # holds the whole stream it could not decode.
+        raise MailParserOutlookError(
+            f"Cannot convert Outlook file {fp!r}: {type(e).__name__}"
+        ) from e
+
+    temp = _new_outlook_tempfile()
+    with open(temp, "wb") as f:
+        f.write(data)
+    return temp, info
 
 
 def msgconvert(email):
@@ -1016,7 +1121,9 @@ def receiveds_parsing(receiveds, *, defects=None, date_defects=None):
         log.debug(f"Parsing received {idx + 1}/{n}")
         log.debug(f"Try to parse {received!r}")
         diagnostics = []
-        raw_evidence = received.encode("utf-8", "backslashreplace").decode("utf-8")
+        raw_evidence = received.encode("utf-8", "backslashreplace").decode(
+            "utf-8"
+        )
         try:
             # BytesParser stores raw octets using surrogateescape. Decode
             # valid UTF-8 for display, retaining malformed octets losslessly.
@@ -1038,20 +1145,29 @@ def receiveds_parsing(receiveds, *, defects=None, date_defects=None):
         else:
             parsed.append(
                 {
-                    key: item.encode("utf-8", "backslashreplace").decode("utf-8")
+                    key: item.encode("utf-8", "backslashreplace").decode(
+                        "utf-8"
+                    )
                     for key, item in values_by_clause.items()
                 }
             )
         if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
             diagnostics.append(
-                {"reason": "invalid-utf8", "recovered": "raw" not in parsed[-1]}
+                {
+                    "reason": "invalid-utf8",
+                    "recovered": "raw" not in parsed[-1],
+                }
             )
         if defects is not None:
             for defect in diagnostics:
-                defect.update(raw=raw_evidence, header="received", occurrence=idx)
+                defect.update(
+                    raw=raw_evidence, header="received", occurrence=idx
+                )
                 defects.append(defect)
 
-    log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
+    log.debug(
+        "len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed))
+    )
 
     if len(receiveds) != len(parsed):  # pragma: no cover
         # something really bad happened,
@@ -1300,7 +1416,53 @@ def raw_payload(part):
         return part.get_payload(decode=True)
 
 
-def as_string_safe(part, *, budget=None):
+def _refusing_parts(error, root):
+    """
+    Name the parts whose flattening a charset error ended.
+
+    The generator flattens every sub-part with a nested ``flatten()``
+    call, so the error leaves one frame for each part it passed
+    through: the part that refused its charset and every container
+    around it.  Flattening one of them alone ends in the same error
+    only if it repeats the same steps, so a part is named when it has
+    the class and the policy of ``root`` and was written with the line
+    length ``root`` was.  Below ``multipart/signed`` the generator
+    writes headers without a length limit, and a policy may refuse a
+    header there that it folds when the part is flattened alone;
+    ``compat32`` writes or refuses a header whatever the limit is.
+
+    A frame without the expected locals names no part, and that part
+    is flattened again: the cost of a pass, never another output.
+
+    Args:
+        error (Exception): charset error raised while flattening root
+        root (email.message.Message): part the flattening started from
+
+    Returns:
+        set of the parts that raise the same error when flattened alone
+    """
+    passes = [
+        (
+            frame.f_locals.get("msg"),
+            getattr(frame.f_locals.get("policy"), "max_line_length", None),
+        )
+        for frame, _ in traceback.walk_tb(error.__traceback__)
+        if frame.f_code is _FLATTEN_CODE
+    ]
+    if not passes:
+        return set()
+    any_length = type(root.policy) is Compat32
+    root_length = passes[0][1]
+    return {
+        part
+        for part, length in passes
+        if type(part) is type(root)
+        and getattr(part, "policy", None) is root.policy
+        and (any_length or (length is not None and length == root_length))
+    }
+
+
+def as_string_safe(part, *, budget=None, _known=None):
     """
     Flatten a part back to its textual form.
 
@@ -1313,34 +1475,72 @@ def as_string_safe(part, *, budget=None):
     Args:
         part (email.message.Message): part to flatten
         budget: optional per-parse budget for container representations
+        _known: private, for the calls this function makes to itself
+            on the sub-parts: the parts already known to refuse
+            ``as_string()`` and the ones known to refuse
+            ``as_bytes()``, as a pair of sets
 
     Returns:
         the flattened part as a string
     """
-    try:
-        if budget is None:
-            return part.as_string()
-        return bounded_flatten(part, budget)
-    except _CHARSET_ERRORS:
-        log.warning("Cannot flatten part with the declared charset")
+    if _known is None:
+        _known = (set(), set())
+    text_refusing, bytes_refusing = _known
 
-    try:
-        data = (
-            part.as_bytes()
-            if budget is None
-            else bounded_flatten(part, budget, binary=True)
-        )
-        return data.decode("utf-8", "surrogateescape")
-    except _CHARSET_ERRORS:
-        # BytesGenerator bypasses the charset only for text parts. A part
-        # whose type is multipart but which carries no boundary is routed
-        # to the generic multipart handler, which decodes with the
-        # declared charset just like as_string() did.
-        log.warning("Cannot flatten part, using its raw headers and body")
+    # The part that refuses its charset fails every container around
+    # it.  Flattened alone, each of them would flatten all that comes
+    # before that part only to fail again: size times depth.  The first
+    # failure names them, and none is flattened a second time.  With a
+    # budget every pass is debited, also one that fails, so none is
+    # skipped there: that would move the resource limit.
+    header_refused = False
+    if part not in text_refusing:
+        try:
+            with _keeping_empty_boundaries():
+                if budget is None:
+                    return part.as_string()
+                return bounded_flatten(part, budget)
+        except _FLATTEN_ERRORS as error:
+            log.warning("Cannot flatten part with the declared charset")
+            # The bytes generator of some releases writes a header the
+            # text generator refuses, line break included: a part
+            # refused for a header is not given to it.
+            header_refused = isinstance(error, _HEADER_ERRORS)
+            if budget is None:
+                refusing = _refusing_parts(error, part)
+                text_refusing.update(refusing)
+                if header_refused:
+                    bytes_refusing.update(refusing)
 
+    if not header_refused and part not in bytes_refusing:
+        try:
+            with _keeping_empty_boundaries():
+                data = (
+                    part.as_bytes()
+                    if budget is None
+                    else bounded_flatten(part, budget, binary=True)
+                )
+            return data.decode("utf-8", "surrogateescape")
+        except _FLATTEN_ERRORS as error:
+            # BytesGenerator bypasses the charset only for text parts. A
+            # part whose type is multipart but which carries no boundary
+            # is routed to the generic multipart handler, which decodes
+            # with the declared charset just like as_string() did.
+            if budget is None:
+                bytes_refusing.update(_refusing_parts(error, part))
+
+    log.warning("Cannot flatten part, using its raw headers and body")
     header_chunks = []
-    for k, v in part.items():
-        chunk = f"{k}: {v}\n"
+    for k, v in part.raw_items():
+        try:
+            chunk = f"{k}: {part.policy.header_fetch_parse(k, v)}\n"
+        except UnicodeEncodeError:
+            # A value with surrogates comes back as an unknown-8bit Header,
+            # whose str() reads them as escaped octets. A lone surrogate
+            # outside that range, or a non-ASCII character next to one,
+            # can only come from a str: write the value as it was parsed,
+            # as the body is.
+            chunk = f"{k}: {v}\n"
         if budget is not None:
             budget.spend(characters=len(chunk))
         header_chunks.append(chunk)
@@ -1349,10 +1549,12 @@ def as_string_safe(part, *, budget=None):
     if isinstance(body, list):
         # A conforming multipart: flatten each sub-part the same way, since
         # the one that refused its charset may be nested any depth down.
-        body = "".join(as_string_safe(sub, budget=budget) for sub in body)
-    else:
+        body = "".join(
+            as_string_safe(sub, budget=budget, _known=_known) for sub in body
+        )
+    elif isinstance(body, bytes):
         # The charset was refused above, so raw_payload() fell back to the
-        # undecoded bytes.
+        # undecoded bytes.  A part refused for a header keeps its text.
         body = body.decode("utf-8", "surrogateescape")
     if budget is not None:
         budget.spend(characters=len(headers) + len(body) + 1, nodes=1)
@@ -1396,7 +1598,9 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
             else:
                 payload = i["payload"]
 
-            i["md5"], i["sha1"], i["sha256"], i["sha512"] = fingerprints(payload)
+            i["md5"], i["sha1"], i["sha256"], i["sha512"] = fingerprints(
+                payload
+            )
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
@@ -1424,7 +1628,9 @@ def write_attachments(attachments, base_path):  # pragma: no cover
         try:
             filename = _safe_attachment_filename(a["filename"])
         except ValueError:
-            log.warning(f"Skipped attachment with invalid filename: {a['filename']!r}")
+            log.warning(
+                f"Skipped attachment with invalid filename: {a['filename']!r}"
+            )
             continue
 
         filename = _deduplicate_filename(filename, used_filenames)
@@ -1445,7 +1651,8 @@ def _safe_attachment_filename(filename):
     if not isinstance(filename, str) or "\x00" in filename:
         raise ValueError("Invalid attachment filename")
 
-    # Treat both POSIX and Windows separators as directory separators on every OS.
+    # Treat both POSIX and Windows separators as directory separators on every
+    # OS.
     filename = os.path.basename(filename.replace("\\", "/"))
     if filename in ("", ".", ".."):
         raise ValueError("Invalid attachment filename")
@@ -1468,7 +1675,9 @@ def _split_attachment_extension(filename):
     """Split a filename while preserving common compressed-tar extensions."""
     lower_filename = filename.lower()
     for extension in _COMPOUND_ATTACHMENT_EXTENSIONS:
-        if lower_filename.endswith(extension) and len(filename) > len(extension):
+        if lower_filename.endswith(extension) and len(filename) > len(
+            extension
+        ):
             return filename[: -len(extension)], filename[-len(extension) :]
     return os.path.splitext(filename)
 
@@ -1563,7 +1772,11 @@ def _deduplicate_filename(filename, used_filenames):
     # Reserve room for the marker instead of appending past the limit:
     # write_sample() sanitizes again, and the clamp there would cut the
     # marker back off, collapsing distinct attachments onto one file.
-    budget = _MAX_FILENAME_BYTES - len(extension.encode("utf-8")) - _MAX_MARKER_BYTES
+    budget = (
+        _MAX_FILENAME_BYTES
+        - len(extension.encode("utf-8"))
+        - _MAX_MARKER_BYTES
+    )
     stem = _clamp_to_budget(root, budget)
 
     # Key on the stem the candidates are built from, not on the name as
@@ -1614,12 +1827,16 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     resolved_sample = os.path.realpath(sample)
 
     try:
-        contained = os.path.commonpath((base_path, resolved_sample)) == base_path
+        contained = (
+            os.path.commonpath((base_path, resolved_sample)) == base_path
+        )
     except ValueError:
         contained = False
 
     if not contained or os.path.islink(sample):
-        raise MailParserPathError("Attachment path escapes the output directory")
+        raise MailParserPathError(
+            "Attachment path escapes the output directory"
+        )
 
     with open(sample, "wb") as f:
         f.write(content)

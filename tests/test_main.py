@@ -183,7 +183,9 @@ class TestMain:
         test_mail = tmp_path / "test.eml"
         test_mail.write_text("From: test@example.com\nSubject: Test\n\nBody")
 
-        with patch("sys.argv", ["mail-parser", "--file", str(test_mail), "--json"]):
+        with patch(
+            "sys.argv", ["mail-parser", "--file", str(test_mail), "--json"]
+        ):
             with patch("mailparser.__main__.safe_print") as mock_print:
                 # main() doesn't necessarily exit, it just processes
                 main_module.main()
@@ -269,7 +271,9 @@ class TestMain:
 
         from mailparser.__main__ import parse_stdin
 
-        test_content = "From: test@example.com\nSubject: Test from stdin\n\nBody"
+        test_content = (
+            "From: test@example.com\nSubject: Test from stdin\n\nBody"
+        )
 
         args = parser.parse_args(["--stdin"])
 
@@ -286,7 +290,8 @@ class TestMain:
         args = parser.parse_args(["--stdin", "--outlook"])
 
         with pytest.raises(
-            MailParserOutlookError, match="You can't use stdin with msg Outlook"
+            MailParserOutlookError,
+            match="You can't use stdin with msg Outlook",
         ):
             parse_stdin(args)
 
@@ -356,7 +361,8 @@ class TestMain:
             mock_print.assert_called_once_with(mock_parser.attachments, False)
 
     def test_get_parser_with_stdin(self, parser):
-        """Test get_parser returns parse_stdin result when args.stdin is True"""
+        """Test get_parser returns parse_stdin result when args.stdin is
+        True"""
         import io
 
         from mailparser.__main__ import get_parser

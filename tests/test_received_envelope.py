@@ -217,7 +217,8 @@ def test_nested_path_only_recovers_after_outer_close(keyword, closed):
     header = _trace(annotation, True)
     neighbor = f"from neighbor by other; {DATE}"
     mail = mailparser.parse_from_string(
-        f"Received: {header}\r\nReceived: {neighbor}\r\nSubject: intact\r\n\r\nbody"
+        f"Received: {header}\r\nReceived: {neighbor}\r\nSubject: intact\r\n"
+        f"\r\nbody"
     )
     key = keyword.replace("-", "_")
     if closed:
@@ -231,7 +232,9 @@ def test_nested_path_only_recovers_after_outer_close(keyword, closed):
     assert mail.received_header_defects == [
         {
             "reason": (
-                "nested-envelope-address" if closed else "unclosed-envelope-address"
+                "nested-envelope-address"
+                if closed
+                else "unclosed-envelope-address"
             ),
             "raw": header,
             "recovered": closed,

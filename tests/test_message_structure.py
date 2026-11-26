@@ -16,7 +16,9 @@ from mailparser.structure import MAX_DRAWN_DEPTH, _delay, _size, _visible
 
 _MAILS = sorted(
     path
-    for path in glob.glob(os.path.join(os.path.dirname(__file__), "mails", "mail_*"))
+    for path in glob.glob(
+        os.path.join(os.path.dirname(__file__), "mails", "mail_*")
+    )
     if "outlook" not in path
 )
 
@@ -38,9 +40,8 @@ _CONFORMING = (
     "--inner--\r\n"
     "--outer\r\nContent-Type: text/csv\r\n"
     'Content-Disposition: ATTACHMENT; filename="report.csv"\r\n'
-    "Content-Transfer-Encoding: base64\r\nContent-ID: <csv@example.com>\r\n\r\n"
-    + base64.b64encode(b"a,b\r\n1,2\r\n").decode()
-    + "\r\n--outer--\r\n"
+    "Content-Transfer-Encoding: base64\r\nContent-ID: <csv@example.com>\r\n"
+    "\r\n" + base64.b64encode(b"a,b\r\n1,2\r\n").decode() + "\r\n--outer--\r\n"
 )
 
 
@@ -89,7 +90,9 @@ def test_tree_invariants_hold_on_corpus(path):
     walked = list(_walk_with_parents(message))
     assert [part for part, _ in walked] == list(message.walk())
     structural = [node for node in tree if not node["recovered"]]
-    assert [parent for _, parent in walked] == [n["parent"] for n in structural]
+    assert [parent for _, parent in walked] == [
+        n["parent"] for n in structural
+    ]
 
 
 def test_conforming_multipart_is_described_as_declared():
@@ -160,7 +163,9 @@ def test_unusable_content_type_stays_visible_beside_the_default():
 
     assert part["content_type"] == "text/plain"
     assert part["content_type_raw"] == "garbage"
-    assert "declared Content-Type: garbage" in mailparser.render_structure(mail)
+    assert "declared Content-Type: garbage" in mailparser.render_structure(
+        mail
+    )
 
 
 def test_digest_default_type_and_embedded_messages():
@@ -243,7 +248,9 @@ def test_omitted_container_representation_keeps_the_part():
         'Content-Type: multipart/mixed; boundary="outer"\r\n\r\n'
         f"--outer\r\n{raw}\r\n--outer--\r\n"
     )
-    omitted = [n for n in mail.mime_tree if "ResourceLimitDefect" in n["defects"]]
+    omitted = [
+        n for n in mail.mime_tree if "ResourceLimitDefect" in n["defects"]
+    ]
 
     assert omitted
     assert {d["part"] for d in mail.resource_limit_defects} == {
@@ -264,7 +271,8 @@ def test_epilogue_recovery_is_marked_and_kept_apart():
     assert _pick(recovered, "parent", "depth", "recovered") == (0, 1, True)
     assert recovered["roles"] == ["attachment"]
     assert (
-        mail.attachments[recovered["attachment"]]["filename"] == (recovered["filename"])
+        mail.attachments[recovered["attachment"]]["filename"]
+        == (recovered["filename"])
     )
     assert "recovered from epilogue" in mailparser.render_structure(mail)
 
@@ -351,14 +359,16 @@ def test_nested_defect_no_epilogue(raw, epilogue, categories, tree, as_bytes):
 
 @_BOTH_ENTRY_POINTS
 @pytest.mark.parametrize(
-    "boundary, delimiter",
+    "boundary, delimiter, root_defects",
     [
-        pytest.param("A", "--A", id="boundary"),
+        pytest.param("A", "--A", [], id="boundary"),
         # RFC 2046 section 5.1.1 requires one character at least.
-        pytest.param('""', "--", id="empty boundary"),
+        pytest.param('""', "--", ["MimeHeaderDefect"], id="empty boundary"),
     ],
 )
-def test_nested_defect_with_epilogue(boundary, delimiter, as_bytes):
+def test_nested_defect_with_epilogue(
+    boundary, delimiter, root_defects, as_bytes
+):
     """A part hidden after the root's close delimiter is recovered."""
     mail = _parse(
         f"From: a@b\nContent-Type: multipart/mixed; boundary={boundary}\n\n"
@@ -370,9 +380,12 @@ def test_nested_defect_with_epilogue(boundary, delimiter, as_bytes):
 
     assert mail.body == "hidden\n--- mail_boundary ---\nx\n"
     assert mail.has_defects is True
-    assert mail.defects_categories == {"StartBoundaryNotFoundDefect"}
+    assert mail.defects_categories == {
+        "StartBoundaryNotFoundDefect",
+        *root_defects,
+    }
     assert [_pick(node, "parent", *_TREE_KEYS) for node in mail.mime_tree] == [
-        (None, "multipart/mixed", ["container"], [], False),
+        (None, "multipart/mixed", ["container"], root_defects, False),
         (0, *_NESTED_NODE),
         (0, "text/plain", ["body"], [], True),
     ]
@@ -399,7 +412,9 @@ def test_defects_are_attributed_to_their_part():
 @pytest.mark.parametrize("name", ["Mime-Tree", "mime_tree", "Mime_Tree_json"])
 def test_wire_header_cannot_replace_the_tree(name):
     """The computed name is never resolved from a sender-chosen header."""
-    mail = mailparser.parse_from_string(_HEADERS + f"{name}: forged\r\n\r\nhi\r\n")
+    mail = mailparser.parse_from_string(
+        _HEADERS + f"{name}: forged\r\n\r\nhi\r\n"
+    )
 
     assert [node["content_type"] for node in mail.mime_tree] == ["text/plain"]
     assert json.loads(mail.mime_tree_json) == mail.mime_tree
@@ -409,7 +424,8 @@ def test_wire_header_cannot_replace_the_tree(name):
 def test_tree_of_invalid_octets_is_serializable():
     """Non-UTF-8 MIME metadata does not reach the tree as surrogates."""
     mail = mailparser.parse_from_bytes(
-        _HEADERS.encode() + b"Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+        _HEADERS.encode()
+        + b"Content-Type: multipart/mixed; boundary=b\r\n\r\n"
         b"--b\r\nContent-Type: text/pl\xff; name=\xfe.txt\r\n"
         b"Content-ID: <\xfd>\r\n\r\nhi\r\n"
         b"--b\r\nContent-Type: message/rfc822\r\n\r\n"
@@ -459,7 +475,9 @@ def test_drawing_shows_every_part_under_its_parent():
         "  │  └─ 3 text/html           quoted-printable  utf-8  11 B",
         "  └─ 4 text/csv               base64  10 B",
     ]
-    assert tree_lines[-1].endswith('[attachment]  disposition:attachment  "report.csv"')
+    assert tree_lines[-1].endswith(
+        '[attachment]  disposition:attachment  "report.csv"'
+    )
     assert "  From:         Alice <alice@example.com>" in drawing
     assert "  Message-ID:   <1@example.com>" in drawing
     assert "Defects:" not in drawing
@@ -473,7 +491,8 @@ def test_hostile_text_cannot_reach_the_terminal():
         "Subject: back\\slash \x1b[2J\r\n"
         "Content-Type: application/x\x7f-y; charset=\x1b[31m\r\n"
         "Content-Disposition: attachment;\r\n"
-        " filename*=utf-8''a%1B%5B2K%0D%E2%80%AEfdp%C2%A0.exe%E2%80%8B\r\n\r\nx\r\n"
+        " filename*=utf-8''a%1B%5B2K%0D%E2%80%AEfdp%C2%A0.exe%E2%80%8B\r\n\r\n"
+        "x\r\n"
     )
     drawing = mailparser.render_structure(mail)
 
@@ -490,7 +509,8 @@ def test_ascii_only_drawing_is_ascii():
     mail = mailparser.parse_from_string(
         _HEADERS.replace("structure", "caffè ☕").replace("Alice", "Ålice")
         + "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
-        '--b\r\nContent-Type: text/plain; name="résumé.txt"\r\n\r\nx\r\n--b--\r\n'
+        '--b\r\nContent-Type: text/plain; name="résumé.txt"\r\n\r\nx\r\n'
+        "--b--\r\n"
     )
     drawing = mailparser.render_structure(mail, ascii_only=True)
 
@@ -614,7 +634,9 @@ def test_cli_falls_back_to_ascii(capsys, tmp_path):
         stdout.encoding = "ascii"
         path = tmp_path / "mail.eml"
         path.write_bytes(_CONFORMING.encode())
-        with patch.object(sys, "argv", ["mail-parser", "-f", str(path), "-st"]):
+        with patch.object(
+            sys, "argv", ["mail-parser", "-f", str(path), "-st"]
+        ):
             with patch("builtins.print") as printed:
                 main()
     (drawing,), _ = printed.call_args
@@ -675,7 +697,9 @@ def test_visible_stops_at_the_limit_whatever_the_input_length():
     assert examined == "x" * 33
     # A fold is not content; a line break that folds nothing is shown.
     folded = "a" + chr(13) + chr(10) + chr(9) + "b" + chr(10) + "c"
-    assert _visible(folded, ascii_only=False, ellipsis="~") == ("a b" + BS + "x0ac")
+    assert _visible(folded, ascii_only=False, ellipsis="~") == (
+        "a b" + BS + "x0ac"
+    )
 
 
 def _strings(value):
@@ -700,7 +724,9 @@ def _strings(value):
     ],
 )
 @pytest.mark.parametrize("factory", ["string", "bytes"])
-def test_boundary_decoded_to_a_surrogate_stays_serializable(parameter, factory):
+def test_boundary_decoded_to_a_surrogate_stays_serializable(
+    parameter, factory
+):
     """RFC 2231 decoding runs a sender-chosen codec: its result is escaped.
 
     Security review: a lone surrogate in ``boundary`` made
@@ -772,7 +798,8 @@ def test_characters_that_draw_nothing_are_made_visible(code):
         f"Received: from a.example by mx.goo{hidden}gle.com with ESMTP;"
         " Thu, 01 Oct 2026 12:00:00 +0000\r\n"
         f"From: CEO{hidden} <ceo@example.com>\r\n"
-        f'Content-Type: text/plain; name="invoice.pdf{hidden}.exe"\r\n\r\nx\r\n'
+        f'Content-Type: text/plain; name="invoice.pdf{hidden}.exe"\r\n\r\n'
+        f"x\r\n"
     )
     drawing = mailparser.render_structure(mail)
     escape = chr(92) + (f"u{code:04x}" if code <= 0xFFFF else f"U{code:08x}")
@@ -809,7 +836,11 @@ def test_reading_the_tree_does_not_change_the_message():
     )
     message = mail.message
     assert message is not None
-    before = (list(message.defects), mail.mail_json, set(mail.defects_categories))
+    before = (
+        list(message.defects),
+        mail.mail_json,
+        set(mail.defects_categories),
+    )
 
     assert mail.mime_tree[0]["size"] == 2
     assert mail.mime_tree is mail.mime_tree

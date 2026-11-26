@@ -93,6 +93,9 @@ addopts = """
 --verbose
 """
 
+[tool.ruff]
+line-length = 79
+
 [tool.ruff.lint]
 select = [
   # pycodestyle

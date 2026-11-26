@@ -47,8 +47,12 @@ def get_args():
     )
 
     parsing_group = parser.add_mutually_exclusive_group(required=True)
-    parsing_group.add_argument("-f", "--file", dest="file", help="Raw email file")
-    parsing_group.add_argument("-s", "--string", dest="string", help="Raw email string")
+    parsing_group.add_argument(
+        "-f", "--file", dest="file", help="Raw email file"
+    )
+    parsing_group.add_argument(
+        "-s", "--string", dest="string", help="Raw email string"
+    )
     parsing_group.add_argument(
         "-k",
         "--stdin",
@@ -75,7 +79,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-b", "--body", dest="body", action="store_true", help="Print the body of mail"
+        "-b",
+        "--body",
+        dest="body",
+        action="store_true",
+        help="Print the body of mail",
     )
 
     parser.add_argument(
@@ -95,7 +103,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-t", "--to", dest="to", action="store_true", help="Print the to of mail"
+        "-t",
+        "--to",
+        dest="to",
+        action="store_true",
+        help="Print the to of mail",
     )
 
     parser.add_argument(
@@ -107,7 +119,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-m", "--from", dest="from_", action="store_true", help="Print the from of mail"
+        "-m",
+        "--from",
+        dest="from_",
+        action="store_true",
+        help="Print the from of mail",
     )
 
     parser.add_argument(

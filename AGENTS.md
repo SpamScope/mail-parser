@@ -67,17 +67,21 @@ mail = mailparser.parse_from_string(
 )
 assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
 assert mail.has_defects is True
-assert mail.address_header_defects == [{
-    "reason": "invalid-display-name",
-    "raw": "billing@trusted.example < billing@vendor.example >",
-    "recovered": True,
-    "candidates": [{
-        "display_name": "billing@trusted.example",
-        "address": "billing@vendor.example",
-    }],
-    "header": "from",
-    "occurrence": 0,
-}]
+assert mail.address_header_defects == [
+    {
+        "reason": "invalid-display-name",
+        "raw": "billing@trusted.example < billing@vendor.example >",
+        "recovered": True,
+        "candidates": [
+            {
+                "display_name": "billing@trusted.example",
+                "address": "billing@vendor.example",
+            }
+        ],
+        "header": "from",
+        "occurrence": 0,
+    }
+]
 ```
 
 ## Python Style
@@ -225,6 +229,41 @@ accessors, which raise `TypeError` for an RFC 2231 charset on an 8-bit body and,
 3.13.18, for sections with and without a number. `raw_payload()` catches it and returns the
 bytes. `as_string_safe()` must not: its raw-bytes fallback is not text, and a charset that
 could have been applied must never reach it.
+
+**Flattening fallback**: when a part refuses its charset, `as_string_safe()` writes the containers
+around it by hand and flattens their sub-parts one by one. A pass that fails must not be repeated
+at every level: that cost the size of the message times its depth on `message_as_string`.
+`_refusing_parts()` reads the parts a failed pass went through from the frames of
+`Generator.flatten` in the traceback (locals `msg` and `policy`), and those parts skip the pass.
+A header the generator will not fold is refused the same way, and is no charset error:
+`Header.encode()` takes a form feed for a line break, which the feed parser does not
+(`HeaderWriteError`, `HeaderParseError`). Catch `_FLATTEN_ERRORS` around a pass, never the
+charset errors alone: the error left `parse_from_bytes()` below an attached container. A part
+refused for a header skips the bytes pass too: before its own fix the bytes generator writes
+that header with the line break, which a sender can make a delimiter.
+Three rules keep the output what it was:
+
+- A part is named only when flattening it alone repeats the failed pass: same class and same
+  policy object as the part the pass started from, and the same line length. Below
+  `multipart/signed` the generator drops the length limit, and a policy other than `compat32` may
+  refuse there a header it folds when the part is flattened alone.
+- Nothing is skipped when a `SerializationBudget` is passed: at parse time every pass is debited,
+  also one that fails, and the debit decides which containers reach the resource limit.
+- Add no stack frame per nesting level and catch no `RecursionError` there: the depth at which
+  `message_as_string` raises `MailParserRecursionError` must not move. A frame without the
+  expected locals names no part; it costs a pass, never another output.
+
+A pass must not rewrite the message: the generator takes an empty boundary (`boundary=""`,
+`boundary*=utf-8''`, only whitespace) for a missing one, invents another and stores it with
+`set_boundary()`, which changed `mail.message` on a read and during `parse()` below an attached
+container. Run every generator pass inside `_keeping_empty_boundaries()`: there
+`RecoveringMessage.get_boundary()` returns the empty boundary as a string that is true, so the
+delimiters written are the `--` and `----` the message has, and outside a pass it returns the
+plain `""`. Do not save and restore headers around a pass instead (finding the parts is a scan
+of the subtree at every call, and the text holds a random boundary); a plain `Message` of the
+caller has no such accessor and is still rewritten. Keeping the empty boundary is recovery, not
+compliance: `mime_boundary()` reports it as `invalid-boundary-parameter: empty` on that part
+(RFC 2046 section 5.1.1), and only for a `multipart/*` part.
 
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
