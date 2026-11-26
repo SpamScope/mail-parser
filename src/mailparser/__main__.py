@@ -47,8 +47,12 @@ def get_args():
     )
 
     parsing_group = parser.add_mutually_exclusive_group(required=True)
-    parsing_group.add_argument("-f", "--file", dest="file", help="Raw email file")
-    parsing_group.add_argument("-s", "--string", dest="string", help="Raw email string")
+    parsing_group.add_argument(
+        "-f", "--file", dest="file", help="Raw email file"
+    )
+    parsing_group.add_argument(
+        "-s", "--string", dest="string", help="Raw email string"
+    )
     parsing_group.add_argument(
         "-k",
         "--stdin",
@@ -75,7 +79,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-b", "--body", dest="body", action="store_true", help="Print the body of mail"
+        "-b",
+        "--body",
+        dest="body",
+        action="store_true",
+        help="Print the body of mail",
     )
 
     parser.add_argument(
@@ -95,7 +103,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-t", "--to", dest="to", action="store_true", help="Print the to of mail"
+        "-t",
+        "--to",
+        dest="to",
+        action="store_true",
+        help="Print the to of mail",
     )
 
     parser.add_argument(
@@ -107,7 +119,11 @@ def get_args():
     )
 
     parser.add_argument(
-        "-m", "--from", dest="from_", action="store_true", help="Print the from of mail"
+        "-m",
+        "--from",
+        dest="from_",
+        action="store_true",
+        help="Print the from of mail",
     )
 
     parser.add_argument(
@@ -180,6 +196,22 @@ def get_args():
         dest="attachments_path",
         default="/tmp",
         help="Path where store attachments",
+    )
+
+    parser.add_argument(
+        "-st",
+        "--structure",
+        dest="structure",
+        action="store_true",
+        help="Draw the message structure: headers, delivery path, MIME tree",
+    )
+
+    # No short form: "-mt" already means "-m -t".
+    parser.add_argument(
+        "--mime-tree",
+        dest="mime_tree",
+        action="store_true",
+        help="Print the MIME tree of mail as JSON",
     )
 
     parser.add_argument(
@@ -267,6 +299,14 @@ def process_output(args, parser):
     if args.json:
         safe_print(parser.mail_json)
 
+    # Directly after the mail: a caller reading both gets two consecutive
+    # JSON documents.
+    if args.mime_tree:
+        safe_print(parser.mime_tree_json)
+
+    if args.structure:
+        print_structure(parser)
+
     if args.body:
         safe_print(parser.body)
 
@@ -304,6 +344,24 @@ def process_output(args, parser):
     if args.store_attachments:
         log.debug("Store attachments on disk")
         write_attachments(parser.attachments, args.attachments_path)
+
+
+def print_structure(parser):
+    """
+    Print the drawing of the message structure.
+
+    Falls back to ASCII when the output encoding cannot represent the
+    drawing, so a terminal that is not UTF-8 gets text, not an error.
+
+    :param parser: MailParser
+    :type parser: mailparser.core.MailParser
+    """
+    drawing = mailparser.render_structure(parser)
+    try:
+        drawing.encode(sys.stdout.encoding or "ascii")
+    except (UnicodeEncodeError, LookupError):
+        drawing = mailparser.render_structure(parser, ascii_only=True)
+    print(drawing)
 
 
 def print_defects(parser):

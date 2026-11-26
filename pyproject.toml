@@ -30,10 +30,11 @@ maintainers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://spamscope.ai/en/"
+Homepage = "https://spamscope.ai/en/mail-parser/"
 Source = "https://github.com/SpamScope/mail-parser"
 Issues = "https://github.com/SpamScope/mail-parser/issues"
 Changelog = "https://github.com/SpamScope/mail-parser/releases"
+Funding = "https://github.com/sponsors/fedelemantuano"
 
 [project.optional-dependencies]
 outlook = ["extract-msg>=0.54"]
@@ -91,6 +92,9 @@ addopts = """
 --junitxml=junit.xml
 --verbose
 """
+
+[tool.ruff]
+line-length = 79
 
 [tool.ruff.lint]
 select = [

@@ -66,7 +66,9 @@ def test_named_inline_text_and_attachment(media_type, name_source):
         }
     ]
     expected = [payload.decode("ascii")]
-    assert parsed.text_plain == (expected if media_type == b"text/plain" else [])
+    assert parsed.text_plain == (
+        expected if media_type == b"text/plain" else []
+    )
     assert parsed.text_html == (expected if media_type == b"text/html" else [])
     assert parsed.body == payload.decode("ascii")
     assert parsed.has_defects is False
@@ -125,7 +127,9 @@ def test_named_inline_decodes_once_as_body_and_keeps_bytes(charset, cte):
     elif cte == "quoted-printable":
         wire = quopri.encodestring(payload)
     headers = (
-        b"Content-Transfer-Encoding: " + cte.encode("ascii") + b"\r\n" if cte else b""
+        b"Content-Transfer-Encoding: " + cte.encode("ascii") + b"\r\n"
+        if cte
+        else b""
     )
     parsed = mailparser.parse_from_bytes(
         _HEADERS
@@ -169,7 +173,9 @@ def test_named_inline_unicode_string_input():
         (b"application/html", b'inline; filename="sample.bin"'),
     ],
 )
-def test_inline_binary_and_nontext_parts_remain_attachments(media_type, disposition):
+def test_inline_binary_and_nontext_parts_remain_attachments(
+    media_type, disposition
+):
     """Content-ID and text-like subtypes do not promote binary media."""
     payload = b"\x00\x80\xff\r\n"
     parsed = mailparser.parse_from_bytes(
@@ -178,7 +184,8 @@ def test_inline_binary_and_nontext_parts_remain_attachments(media_type, disposit
             media_type,
             disposition,
             base64.b64encode(payload),
-            b"Content-ID: <image@example.com>\r\nContent-Transfer-Encoding: base64\r\n",
+            b"Content-ID: <image@example.com>\r\nContent-Transfer-Encoding: "
+            b"base64\r\n",
         )
     )
 
@@ -191,13 +198,20 @@ def test_inline_binary_and_nontext_parts_remain_attachments(media_type, disposit
 
 def test_nested_inline_siblings_and_explicit_attachment():
     """Collect nested inline text while retaining explicit text files."""
-    plain = _entity(b"text/plain", b'inline; filename="body.txt"', b"plain body")
-    html = _entity(b"text/html", b'inline; filename="body.html"', b"<p>html body</p>")
+    plain = _entity(
+        b"text/plain", b'inline; filename="body.txt"', b"plain body"
+    )
+    html = _entity(
+        b"text/html", b'inline; filename="body.html"', b"<p>html body</p>"
+    )
     attachment = _entity(
         b"text/plain", b'attachment; filename="private.txt"', b"private"
     )
     raw = _HEADERS + _multipart(
-        [_multipart([plain, html], b"alternative", subtype=b"alternative"), attachment],
+        [
+            _multipart([plain, html], b"alternative", subtype=b"alternative"),
+            attachment,
+        ],
         b"outer",
     )
     parsed = mailparser.parse_from_bytes(raw)
@@ -216,9 +230,16 @@ def test_nested_inline_siblings_and_explicit_attachment():
 @pytest.mark.parametrize("wrapper", ["multipart", "message"])
 @pytest.mark.parametrize(
     ("disposition", "presented"),
-    [(b"attachment", False), (b"x-custom", False), (None, False), (b"inline", True)],
+    [
+        (b"attachment", False),
+        (b"x-custom", False),
+        (None, False),
+        (b"inline", True),
+    ],
 )
-def test_named_inline_respects_container_disposition(wrapper, disposition, presented):
+def test_named_inline_respects_container_disposition(
+    wrapper, disposition, presented
+):
     """A named attached ancestor cannot expose newly included inline text."""
     child = _entity(b"text/plain", b'inline; filename="child.txt"', b"inside")
     inner = _multipart([child], b"inner")
@@ -235,12 +256,16 @@ def test_named_inline_respects_container_disposition(wrapper, disposition, prese
             b'boundary=container; name="bundle.mime"\r\n',
             1,
         )
-    visible = _entity(b"text/plain", b'inline; filename="visible.txt"', b"outside")
+    visible = _entity(
+        b"text/plain", b'inline; filename="visible.txt"', b"outside"
+    )
     parsed = mailparser.parse_from_bytes(
         _HEADERS + _multipart([visible, container], b"outer")
     )
 
-    assert parsed.text_plain == (["outside", "inside"] if presented else ["outside"])
+    assert parsed.text_plain == (
+        ["outside", "inside"] if presented else ["outside"]
+    )
     child_attachment = next(
         a for a in parsed.attachments if a["filename"] == "child.txt"
     )

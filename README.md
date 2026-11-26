@@ -1,12 +1,13 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/mail-parser)](https://pypi.org/project/mail-parser/)
 [![Coverage Status](https://coveralls.io/repos/github/SpamScope/mail-parser/badge.svg?branch=develop)](https://coveralls.io/github/SpamScope/mail-parser?branch=develop)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/mail-parser?color=blue)](https://pypistats.org/packages/mail-parser)
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?logo=githubsponsors&logoColor=white)](https://github.com/SpamScope/mail-parser#support-mail-parser)
 
 ![SpamScope](https://raw.githubusercontent.com/SpamScope/spamscope/develop/docs/logo/spamscope.png)
 
 # mail-parser
 
-**Project website:** [spamscope.ai/en/](https://spamscope.ai/en/)
+**Project website:** [spamscope.ai/en/mail-parser/](https://spamscope.ai/en/mail-parser/)
 
 mail-parser is a **production-grade, RFC-compliant email parsing library** that goes far beyond a
 simple wrapper for Python's [email module](https://docs.python.org/2/library/email.message.html).
@@ -64,7 +65,9 @@ Two conversion backends are supported:
 Only when it is *not* available does mail-parser fall back to the `msgconvert`
 external tool, logging a deprecation warning. If neither backend is available,
 `parse_from_file_msg()` raises `MailParserOSError` telling you to install
-either path.
+either path. A malformed `.msg` (not OLE, truncated, corrupt) read with
+`extract-msg` raises `MailParserOutlookError`, with the library's exception as
+`__cause__`.
 
 > **⚠️ Deprecated:** the `msgconvert` external-tool backend is deprecated and
 > will be removed in a future release. Migrate to the pure-Python backend with
@@ -81,43 +84,36 @@ previous `msgconvert`-only behavior. Downstream code asserting on exact
 
 mail-parser can be downloaded, used, and modified free of charge. It is available under the Apache 2 license.
 
-# Support the Future of mail-parser
+# Support mail-parser
 
-mail-parser is a **labor of love and commitment to the open-source community**. Thousands of
-developers and security professionals worldwide rely on this library for critical email processing
-and threat analysis. Your support directly fuels continued innovation and excellence.
+<p align="center">
+  <a href="https://github.com/sponsors/fedelemantuano"><img
+    src="https://img.shields.io/badge/GitHub%20Sponsors-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white"
+    alt="Sponsor on GitHub"></a>
+  <a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&amp;hosted_button_id=VEPXYP745KJF2"><img
+    src="https://img.shields.io/badge/PayPal-003087?style=for-the-badge&logo=paypal&logoColor=white"
+    alt="Donate with PayPal"></a>
+  <a href="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"><img
+    src="https://img.shields.io/badge/Bitcoin-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white"
+    alt="Donate with Bitcoin"></a>
+</p>
 
-## Invest in Innovation
+mail-parser is free and open source. Thousands of developers and security professionals rely on it
+for email processing and threat analysis. Every donation, whether $5 or $500, funds development
+time and infrastructure: detection of new evasion techniques, RFC compliance, performance, and
+tested releases you can trust in production.
 
-Your contribution—no matter the size—makes a real difference. By supporting mail-parser, you enable us to:
+**Bitcoin address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
 
-- **Advance Security Capabilities**: Develop cutting-edge detection mechanisms for emerging email
-  threats and attack vectors.
-- **Expand Format Support**: Add compatibility with new email formats and standards as they evolve.
-- **Enhance Performance**: Optimize parsing speed and memory efficiency for large-scale deployments.
-- **Maintain Excellence**: Ensure comprehensive testing, documentation, and bug-free releases that
-  you can trust in production.
-- **Foster Community**: Respond to issues, review contributions, and build a thriving ecosystem
-  around email security.
-- **Stay RFC-Compliant**: Keep pace with evolving email standards and specifications to ensure
-  maximum compatibility.
+<details>
+<summary>Show Bitcoin QR code</summary>
 
-Every donation, whether $5 or $500, directly funds development time and infrastructure costs. Join
-the community of supporters who believe in **accessible, reliable, and secure email parsing for
-everyone**.
+<img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"
+alt="Bitcoin QR code" width="200">
 
-[![Donate](https://www.paypal.com/en_US/i/btn/btn_donateCC_LG.gif "Donate")](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=VEPXYP745KJF2)
+</details>
 
-Or contribute with Bitcoin:
-
-<a href="bitcoin:bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32">
-  <img src="https://github.com/SpamScope/mail-parser/blob/develop/docs/images/Bitcoin%20SpamScope.jpg?raw=true"
-       alt="Bitcoin" width="200">
-</a>
-
-**Bitcoin Address:** `bc1qxhz3tghztpjqdt7atey68s344wvmugtl55tm32`
-
-Thank you for supporting the evolution of mail-parser!
+Thank you for supporting mail-parser!
 
 # mail-parser in the ecosystem
 
@@ -293,9 +289,9 @@ All parsed properties provide three access variants using intuitive suffixes:
 Example usage:
 
 ```python
-mail.to          # Python list of recipient objects
-mail.to_json     # JSON string representation
-mail.to_raw      # Original "To:" header string as it appears in the email
+mail.to  # Python list of recipient objects
+mail.to_json  # JSON string representation
+mail.to_raw  # Original "To:" header string as it appears in the email
 ```
 
 The command-line tool outputs parsed emails in JSON format by default for easy integration with
@@ -431,6 +427,27 @@ decoder that produces a non-Unicode scalar also triggers recovery: names retain
 their literal encoded form and text retains a safe byte-derived view, keeping
 JSON and CLI output encodable as UTF-8.
 
+A malformed RFC 2231 parameter does not stop the parse, whatever Python's
+`email` package does with it. A multipart boundary whose charset refuses the
+octets (`boundary*=undefined''%41%42`) is read as the package reads a value
+with an unknown charset, the percent-decoded octets as Latin-1 (`AB`), so its
+parts are still found. A parameter with numbered and unnumbered sections
+(`filename*0=report; filename*=utf-8''evil.exe; filename*1=.pdf`), or with a
+section given twice (`filename*0=b.exe; filename*0=a`), is read on every
+Python as the current releases read it: an unnumbered section is section 0,
+or is dropped when section 0 exists (`report.pdf`), and equal sections keep
+the order of the header (`b.exea`). A section number too long to be a number
+leaves that parameter under its literal name.
+The other parameters of the header are read as usual. Each case is a
+`MimeHeaderDefect` of that MIME part, with the value as evidence:
+`invalid-boundary-parameter` or `invalid-parameter-continuation`.
+
+A multipart whose boundary is empty (`boundary=""`, `boundary*=utf-8''`, a
+value of only white space) is still read with the delimiters `--` and `----`,
+and its header is kept as received. RFC 2046 section 5.1.1 requires a boundary
+of 1 to 70 characters, so the part reports the `MimeHeaderDefect`
+`invalid-boundary-parameter: empty` with the raw parameter value.
+
 Header decoding is strict. An unknown charset, invalid byte sequence or
 non-Unicode scalar leaves the complete original header value literal instead
 of dropping bytes or mixing a decoded prefix with the original. A
@@ -477,6 +494,124 @@ budget applies during parsing to container copies, not to input ingestion,
 individual leaf payloads, or an explicit later `message_as_string` request.
 Applications processing untrusted mail should still bound input size and
 isolate workers according to their own resource constraints.
+
+`message_as_string` raises `MailParserRecursionError` when the message is
+nested too deeply to flatten. Flattening needs more stack per MIME nesting
+level than parsing, so this can happen for a message that parsed without
+error: with the default interpreter recursion limit, at roughly 250 levels.
+Deep nesting is not a MIME syntax violation and sets no defect. `mail.message`
+and `mail.mime_tree` still expose the original tree.
+
+## Message structure
+
+`mail.mime_tree` describes the MIME tree: one entry per MIME part, in the
+order of the wire, containers included. Entry `i` is part `i`, the number
+defect messages quote as `part N`. Each entry names its enclosing part in
+`parent`, so the list is flat however deeply a sender nests the message.
+
+```python
+import mailparser
+
+mail = mailparser.parse_from_file("example_mail")
+for part in mail.mime_tree:
+    print(
+        "  " * part["depth"],
+        part["index"],
+        part["content_type"],
+        part["roles"],
+    )
+
+print(mailparser.render_structure(mail))
+```
+
+| Key                         | Meaning                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------ |
+| `index`, `parent`, `depth`  | Position in the list, position of the enclosing part (`None` for the root), nesting level. |
+| `content_type`              | The type the parser acted on. Absent or unusable headers get the RFC 2045/2046 default.    |
+| `content_type_raw`          | The literal `Content-Type` value, `None` when the part has none.                           |
+| `content_transfer_encoding` | Declared encoding, `None` when absent.                                                     |
+| `charset`, `boundary`       | Declared parameters.                                                                       |
+| `content_disposition`       | Declared disposition type.                                                                 |
+| `filename`, `content_id`    | Declared file name (decoded) and `Content-ID`.                                             |
+| `size`                      | Octets of a leaf after transfer decoding; `None` for a container.                          |
+| `roles`                     | How the part was classified: any of `container`, `body`, `attachment`.                     |
+| `attachment`                | Position of the matching entry in `mail.attachments`.                                      |
+| `defects`                   | Defect categories recorded against this part.                                              |
+| `recovered`                 | `True` for a part recovered from an epilogue.                                              |
+| `embedded_headers`          | Literal `from`, `subject` and `date` of a message enclosed in a `message/*` part.          |
+
+The tree is the structure on the wire annotated with the parser's
+interpretation, so the two can be compared: named inline text has the roles
+`attachment` and `body`, an attached multipart has `container` and
+`attachment`, and a leaf with no role was exposed neither as body text nor as
+an attachment. Values are the ones the message declares; apart from
+`content_type`, an absent header is `None`, never a default. A part whose
+container representation was omitted for the
+[resource limit](#resource-limits-for-container-representations) keeps the
+`attachment` role, has `attachment` set to `None` and carries
+`ResourceLimitDefect`.
+
+`mail.mime_tree_json` is the same list as JSON. The tree is not part of
+`mail.mail` or `mail.mail_json`, which are unchanged. `mime_tree` is a
+computed name: a wire header called `Mime-Tree` stays readable through
+`mail.headers`.
+
+The tree is built the first time it is read. It has one entry per part, and
+the number of parts is chosen by the sender: about 400 bytes of JSON per
+entry, so a 2.7 MiB message made of 400,000 empty parts yields a 159 MiB
+tree. Bound the input size, or the number of entries you keep, when the tree
+of untrusted mail is stored or sent on. A boundary that an RFC 2231 charset
+decodes to something that is not text is shown with `\udXXX` escapes and
+reported as `MimeHeaderDefect`; one the charset cannot decode at all is shown
+as its percent-decoded octets read as Latin-1, with the same defect.
+
+`mailparser.render_structure(mail)` draws the message structure as text:
+
+```text
+MESSAGE
+  From:         meteo@regione.vda.it
+  Reply-To:     meteo@regione.vda.it
+  Return-Path:  <meteo@regione.vda.it>
+  To:           echo@tu-berlin.de, Porcile, M. <mporcile@server_mail.it>
+  Subject:      Bollettino Meteorologico del 29/11/2015
+  Date:         Sun, 29 Nov 2015 09:45:18 +0100
+  Message-ID:   <4516257BC5774408ADC1263EEBBBB73F@ad.regione.vda.it>
+  Defects:      CharsetDecodeDefect
+
+DELIVERY PATH
+  1  2015-11-29T08:45:17+00:00  WWWGESTIONE3 ([172.30.104.243])       ──▶ aspam2-ravda.regione.vda.it      Microsoft SMTPSVC(6.0.37…
+  │  -3s
+  2  2015-11-29T08:45:14+00:00  aspam2-ravda.regione.vda.it (unknown… ──▶ Websense Email Security Gateway  ESMTP
+  │  +48s
+  3  2015-11-29T08:46:02+00:00  smtp2.regione.vda.it (217.76.210.112… ──▶ smtp.customers.net               SMTP
+  │  +0s
+  4  2015-11-29T08:46:02+00:00  (no from or by clause)
+
+MIME TREE
+  0 multipart/mixed              [container]
+  ├─ 1 multipart/related         [container]
+  │  ├─ 2 multipart/alternative  [container]
+  │  │  ├─ 3 text/plain          quoted-printable  iso-8859-1  2.2 KB  [body]
+  │  │  └─ 4 text/html           8bit  4.0 KB  [body]
+  │  │        ⚠ CharsetDecodeDefect
+  │  ├─ 5 image/jpeg             base64  9.7 KB  [attachment]  disposition:inline  "intestazione.jpg"
+  │  └─ 6 image/jpeg             base64  7.1 KB  [attachment]  disposition:inline  "logometeo.jpg"
+  └─ 7 application/octet-stream  base64  1.0 MB  [attachment]  disposition:attachment  "Bollettino.pdf"
+```
+
+A warning mark means a defect the parser recorded for that hop or part; a
+delay is printed as a number and never judged. Parts nested deeper than 32
+levels are counted on one line instead of being drawn. Pass `ascii_only=True`
+for ASCII connectors.
+
+The drawing is safe to print: text taken from the message is cut to a bounded
+width, and control characters, ANSI escapes, bidirectional and zero-width
+formatting characters, and characters that draw nothing, are shown as visible
+escapes such as `\x1b`. Letters of different scripts that merely look alike
+are not detected. The values
+in `mime_tree`, `headers` and `received` are not escaped. They are untrusted
+text chosen by the sender: escape them before putting them in HTML, a terminal
+or a diagram language.
 
 ## Defects and Their Critical Role in Email Security
 
@@ -535,28 +670,31 @@ mail = mailparser.parse_from_string(
 assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
 assert mail.has_defects is True
 assert "AddressHeaderDefect" in mail.defects_categories
-assert mail.defects == [{"address-headers": [
-    "AddressHeaderDefect: from[0]: invalid-display-name"
-]}]
-assert mail.address_header_defects == [{
-    "reason": "invalid-display-name",
-    "raw": "billing@trusted.example < billing@vendor.example >",
-    "recovered": True,
-    "candidates": [{
-        "display_name": "billing@trusted.example",
-        "address": "billing@vendor.example",
-    }],
-    "header": "from",
-    "occurrence": 0,
-}]
+assert mail.defects == [
+    {"address-headers": ["AddressHeaderDefect: from[0]: invalid-display-name"]}
+]
+assert mail.address_header_defects == [
+    {
+        "reason": "invalid-display-name",
+        "raw": "billing@trusted.example < billing@vendor.example >",
+        "recovered": True,
+        "candidates": [
+            {
+                "display_name": "billing@trusted.example",
+                "address": "billing@vendor.example",
+            }
+        ],
+        "header": "from",
+        "occurrence": 0,
+    }
+]
 assert json.loads(mail.mail_json)["address_header_defects"] == (
     mail.address_header_defects
 )
 
 # 2. Incomplete address: no selected mailbox; a valid neighbouring field survives.
 mail = mailparser.parse_from_string(
-    "From: Alice <alice@example.com\r\n"
-    "To: Bob <bob@example.com>\r\n\r\n"
+    "From: Alice <alice@example.com\r\nTo: Bob <bob@example.com>\r\n\r\n"
 )
 assert mail.from_ == []
 assert mail.to == [("Bob", "bob@example.com")]
@@ -573,8 +711,7 @@ assert mail.address_header_defects[0]["occurrence"] == 1
 
 # 4. Received: ambiguous trace syntax stays raw, with structured diagnostics.
 trace = (
-    "from sender.example (unclosed; by mx.example; "
-    "1 Jan 2024 12:00:00 +0000"
+    "from sender.example (unclosed; by mx.example; 1 Jan 2024 12:00:00 +0000"
 )
 mail = mailparser.parse_from_string(f"Received: {trace}\r\n\r\n")
 assert "ReceivedHeaderDefect" in mail.defects_categories
@@ -592,9 +729,7 @@ assert mail.received_header_defects[0]["recovered"] is True
 assert mail.received[0]["for"] == "<bob@example.com>"
 
 # 5. Dates: an impossible date is not selected; a wrong weekday is recoverable.
-mail = mailparser.parse_from_string(
-    "Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n"
-)
+mail = mailparser.parse_from_string("Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n")
 assert "DateHeaderDefect" in mail.defects_categories
 assert mail.date is None
 assert mail.date_header_defects[0]["reason"] == "invalid-calendar-date"
@@ -613,7 +748,8 @@ mail = mailparser.parse_from_string(
     "1 Jan 2024 25:00:00 +0000\r\n\r\n"
 )
 assert {d["header"] for d in mail.date_header_defects} == {
-    "resent-date", "received"
+    "resent-date",
+    "received",
 }
 
 # 6. Charset: failed declared decoding, then readable UTF-8 or replacement text.
@@ -638,31 +774,43 @@ assert base64.b64decode(mail.attachments[0]["payload"]) == b"Hello"
 
 # 8. Standard-library structure defects: missing parameter/start/closing boundary.
 for raw, category in [
-    ("Content-Type: multipart/mixed\r\n\r\nHello",
-     "NoBoundaryInMultipartDefect"),
-    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\nHello',
-     "StartBoundaryNotFoundDefect"),
-    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
-     '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n',
-     "CloseBoundaryNotFoundDefect"),
-    ("Subject: example\r\ninvalid header line\r\n\r\nHello",
-     "MissingHeaderBodySeparatorDefect"),
+    (
+        "Content-Type: multipart/mixed\r\n\r\nHello",
+        "NoBoundaryInMultipartDefect",
+    ),
+    (
+        'Content-Type: multipart/mixed; boundary="b"\r\n\r\nHello',
+        "StartBoundaryNotFoundDefect",
+    ),
+    (
+        'Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
+        "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n",
+        "CloseBoundaryNotFoundDefect",
+    ),
+    (
+        "Subject: example\r\ninvalid header line\r\n\r\nHello",
+        "MissingHeaderBodySeparatorDefect",
+    ),
 ]:
     mail = mailparser.parse_from_string(raw)
     assert mail.has_defects
     assert category in mail.defects_categories
-    assert any(category in text for entry in mail.defects
-               for texts in entry.values() for text in texts)
+    assert any(
+        category in text
+        for entry in mail.defects
+        for texts in entry.values()
+        for text in texts
+    )
 
 # 9. Bad epilogue: reusing the parent's boundary corrupts nested MIME structure.
 # The attachment after the first closing boundary lands in the outer epilogue.
 raw = (
     'MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="b"\r\n\r\n'
     '--b\r\nContent-Type: multipart/alternative; boundary="b"\r\n\r\n'
-    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b--\r\n'
+    "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b--\r\n"
     '--b\r\nContent-Type: application/octet-stream; name="evidence.txt"\r\n'
     'Content-Disposition: attachment; filename="evidence.txt"\r\n'
-    'Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8=\r\n--b--\r\n'
+    "Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8=\r\n--b--\r\n"
 )
 mail = mailparser.parse_from_string(raw)
 assert mail.has_defects
@@ -685,8 +833,8 @@ for raw in [
     "From: Alice <alice@example.com>\r\n"
     "Date: 1 Jan 24 12:00:00 GMT\r\n\r\nHello",
     'Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
-    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n'
-    '--b--\r\nOrdinary epilogue\r\n',
+    "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n"
+    "--b--\r\nOrdinary epilogue\r\n",
 ]:
     mail = mailparser.parse_from_string(raw)
     assert mail.has_defects is False
@@ -732,6 +880,11 @@ This robust defect detection mechanism has made mail-parser the **trusted choice
 platforms like SpamScope**, where identifying malicious intent hidden in structural anomalies can
 mean the difference between a blocked threat and a successful attack.
 
+# Reporting Security Issues
+
+Do not report vulnerabilities in public issues. See [SECURITY.md](SECURITY.md) for supported
+versions, private reporting channels and the disclosure process.
+
 # Authors
 
 ## Main Author
@@ -741,6 +894,12 @@ mean the difference between a blocked threat and a successful attack.
 # Installation
 
 mail-parser requires Python 3 and can be installed in seconds using pip. Follow these steps:
+
+Use the latest patch release of your Python series. mail-parser parses with
+Python's `email` package, and older patch releases take quadratic time on a
+header with many parameters: an 80 KB `Content-Type` value takes more than a
+second to parse on Python 3.9.6, 3.11.11, 3.12.8 and 3.13.2, and under 0.1
+seconds on 3.10.22, 3.12.16, 3.13.18, 3.14.10 and 3.15.2.
 
 ## Quick Install
 
@@ -783,11 +942,11 @@ Import the `mailparser` module and use the convenient factory functions:
 ```python
 import mailparser
 
-mail = mailparser.parse_from_bytes(byte_mail)      # Parse from bytes object
-mail = mailparser.parse_from_file(f)               # Parse from file path
-mail = mailparser.parse_from_file_msg(outlook_mail) # Parse Outlook .msg file
-mail = mailparser.parse_from_file_obj(fp)          # Parse from file object
-mail = mailparser.parse_from_string(raw_mail)      # Parse from string
+mail = mailparser.parse_from_bytes(byte_mail)  # Parse from bytes object
+mail = mailparser.parse_from_file(f)  # Parse from file path
+mail = mailparser.parse_from_file_msg(outlook_mail)  # Parse Outlook .msg file
+mail = mailparser.parse_from_file_obj(fp)  # Parse from file object
+mail = mailparser.parse_from_string(raw_mail)  # Parse from string
 ```
 
 File paths are read as bytes, preserving undecodable octets and original MIME
@@ -806,28 +965,29 @@ by its caller.
 Once parsed, access all email components through intuitive properties:
 
 ```python
-mail.attachments              # List of all attachments with metadata
-mail.body                     # Complete message body
-mail.date                     # Parsed datetime object (UTC)
-mail.defects                  # List of RFC compliance defects
-mail.defects_categories       # Categorized defect types
-mail.delivered_to             # Delivery address
-mail.from_                    # Sender information
+mail.attachments  # List of all attachments with metadata
+mail.body  # Complete message body
+mail.date  # Parsed datetime object (UTC)
+mail.defects  # List of RFC compliance defects
+mail.defects_categories  # Categorized defect types
+mail.delivered_to  # Delivery address
+mail.from_  # Sender information
 mail.get_server_ipaddress(trust="my_server_mail_trust")  # Reliable sender IP
-mail.headers                  # All headers as structured object
-mail.mail                     # Fully tokenized mail object
-mail.message                  # Underlying email.message.Message object
-mail.message_as_string        # Reconstructed message as string
-mail.message_id               # Unique message identifier
-mail.received                 # Parsed routing information (hop-by-hop)
-mail.subject                  # Email subject
-mail.text_plain               # Plain text body parts (list)
-mail.text_html                # HTML body parts (list)
-mail.text_not_managed         # Unprocessed text parts (check logs for subtypes)
-mail.to                       # Recipient information
-mail.to_domains               # Extracted recipient domains
-mail.timezone                 # Timezone information (offset from UTC)
-mail.mail_partial             # Partial mail object (main parts only)
+mail.headers  # All headers as structured object
+mail.mail  # Fully tokenized mail object
+mail.message  # Underlying email.message.Message object
+mail.message_as_string  # Reconstructed message as string
+mail.message_id  # Unique message identifier
+mail.mime_tree  # One entry per MIME part, with its enclosing part
+mail.received  # Parsed routing information (hop-by-hop)
+mail.subject  # Email subject
+mail.text_plain  # Plain text body parts (list)
+mail.text_html  # HTML body parts (list)
+mail.text_not_managed  # Unprocessed text parts (check logs for subtypes)
+mail.to  # Recipient information
+mail.to_domains  # Extracted recipient domains
+mail.timezone  # Timezone information (offset from UTC)
+mail.mail_partial  # Partial mail object (main parts only)
 ```
 
 ## Saving Attachments to Disk
@@ -853,26 +1013,26 @@ treated this way: it raises `MailParserPathError` and stops the batch.
 
 # Usage from Command Line
 
-After installing mail-parser with pip, you can use the `mailparser` command-line tool for quick
+After installing mail-parser with pip, you can use the `mail-parser` command-line tool for quick
 email analysis, batch processing, or integration with shell scripts and pipelines.
 
 ## Command-Line Options
 
 ```text
-usage: mailparser [-h] (-f FILE | -s STRING | -k)
+usage: mail-parser [-h] (-f FILE | -s STRING | -k)
                    [-l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}] [-j] [-b]
                    [-a] [-r] [-t] [-dt] [-m] [-u] [-c] [-d] [-o]
-                   [-i Trust mail server string] [-p] [-z] [-v]
+                   [-i Trust mail server string] [-p] [-z] [-sa]
+                   [-ap ATTACHMENTS_PATH] [-st] [--mime-tree] [-v]
 
 Wrapper for email Python Standard Library
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -f FILE, --file FILE  Raw email file (default: None)
-  -s STRING, --string STRING
-                        Raw email string (default: None)
+  -f, --file FILE       Raw email file (default: None)
+  -s, --string STRING   Raw email string (default: None)
   -k, --stdin           Enable parsing from stdin (default: False)
-  -l {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
+  -l, --log-level {CRITICAL,ERROR,WARNING,INFO,DEBUG,NOTSET}
                         Set log level (default: WARNING)
   -j, --json            Show the JSON of parsed mail (default: False)
   -b, --body            Print the body of mail (default: False)
@@ -885,7 +1045,7 @@ optional arguments:
   -c, --receiveds       Print all receiveds of mail (default: False)
   -d, --defects         Print the defects of mail (default: False)
   -o, --outlook         Analyze Outlook msg (default: False)
-  -i Trust mail server string, --senderip Trust mail server string
+  -i, --senderip Trust mail server string
                         Extract a reliable sender IP address heuristically
                         (default: None)
   -p, --mail-hash       Print mail fingerprints without headers (default:
@@ -894,8 +1054,11 @@ optional arguments:
                         Print attachments with fingerprints (default: False)
   -sa, --store-attachments
                         Store attachments on disk (default: False)
-  -ap ATTACHMENTS_PATH, --attachments-path ATTACHMENTS_PATH
+  -ap, --attachments-path ATTACHMENTS_PATH
                         Path where store attachments (default: /tmp)
+  -st, --structure      Draw the message structure: headers, delivery path,
+                        MIME tree (default: False)
+  --mime-tree           Print the MIME tree of mail as JSON (default: False)
   -v, --version         show program's version number and exit
 
 It takes as input a raw mail and generates a parsed object.
@@ -906,25 +1069,44 @@ It takes as input a raw mail and generates a parsed object.
 Parse an email file and output as formatted JSON:
 
 ```shell
-mailparser -f example_mail -j
+mail-parser -f example_mail -j
 ```
 
 Extract only the subject and sender:
 
 ```shell
-mailparser -f example_mail -u -m
+mail-parser -f example_mail -u -m
 ```
 
 Analyze an Outlook .msg file with defect detection:
 
 ```shell
-mailparser -f email.msg -o -d -j
+mail-parser -f email.msg -o -d -j
+```
+
+Draw the message structure: main headers, delivery path and MIME tree:
+
+```shell
+mail-parser -f example_mail -st
+```
+
+Print the parsed mail and its MIME tree as two consecutive JSON documents:
+
+```shell
+mail-parser -f example_mail -j --mime-tree
+```
+
+Log messages go to standard error, so standard output holds only the output
+you asked for and can be read as JSON:
+
+```shell
+mail-parser -f example_mail -j > example_mail.json
 ```
 
 Parse from stdin (useful for pipelines):
 
 ```shell
-cat raw_email.eml | mailparser -k -j
+cat raw_email.eml | mail-parser -k -j
 ```
 
 See the transformation from [raw email](https://gist.github.com/fedelemantuano/5dd702004c25a46b2bd60de21e67458e)
@@ -947,7 +1129,7 @@ MailParserError: Base MailParser Exception
 |
 \── MailParserReceivedParsingError: Raised when a received header cannot be parsed
 |
-\── MailParserRecursionError: Raised when a message is nested too deeply to parse
+\── MailParserRecursionError: Raised when a message is nested too deeply to parse or flatten
 ```
 
 # Docker Deployment

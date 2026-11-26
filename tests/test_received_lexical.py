@@ -62,7 +62,9 @@ def test_comment_delimiters_do_not_split_received(comment):
 )
 def test_recipient_is_one_lexical_value(recipient):
     """Quotes, escapes and domain literals cannot forge clauses or dates."""
-    header = f"from sender.example by mx.example with ESMTP for {recipient}; {DATE}"
+    header = (
+        f"from sender.example by mx.example with ESMTP for {recipient}; {DATE}"
+    )
     mail = _mail(header)
     assert mail.received[0]["for"] == recipient
     assert mail.received[0]["date"] == DATE
@@ -216,7 +218,10 @@ def test_invalid_received_octet_does_not_crash_or_disappear():
     assert mail.received[0]["raw"] == evidence
     assert mail.received_header_defects[0]["raw"] == evidence
     assert mail.message is not None
-    assert next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape") == raw
+    assert (
+        next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape")
+        == raw
+    )
 
 
 def test_utf8_received_comment_does_not_crash():
@@ -309,27 +314,42 @@ def test_invalid_received_evidence_is_utf8_serializable(malformed):
     assert b"\\\\udcff" in rendered
     assert mail.has_defects is True
     assert mail.message is not None
-    assert next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape") == raw
+    assert (
+        next(mail.message.raw_items())[1].encode("utf-8", "surrogateescape")
+        == raw
+    )
 
 
 @pytest.mark.parametrize(
     "argument",
-    ['"x by y" [8.8.8.8]', "host [8.8.8.8]", "x (nested [8.8.8.8])", r"x\) [8.8.8.8]"],
+    [
+        '"x by y" [8.8.8.8]',
+        "host [8.8.8.8]",
+        "x (nested [8.8.8.8])",
+        r"x\) [8.8.8.8]",
+    ],
 )
 @pytest.mark.parametrize("real_ip", ["(1.2.3.4) ", ""])
 def test_comment_initial_helo_cannot_supply_sender_ip(argument, real_ip):
     """A comment-initial HELO argument cannot override the connection IP."""
     raw = (
-        f"Received: from source {real_ip}(HELO {argument}) by mx.example; {DATE}\r\n"
+        f"Received: from source {real_ip}(HELO {argument}) by mx.example; "
+        f"{DATE}\r\n"
         f"Received: from forged ([8.8.4.4]) by mx.example; {DATE}\r\n\r\n"
     )
     mail = mailparser.parse_from_string(raw)
-    assert mail.get_server_ipaddress("mx.example") == ("1.2.3.4" if real_ip else None)
+    assert mail.get_server_ipaddress("mx.example") == (
+        "1.2.3.4" if real_ip else None
+    )
 
 
 @pytest.mark.parametrize(
     "comment",
-    ["( helo [45.33.32.156])", "(\thelo [45.33.32.156])", "((helo [45.33.32.156]))"],
+    [
+        "( helo [45.33.32.156])",
+        "(\thelo [45.33.32.156])",
+        "((helo [45.33.32.156]))",
+    ],
 )
 def test_literal_helo_hostname_after_comment_fws(comment):
     """Formatting or nesting cannot promote the sender's first-token IP."""

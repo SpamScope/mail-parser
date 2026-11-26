@@ -41,7 +41,10 @@ def test_display_words_preserve_quote_context(name, expected, factory):
         if factory == "bytes"
         else mailparser.parse_from_string(raw)
     )
-    assert mail.from_ == [(expected, "alice@example.com"), ("Bob", "bob@example.com")]
+    assert mail.from_ == [
+        (expected, "alice@example.com"),
+        ("Bob", "bob@example.com"),
+    ]
     assert mail.to == [("", "neighbor@example.com")]
     decoded_json = mail.from_json
     assert isinstance(decoded_json, str)
@@ -56,9 +59,15 @@ def test_display_words_preserve_quote_context(name, expected, factory):
 @pytest.mark.parametrize(
     "value, expected",
     [
-        ("Alice (=?utf-8?Q?Andr=C3=A9?=) <alice@example.com>", "Alice (André)"),
+        (
+            "Alice (=?utf-8?Q?Andr=C3=A9?=) <alice@example.com>",
+            "Alice (André)",
+        ),
         ("alice@example.com (=?utf-8?Q?Andr=C3=A9?=)", "André"),
-        ("Alice (=?utf-8?Q?A=28B=29=5CC?=) <alice@example.com>", "Alice (A(B)\\C)"),
+        (
+            "Alice (=?utf-8?Q?A=28B=29=5CC?=) <alice@example.com>",
+            "Alice (A(B)\\C)",
+        ),
     ],
 )
 def test_comment_words_keep_special_characters_as_data(value, expected):
@@ -71,13 +80,16 @@ def test_comment_words_keep_special_characters_as_data(value, expected):
 def test_get_addresses_retains_undecoded_name_contract():
     """The helper's default still returns literal encoded display words."""
     value = "=?utf-8?Q?Jos=C3=A9?= <alice@example.com>"
-    assert get_addresses(value) == [("=?utf-8?Q?Jos=C3=A9?=", "alice@example.com")]
+    assert get_addresses(value) == [
+        ("=?utf-8?Q?Jos=C3=A9?=", "alice@example.com")
+    ]
 
 
 def test_recovery_keeps_raw_name_evidence_and_a_valid_neighbor():
     """Malformed display syntax remains diagnosed after rendering."""
     value = (
-        'bad@label "=?utf-8?Q?Jos=C3=A9?=" <alice@example.com>, Bob <bob@example.com>'
+        'bad@label "=?utf-8?Q?Jos=C3=A9?=" <alice@example.com>, Bob '
+        "<bob@example.com>"
     )
     mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert mail.from_ == [
@@ -124,7 +136,8 @@ def test_rendering_cannot_reinterpret_address_or_escaped_text(value, expected):
 def test_encoded_names_do_not_hide_invalid_utf8_evidence():
     """Keep invalid-octet diagnostics and the neighboring valid mailbox."""
     value = (
-        b'"=?utf-8?Q?Alice?=" <a\xff@example.com>, =?utf-8?Q?Bob?= <bob@example.com>'
+        b'"=?utf-8?Q?Alice?=" <a\xff@example.com>, =?utf-8?Q?Bob?= '
+        b"<bob@example.com>"
     )
     mail = mailparser.parse_from_bytes(b"From: " + value + b"\r\n\r\n")
     assert mail.from_ == [("Bob", "bob@example.com")]
@@ -151,7 +164,8 @@ def test_many_display_words_remain_bounded():
 def test_overlong_encoded_word_is_recovered_and_reported(context):
     """Recover the existing corpus name despite its 76-character word."""
     word = (
-        "=?UTF-8?B?0YHQu9GD0LbQsdCwINCk0J3QoSDQlNCw0L3QuNC40Lsg0KHRg9Cy0L7RgNC+0LI=?="
+        "=?UTF-8?B?0YHQu9GD0LbQsdCwINCk0J3QoSDQlNCw0L3QuNC40Lsg0KHRg9Cy0L7RgNC"
+        "+0LI=?="
     )
     expected = "служба ФНС Даниил Суворов"
     assert len(word) == 76
@@ -162,7 +176,10 @@ def test_overlong_encoded_word_is_recovered_and_reported(context):
     mail = mailparser.parse_from_bytes(
         f"From: {value}, Bob <bob@example.com>\r\n\r\n".encode()
     )
-    assert mail.from_ == [(expected, "alice@example.com"), ("Bob", "bob@example.com")]
+    assert mail.from_ == [
+        (expected, "alice@example.com"),
+        ("Bob", "bob@example.com"),
+    ]
     assert mail.has_defects
     assert mail.address_header_defects == [
         {
@@ -184,7 +201,9 @@ def test_overlong_encoded_word_is_recovered_and_reported(context):
 def test_overlong_quoted_encoded_looking_text_remains_literal():
     """RFC 2047's length limit does not apply to quoted literal text."""
     word = "=?utf-8?Q?" + "A" * 100 + "?="
-    mail = mailparser.parse_from_string(f'From: "{word}" <alice@example.com>\r\n\r\n')
+    mail = mailparser.parse_from_string(
+        f'From: "{word}" <alice@example.com>\r\n\r\n'
+    )
     assert mail.from_ == [(word, "alice@example.com")]
     assert not mail.has_defects
 
@@ -202,7 +221,9 @@ def test_long_encoded_tokens_and_failed_matches_remain_bounded(terminated):
     assert mail.from_[0][1] == "alice@example.com"
     if terminated:
         assert mail.from_[0][0] == "A" * (100 * count)
-        assert mail.address_header_defects[0]["reason"] == "overlong-encoded-word"
+        assert (
+            mail.address_header_defects[0]["reason"] == "overlong-encoded-word"
+        )
     else:
         assert mail.from_[0][0] == " ".join([word] * count)
 

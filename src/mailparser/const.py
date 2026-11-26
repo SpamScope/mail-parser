@@ -61,7 +61,9 @@ _SENDGRID_DATE_RE = re.compile(
 
 EPILOGUE_DEFECTS = {"StartBoundaryNotFoundDefect"}
 
-ADDRESSES_HEADERS = set(["bcc", "cc", "delivered-to", "from", "reply-to", "to"])
+ADDRESSES_HEADERS = set(
+    ["bcc", "cc", "delivered-to", "from", "reply-to", "to"]
+)
 
 # These parts are always returned
 OTHERS_PARTS = set(

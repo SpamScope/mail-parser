@@ -18,6 +18,10 @@ limitations under the License.
 
 import base64
 import datetime
+import email
+import email.errors
+import email.policy
+import glob
 import hashlib
 import json
 import logging
@@ -26,6 +30,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from email.generator import Generator
 from email.message import Message
 from unittest.mock import patch
 
@@ -36,13 +41,16 @@ import mailparser
 from mailparser.const import REGXIP6
 from mailparser.exceptions import (
     MailParserOSError,
+    MailParserOutlookError,
     MailParserPathError,
     MailParserRecursionError,
 )
+from mailparser.serialization import SerializationBudget
 from mailparser.utils import (
     _deduplicate_filename,
     _safe_attachment_filename,
     _truncate_filename,
+    as_string_safe,
     convert_mail_date,
     extract_msg_convert,
     fingerprints,
@@ -160,7 +168,10 @@ dGhpcmQ=
                 ["../marker.txt", "../marker.txt", "../content-id.txt"],
             )
             self.assertEqual(
-                [attachment["safe_filename"] for attachment in mail.attachments],
+                [
+                    attachment["safe_filename"]
+                    for attachment in mail.attachments
+                ],
                 ["marker.txt", "marker.txt", "content-id.txt"],
             )
 
@@ -170,15 +181,25 @@ dGhpcmQ=
                 sorted(os.listdir(output_dir)),
                 ["content-id.txt", "marker.txt", "marker_1.txt"],
             )
-            with open(os.path.join(output_dir, "marker.txt"), "rb") as attachment:
+            with open(
+                os.path.join(output_dir, "marker.txt"), "rb"
+            ) as attachment:
                 self.assertEqual(attachment.read(), b"first")
-            with open(os.path.join(output_dir, "marker_1.txt"), "rb") as attachment:
+            with open(
+                os.path.join(output_dir, "marker_1.txt"), "rb"
+            ) as attachment:
                 self.assertEqual(attachment.read(), b"second")
-            with open(os.path.join(output_dir, "content-id.txt"), "rb") as attachment:
+            with open(
+                os.path.join(output_dir, "content-id.txt"), "rb"
+            ) as attachment:
                 self.assertEqual(attachment.read(), b"third")
 
-            self.assertFalse(os.path.exists(os.path.join(temp_dir, "marker.txt")))
-            self.assertFalse(os.path.exists(os.path.join(temp_dir, "content-id.txt")))
+            self.assertFalse(
+                os.path.exists(os.path.join(temp_dir, "marker.txt"))
+            )
+            self.assertFalse(
+                os.path.exists(os.path.join(temp_dir, "content-id.txt"))
+            )
 
     def test_write_attachments_skips_invalid_filename(self):
         # A NUL byte smuggled in through RFC 2231 percent-encoding used to
@@ -210,7 +231,8 @@ dGhpcmQ=
         raw_mail = (
             "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
             "--b\r\nContent-Type: application/octet-stream\r\n"
-            f"Content-Disposition: attachment; filename={long_name}\r\n\r\nxx\r\n"
+            f"Content-Disposition: attachment; filename={long_name}\r\n\r\n"
+            f"xx\r\n"
             "--b\r\nContent-Type: application/octet-stream\r\n"
             "Content-Disposition: attachment; filename=good.bin\r\n\r\nyy\r\n"
             "--b--\r\n"
@@ -238,7 +260,8 @@ dGhpcmQ=
             "Content-Type: multipart/mixed; boundary=b\r\n\r\n"
             "--b\r\nContent-Type: application/octet-stream\r\n"
             "Content-Transfer-Encoding: base64\r\n"
-            "Content-Disposition: attachment; filename=evil.bin\r\n\r\nAAAAA\r\n"
+            "Content-Disposition: attachment; filename=evil.bin\r\n\r\n"
+            "AAAAA\r\n"
             "--b\r\nContent-Type: application/octet-stream\r\n"
             "Content-Disposition: attachment; filename=good.bin\r\n\r\nyy\r\n"
             "--b--\r\n"
@@ -249,8 +272,12 @@ dGhpcmQ=
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = os.path.join(temp_dir, "attachments")
             mail.write_attachments(output_dir)
-            self.assertEqual(sorted(os.listdir(output_dir)), ["evil.bin", "good.bin"])
-            with open(os.path.join(output_dir, "evil.bin"), "rb") as attachment:
+            self.assertEqual(
+                sorted(os.listdir(output_dir)), ["evil.bin", "good.bin"]
+            )
+            with open(
+                os.path.join(output_dir, "evil.bin"), "rb"
+            ) as attachment:
                 # The orphan character carries no complete byte and is
                 # dropped, exactly as a mail client would.
                 self.assertEqual(attachment.read(), b"\x00\x00\x00")
@@ -265,7 +292,8 @@ dGhpcmQ=
         raw_mail = (
             "From: a@b.c\r\nContent-Type: application/octet-stream\r\n"
             "Content-Transfer-Encoding: base64\r\n"
-            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n{poisoned}'
+            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n'
+            f"{poisoned}"
         )
 
         mail = mailparser.parse_from_string(raw_mail)
@@ -285,7 +313,8 @@ dGhpcmQ=
         raw_mail = (
             "From: a@b.c\r\nContent-Type: application/octet-stream\r\n"
             "Content-Transfer-Encoding: base64\r\n"
-            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n{poisoned}'
+            f'Content-Disposition: attachment; filename="x.bin"\r\n\r\n'
+            f"{poisoned}"
         )
 
         mail = mailparser.parse_from_string(raw_mail)
@@ -303,7 +332,8 @@ dGhpcmQ=
             raw_mail = (
                 b'Content-Type: multipart/mixed; boundary="B1"\r\n\r\n--B1\r\n'
                 b'Content-Type: multipart/mixed; boundary="B2"\r\n'
-                b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n--B2\r\n'
+                b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n'
+                b"--B2\r\n"
                 b"Content-Type: multipart/report; charset=" + charset + b"\r\n"
                 b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe\x80 body\r\n"
                 b"--B1--\r\n"
@@ -321,7 +351,8 @@ dGhpcmQ=
         raw_mail = (
             b'Content-Type: multipart/mixed; boundary="B1"\r\n\r\n--B1\r\n'
             b'Content-Type: multipart/mixed; boundary="B2"\r\n'
-            b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n--B2\r\n'
+            b'Content-Disposition: attachment; filename="p.zip"\r\n\r\n'
+            b"--B2\r\n"
             b'Content-Type: multipart/mixed; boundary="B3"\r\n\r\n--B3\r\n'
             b'Content-Type: multipart/report; charset="undefined"\r\n'
             b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe\x80 body\r\n"
@@ -347,9 +378,16 @@ dGhpcmQ=
         # as_string() re-encodes an 8-bit body with the charset the sender
         # declared, and utf-16 (like idna, or a non-text codec) cannot
         # represent the surrogates that carry those bytes.
-        for charset in (b"utf-16", b"utf-32", b"idna", b"undefined", b"base64"):
+        for charset in (
+            b"utf-16",
+            b"utf-32",
+            b"idna",
+            b"undefined",
+            b"base64",
+        ):
             raw_mail = (
-                b"From: a@b.c\r\nContent-Type: multipart/mixed; boundary=BB\r\n\r\n"
+                b"From: a@b.c\r\nContent-Type: multipart/mixed; "
+                b"boundary=BB\r\n\r\n"
                 b"--BB\r\nContent-Type: message/rfc822\r\n"
                 b'Content-Disposition: attachment; filename="fwd.eml"\r\n\r\n'
                 b"Content-Type: text/plain; charset=" + charset + b"\r\n"
@@ -375,10 +413,14 @@ dGhpcmQ=
         payloads = ("one", "two", "three")
         parts = "".join(
             "--b\r\nContent-Type: application/octet-stream\r\n"
-            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n'
+            f"{payload}\r\n"
             for name, payload in zip(names, payloads)
         )
-        raw_mail = f"Content-Type: multipart/mixed; boundary=b\r\n\r\n{parts}--b--\r\n"
+        raw_mail = (
+            f"Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            f"{parts}--b--\r\n"
+        )
 
         mail = mailparser.parse_from_string(raw_mail)
 
@@ -407,10 +449,14 @@ dGhpcmQ=
         payloads = ("first", "second", "third")
         parts = "".join(
             "--b\r\nContent-Type: application/octet-stream\r\n"
-            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n'
+            f"{payload}\r\n"
             for name, payload in zip(names, payloads)
         )
-        raw_mail = f"Content-Type: multipart/mixed; boundary=b\r\n\r\n{parts}--b--\r\n"
+        raw_mail = (
+            f"Content-Type: multipart/mixed; boundary=b\r\n\r\n"
+            f"{parts}--b--\r\n"
+        )
 
         mail = mailparser.parse_from_string(raw_mail)
 
@@ -441,7 +487,8 @@ dGhpcmQ=
         # The per-attachment guard must not swallow a containment failure.
         raw_mail = (
             "Content-Type: application/octet-stream\r\n"
-            "Content-Disposition: attachment; filename=attachment.txt\r\n\r\nxx\r\n"
+            "Content-Disposition: attachment; filename=attachment.txt\r\n\r\n"
+            "xx\r\n"
         )
         mail = mailparser.parse_from_string(raw_mail)
 
@@ -628,7 +675,9 @@ Y29udGVudA==
         self.assertEqual(sha1, "62fef1e38327ed09363624c3aff8ea11723ee05f")
         self.assertEqual(
             sha256,
-            ("cd4af1017f2e623f6d38f691048b6a28d8b1f44a0478137b4337eac6de78f71a"),
+            (
+                "cd4af1017f2e623f6d38f691048b6a28d8b1f44a0478137b4337eac6de78f71a"
+            ),
         )
         self.assertEqual(
             sha512,
@@ -905,7 +954,8 @@ Y29udGVudA==
         cases = (
             b'Content-Type: application/octet-stream; charset="undefined"\r\n'
             b"Content-Transfer-Encoding: base64\r\n"
-            b"Content-Disposition: attachment; filename=x.bin\r\n\r\nQUJD\xff\r\n",
+            b"Content-Disposition: attachment; filename=x.bin\r\n\r\n"
+            b"QUJD\xff\r\n",
             b'Content-Type: text/plain; charset="undefined"\r\n'
             b"Content-Transfer-Encoding: 8bit\r\n\r\n\xff\xfe body\r\n",
             b'Content-Type: text/plain; charset="idna"\r\n'
@@ -928,7 +978,8 @@ Y29udGVudA==
             raw = (
                 "From: a@b.c\r\nMIME-Version: 1.0\r\n"
                 'Content-Type: text/plain; charset="utf-8"\r\n'
-                f"Content-Transfer-Encoding: {transfer_encoding}\r\n\r\n{body}\r\n"
+                f"Content-Transfer-Encoding: {transfer_encoding}\r\n\r\n"
+                f"{body}\r\n"
             )
 
             mail = mailparser.parse_from_string(raw)
@@ -994,9 +1045,8 @@ Y29udGVudA==
                 b"Content-Transfer-Encoding: "
                 + transfer_encoding.encode("ascii")
                 + b"\r\n"
-                b'Content-Disposition: attachment; filename="setup.exe"\r\n\r\n'
-                + original
-                + b"\r\n--B--\r\n"
+                b'Content-Disposition: attachment; filename="setup.exe"\r\n'
+                b"\r\n" + original + b"\r\n--B--\r\n"
             )
 
             mail = mailparser.parse_from_bytes(raw)
@@ -1007,7 +1057,9 @@ Y29udGVudA==
 
             with tempfile.TemporaryDirectory() as temp_dir:
                 mail.write_attachments(temp_dir)
-                with open(os.path.join(temp_dir, "setup.exe"), "rb") as written:
+                with open(
+                    os.path.join(temp_dir, "setup.exe"), "rb"
+                ) as written:
                     self.assertEqual(written.read(), original)
 
     def test_write_attachments_case_insensitive_collision(self):
@@ -1016,10 +1068,17 @@ Y29udGVudA==
         # collapse them: the second attachment overwrote the first.
         parts = "".join(
             "--B\r\nContent-Type: application/octet-stream\r\n"
-            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n{payload}\r\n'
-            for name, payload in (("Invoice.pdf", "benign"), ("invoice.pdf", "malware"))
+            f'Content-Disposition: attachment; filename="{name}"\r\n\r\n'
+            f"{payload}\r\n"
+            for name, payload in (
+                ("Invoice.pdf", "benign"),
+                ("invoice.pdf", "malware"),
+            )
         )
-        raw = f'Content-Type: multipart/mixed; boundary="B"\r\n\r\n{parts}--B--\r\n'
+        raw = (
+            f'Content-Type: multipart/mixed; boundary="B"\r\n\r\n'
+            f"{parts}--B--\r\n"
+        )
 
         mail = mailparser.parse_from_string(raw)
 
@@ -1042,7 +1101,9 @@ Y29udGVudA==
         result = mail.mail
 
         self.assertEqual(len(result["attachments"]), 1)
-        self.assertIsInstance(result["attachments"][0]["mail_content_type"], str)
+        self.assertIsInstance(
+            result["attachments"][0]["mail_content_type"], str
+        )
         # Attachments are kept as bytes, so a quoted-printable part is
         # reported base64-wrapped rather than re-read through its charset.
         self.assertTrue(result["attachments"][0]["binary"])
@@ -1055,7 +1116,9 @@ Y29udGVudA==
             b"The WatchGuard Firebox",
             base64.b64decode(result["attachments"][0]["payload"]),
         )
-        self.assertEqual(result["attachments"][0]["content-disposition"], "inline")
+        self.assertEqual(
+            result["attachments"][0]["content-disposition"], "inline"
+        )
 
         mail = mailparser.parse_from_file(mail_malformed_1)
         attachments = mail.mail["attachments"]
@@ -1082,7 +1145,9 @@ Y29udGVudA==
     @patch("mailparser.core.importlib.util.find_spec", return_value=None)
     @patch("mailparser.core._safe_remove")
     @patch("mailparser.core.msgconvert")
-    def test_parse_from_file_msg(self, mock_msgconvert, mock_remove, mock_find_spec):
+    def test_parse_from_file_msg(
+        self, mock_msgconvert, mock_remove, mock_find_spec
+    ):
         """
         Tested mail from VirusTotal: md5 b89bf096c9e3717f2d218b3307c69bd0
 
@@ -1392,7 +1457,9 @@ Y29udGVudA==
 
         content = "From: test@example.com\nSubject: Test Seekable\n\nBody"
         # Create a real file to test seekable behavior
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".eml") as f:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".eml"
+        ) as f:
             f.write(content)
             fname = f.name
 
@@ -1471,7 +1538,8 @@ InvalidEpilogueData"""
         import email
         from unittest.mock import patch
 
-        # Create a mail with StartBoundaryNotFoundDefect to trigger epilogue parsing
+        # Create a mail with StartBoundaryNotFoundDefect to trigger epilogue
+        # parsing
         raw_mail = """Content-Type: multipart/mixed; boundary="boundary123"
 
 --boundary123
@@ -1541,7 +1609,8 @@ Extra epilogue content"""
                     self.assertIsNotNone(mail)
 
     def test_attachment_with_content_id_no_subtype(self):
-        """Test attachment handling with content-id but no html/plain subtype"""
+        """Test attachment handling with content-id but no html/plain
+        subtype"""
         raw_mail = """Content-Type: multipart/mixed; boundary=boundary
 
 --boundary
@@ -1568,7 +1637,9 @@ RTFData
         attachments = mail.attachments
         self.assertGreater(len(attachments), 0)
         # Should have generated RTF filename
-        self.assertTrue(any(".rtf" in att.get("filename", "") for att in attachments))
+        self.assertTrue(
+            any(".rtf" in att.get("filename", "") for att in attachments)
+        )
 
     def test_attachment_disposition_without_filename(self):
         """Test attachment with content-disposition but no filename"""
@@ -1585,7 +1656,9 @@ PlainTextData
         attachments = mail.attachments
         self.assertGreater(len(attachments), 0)
         # Should have generated .txt filename
-        self.assertTrue(any(".txt" in att.get("filename", "") for att in attachments))
+        self.assertTrue(
+            any(".txt" in att.get("filename", "") for att in attachments)
+        )
 
     def test_text_plain_7bit_encoding(self):
         """Test text/plain body part with 7bit encoding"""
@@ -1615,7 +1688,9 @@ This is plain text with 8bit encoding."""
 
         mail = mailparser.parse_from_file(mail_test_18)
 
-        assert mail.from_ == [("LastßlName, FirstName", "comma.name@example.com")]
+        assert mail.from_ == [
+            ("LastßlName, FirstName", "comma.name@example.com")
+        ]
         assert mail.to == [("", "tony.stark@example.com")]
         assert mail.cc == [
             ("", "simple@example.net"),
@@ -1623,7 +1698,8 @@ This is plain text with 8bit encoding."""
         ]
 
     def test_init_with_message_object_logs_headers(self):
-        """Test core.py:126->128 — MailParser.__init__ with message is not None"""
+        """Test core.py:126->128 — MailParser.__init__ with message is
+        not None"""
         import email as email_module
 
         from mailparser.core import MailParser
@@ -1635,11 +1711,14 @@ This is plain text with 8bit encoding."""
             parser = MailParser(message=msg)
 
         # The debug log about headers must have been emitted
-        self.assertTrue(any("All headers of emails" in line for line in cm.output))
+        self.assertTrue(
+            any("All headers of emails" in line for line in cm.output)
+        )
         self.assertEqual(parser.subject, "LogTest")
 
     def test_init_with_none_message_skips_log(self):
-        """Test core.py:126->128 — MailParser.__init__ message=None skips debug log"""
+        """Test core.py:126->128 — MailParser.__init__ message=None
+        skips debug log"""
         from mailparser.core import MailParser
 
         # message=None: the if-branch is False, no log.debug call
@@ -1647,7 +1726,8 @@ This is plain text with 8bit encoding."""
         self.assertFalse(parser.message)
 
     def test_date_json_returns_none_when_no_date(self):
-        """Test core.py:703->exit — date_json returns None when self.date is falsy"""
+        """Test core.py:703->exit — date_json returns None when
+        self.date is falsy"""
         # A mail with no Date header will have self.date == None
         raw = "From: test@example.com\nSubject: NoDat\n\nBody"
         mail = mailparser.parse_from_string(raw)
@@ -1672,7 +1752,8 @@ This is plain text with 8bit encoding."""
         self.assertIn("2024-01-01", result)
 
     def test_mail_partial_json_no_date(self):
-        """Test core.py:735->737 False branch — mail_partial_json without date"""
+        """Test core.py:735->737 False branch — mail_partial_json
+        without date"""
         # Mail with no Date header: condition is False, skip line 736
         raw = "From: test@example.com\nSubject: NoDate\n\nBody"
         mail = mailparser.parse_from_string(raw)
@@ -1681,7 +1762,8 @@ This is plain text with 8bit encoding."""
         self.assertIsInstance(result, str)
 
     def test_sender_ip_no_message(self):
-        """Test core.py:502 — get_server_ipaddress returns None with no message"""
+        """Test core.py:502 — get_server_ipaddress returns None with no
+        message"""
         mail = mailparser.parse_from_string("fake mail")
         self.assertFalse(mail.message)
         result = mail.get_server_ipaddress("anything")
@@ -1706,7 +1788,9 @@ This is plain text with 8bit encoding."""
 
     def test_public_ip_returns_none_for_unparsable_candidate(self):
         """_public_ip returns None when the candidate is not an IP address"""
-        parser = mailparser.parse_from_string("From: t@example.com\nSubject: x\n\nBody")
+        parser = mailparser.parse_from_string(
+            "From: t@example.com\nSubject: x\n\nBody"
+        )
         self.assertIsNone(parser._public_ip(["not_a_valid_ip"]))
         self.assertIsNone(parser._public_ip([]))
 
@@ -1723,14 +1807,18 @@ This is plain text with 8bit encoding."""
         self.assertIsNone(result)
 
     def test_extract_ip_no_ip_found_returns_none(self):
-        """Test core.py:533->544 — _extract_ip returns None when no IP found at all"""
-        mail = mailparser.parse_from_string("From: t@example.com\nSubject: x\n\nBody")
+        """Test core.py:533->544 — _extract_ip returns None when no IP
+        found at all"""
+        mail = mailparser.parse_from_string(
+            "From: t@example.com\nSubject: x\n\nBody"
+        )
         # A received header with no IP addresses at all
         result = mail._extract_ip("from hostname by other-hostname")
         self.assertIsNone(result)
 
     def test_unicode_decode_error_in_payload(self):
-        """Test core.py:447-448 — UnicodeDecodeError fallback when decoding payload"""
+        """Test core.py:447-448 — UnicodeDecodeError fallback when
+        decoding payload"""
         # A body containing a backslash-u followed by non-hex characters
         # causes raw-unicode-escape to raise UnicodeDecodeError (line 447),
         # which is caught and falls back to ported_string (line 448).
@@ -1750,8 +1838,11 @@ This is plain text with 8bit encoding."""
         self.assertIn("hello", mail.body)
 
     def _make_utf8_raw(self, cte_header=""):
-        """Return a minimal raw email bytes with UTF-8 body (em-dash U+2014)."""
-        cte_line = f"Content-Transfer-Encoding: {cte_header}\n" if cte_header else ""
+        """Return a minimal raw email bytes with UTF-8 body (em-dash
+        U+2014)."""
+        cte_line = (
+            f"Content-Transfer-Encoding: {cte_header}\n" if cte_header else ""
+        )
         raw = (
             "From: a@example.com\n"
             "To: b@example.com\n"
@@ -1765,19 +1856,22 @@ This is plain text with 8bit encoding."""
         return raw.encode("utf-8")
 
     def test_utf8_body_from_bytes_no_cte(self):
-        """parse_from_bytes must not mojibake UTF-8 body with no CTE (issue #152)."""
+        """parse_from_bytes must not mojibake UTF-8 body with no CTE
+        (issue #152)."""
         raw = self._make_utf8_raw()
         mail = mailparser.parse_from_bytes(raw)
         self.assertEqual(mail.text_plain[0], "Hello — world\n")
 
     def test_utf8_body_from_bytes_cte_8bit(self):
-        """parse_from_bytes must not mojibake UTF-8 body with CTE: 8bit (issue #152)."""
+        """parse_from_bytes must not mojibake UTF-8 body with CTE: 8bit
+        (issue #152)."""
         raw = self._make_utf8_raw("8bit")
         mail = mailparser.parse_from_bytes(raw)
         self.assertEqual(mail.text_plain[0], "Hello — world\n")
 
     def test_utf8_body_from_bytes_cte_7bit(self):
-        """parse_from_bytes must not mojibake ASCII body with CTE: 7bit (issue #152)."""
+        """parse_from_bytes must not mojibake ASCII body with CTE: 7bit
+        (issue #152)."""
         raw = (
             b"From: a@example.com\n"
             b"To: b@example.com\n"
@@ -1790,7 +1884,8 @@ This is plain text with 8bit encoding."""
         self.assertEqual(mail.text_plain[0], "Hello world\n")
 
     def test_utf8_body_from_bytes_matches_from_string(self):
-        """parse_from_bytes and parse_from_string: identical text_plain (issue #152)."""
+        """parse_from_bytes and parse_from_string: identical text_plain
+        (issue #152)."""
         raw_bytes = self._make_utf8_raw()
         raw_str = raw_bytes.decode("utf-8")
         mail_b = mailparser.parse_from_bytes(raw_bytes)
@@ -1798,7 +1893,8 @@ This is plain text with 8bit encoding."""
         self.assertEqual(mail_b.text_plain[0], mail_s.text_plain[0])
 
     def test_utf8_body_from_bytes_8bit_matches_from_string(self):
-        """parse_from_bytes (8bit CTE) matches parse_from_string (issue #152)."""
+        """parse_from_bytes (8bit CTE) matches parse_from_string (issue
+        #152)."""
         raw_bytes = self._make_utf8_raw("8bit")
         raw_str = raw_bytes.decode("utf-8")
         mail_b = mailparser.parse_from_bytes(raw_bytes)
@@ -1821,7 +1917,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
     """
 
     def test_from_email_as_display_name(self):
-        """From header with an email address as display name is parsed correctly."""
+        """From header with an email address as display name is parsed
+        correctly."""
         mail = mailparser.parse_from_file(mail_test_19)
         result = mail.from_
         self.assertIsInstance(result, list)
@@ -1831,7 +1928,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "alice@example.com")
 
     def test_cc_email_as_display_name(self):
-        """CC header with an email address as display name is parsed correctly."""
+        """CC header with an email address as display name is parsed
+        correctly."""
         mail = mailparser.parse_from_file(mail_test_19)
         result = mail.cc
         self.assertIsInstance(result, list)
@@ -1841,7 +1939,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "eve@example.com")
 
     def test_reply_to_email_as_display_name(self):
-        """Reply-To header with an email address as display name is parsed correctly."""
+        """Reply-To header with an email address as display name is
+        parsed correctly."""
         mail = mailparser.parse_from_file(mail_test_19)
         result = mail.reply_to
         self.assertIsInstance(result, list)
@@ -1851,7 +1950,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "henry@example.com")
 
     def test_to_mixed_addresses(self):
-        """To header with a mix of quoted name and bare address is parsed correctly."""
+        """To header with a mix of quoted name and bare address is
+        parsed correctly."""
         mail = mailparser.parse_from_file(mail_test_19)
         result = mail.to
         self.assertIsInstance(result, list)
@@ -1887,7 +1987,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "")
 
     def test_quoted_email_as_display_name(self):
-        """Properly quoted email-as-name (RFC-compliant) is parsed by strict parser."""
+        """Properly quoted email-as-name (RFC-compliant) is parsed by
+        strict parser."""
         mail = mailparser.parse_from_string(
             'From: "alice@example.com" <bob@example.com>\nSubject: x\n\nBody'
         )
@@ -1898,7 +1999,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "alice@example.com")
 
     def test_standard_display_name_unchanged(self):
-        """Standard ``Name <email>`` format still works correctly (no regression)."""
+        """Standard ``Name <email>`` format still works correctly (no
+        regression)."""
         mail = mailparser.parse_from_string(
             "From: Alice Smith <alice@example.com>\nSubject: x\n\nBody"
         )
@@ -1909,7 +2011,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "Alice Smith")
 
     def test_bare_address_no_display_name(self):
-        """Bare address with no display name returns empty name (no regression)."""
+        """Bare address with no display name returns empty name (no
+        regression)."""
         mail = mailparser.parse_from_string(
             "From: alice@example.com\nSubject: x\n\nBody"
         )
@@ -1920,9 +2023,11 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(name, "")
 
     def test_empty_header_returns_empty_list(self):
-        """A missing address header returns [] — absent headers must not appear."""
+        """A missing address header returns [] — absent headers must not
+        appear."""
         mail = mailparser.parse_from_string("Subject: x\n\nBody")
-        # Python's getaddresses("") yields [('', '')], but we filter out entries
+        # Python's getaddresses("") yields [('', '')], but we filter out
+        # entries
         # with an empty address so that absent headers are not included in the
         # parsed mail object.
         self.assertEqual(mail.from_, [])
@@ -1932,12 +2037,14 @@ class TestEmailAsDisplayName(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_get_addresses_email_as_name(self):
-        """get_addresses() fallback recovers address when display name is an email."""
+        """get_addresses() fallback recovers address when display name
+        is an email."""
         result = get_addresses("alice@example.com <bob@example.com>")
         self.assertEqual(result, [("alice@example.com", "bob@example.com")])
 
     def test_get_addresses_standard_format(self):
-        """get_addresses() strict path handles normal ``Name <email>`` correctly."""
+        """get_addresses() strict path handles normal ``Name <email>``
+        correctly."""
         result = get_addresses("Alice Smith <alice@example.com>")
         self.assertEqual(result, [("Alice Smith", "alice@example.com")])
 
@@ -1947,7 +2054,8 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(result, [("", "alice@example.com")])
 
     def test_get_addresses_empty_header(self):
-        """get_addresses() on empty string returns [('', '')] — raw Python lib result.
+        """get_addresses() on empty string returns [('', '')] — raw
+        Python lib result.
 
         The ('', '') entry is filtered out in __getattr__ (core.py) so that
         absent headers do not appear in the parsed mail output.
@@ -1956,9 +2064,11 @@ class TestEmailAsDisplayName(unittest.TestCase):
         self.assertEqual(result, [("", "")])
 
     def test_get_addresses_multiple_with_email_as_name(self):
-        """get_addresses() fallback handles multiple addresses when all fail strict."""
+        """get_addresses() fallback handles multiple addresses when all
+        fail strict."""
         result = get_addresses(
-            "alice@example.com <bob@example.com>, eve@example.com <frank@example.com>"
+            "alice@example.com <bob@example.com>, eve@example.com "
+            "<frank@example.com>"
         )
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0], ("alice@example.com", "bob@example.com"))
@@ -2075,6 +2185,1088 @@ def test_deeply_nested_multipart_raises_controlled_error():
         mailparser.parse_from_bytes(raw.encode())
 
 
+def _nested_multipart(depth, closed=True):
+    """
+    A text leaf under ``depth`` nested multiparts; ``closed=False`` leaves
+    out every close delimiter.
+    """
+    opening = "".join(
+        f'Content-Type: multipart/mixed; boundary="B{i}"\r\n\r\n--B{i}\r\n'
+        for i in range(depth)
+    )
+    closing = "".join(f"--B{i}--\r\n" for i in reversed(range(depth)))
+    return (
+        "From: a@b.example\r\n"
+        + opening
+        + "Content-Type: text/plain\r\n\r\nleaf\r\n"
+        + (closing if closed else "")
+    )
+
+
+def _nested_rfc822(depth):
+    """A text leaf under ``depth`` nested ``message/rfc822`` parts."""
+    return (
+        "From: a@b.example\r\n"
+        + "Content-Type: message/rfc822\r\n\r\n" * depth
+        + "Content-Type: text/plain\r\n\r\nleaf\r\n"
+    )
+
+
+def _unterminated_multipart(depth):
+    return _nested_multipart(depth, closed=False)
+
+
+NESTED_SHAPES = pytest.mark.parametrize(
+    ("build", "defects_categories"),
+    [
+        (_nested_multipart, set()),
+        (_nested_rfc822, set()),
+        (_unterminated_multipart, {"CloseBoundaryNotFoundDefect"}),
+    ],
+)
+
+
+@NESTED_SHAPES
+def test_message_as_string_too_deep_raises_controlled_error(
+    build, defects_categories
+):
+    """
+    Regression (GHSA-j23h-c3w8-q63p): the generator recurses four frames
+    per nesting level, so a message the parser accepts can be too deep to
+    flatten.  The export must fail inside the MailParser* hierarchy, and
+    everything the parse recovered must stay readable.
+    """
+    depth = sys.getrecursionlimit() // 3
+    mail = mailparser.parse_from_string(build(depth))
+
+    with pytest.raises(MailParserRecursionError) as raised:
+        mail.message_as_string
+    assert isinstance(raised.value.__cause__, RecursionError)
+
+    # Nesting depth is not a MIME violation: no defect is invented, and
+    # the ones the message does have are kept.
+    assert mail.defects_categories == defects_categories
+    assert mail.from_ == [("", "a@b.example")]
+    assert mail.body.strip() == "leaf"
+    assert len(mail.mime_tree) == depth + 1
+    assert len(list(_walk_iteratively(mail.message))) == depth + 1
+
+
+@NESTED_SHAPES
+def test_message_as_string_flattens_shallow_nesting(build, defects_categories):
+    """A nesting the generator can walk is flattened and parses back."""
+    depth = 5
+    mail = mailparser.parse_from_string(build(depth))
+
+    flattened = mail.message_as_string
+
+    assert mail.defects_categories == defects_categories
+    reparsed = mailparser.parse_from_string(flattened)
+    assert reparsed.from_ == [("", "a@b.example")]
+    assert reparsed.body.strip() == "leaf"
+    assert len(reparsed.mime_tree) == depth + 1
+
+
+def _walk_iteratively(message):
+    """Yield every part without recursing: ``Message.walk()`` recurses."""
+    pending = [message]
+    while pending:
+        part = pending.pop()
+        yield part
+        if part.is_multipart():
+            pending.extend(part.get_payload())
+
+
+# A part both generators refuse: its type says multipart, it has no
+# boundary, and ``undefined`` is a codec that decodes nothing.
+_REFUSED_PART = (
+    'Content-Type: multipart/report; charset="undefined"\r\n'
+    "Content-Transfer-Encoding: 8bit\r\n\r\n\udcff\udcfe refused\r\n"
+)
+# A part ``as_string()`` refuses and ``as_bytes()`` writes as it is.
+_REFUSED_TEXT = (
+    'Content-Type: text/plain; charset="undefined"\r\n'
+    "Content-Transfer-Encoding: 8bit\r\n\r\n\udcff\udcfe text\r\n"
+)
+_PLAIN_TEXT = "Content-Type: text/plain\r\n\r\n{}\r\n"
+
+
+def _multipart(boundary, *entities, preamble="", epilogue=""):
+    """A multipart entity around the given entities."""
+    return (
+        f'Content-Type: multipart/mixed; boundary="{boundary}"\r\n\r\n'
+        + preamble
+        + "".join(f"--{boundary}\r\n{entity}" for entity in entities)
+        + f"--{boundary}--\r\n"
+        + epilogue
+    )
+
+
+def _around(leaf, depth):
+    """``leaf`` under ``depth`` multiparts, with a sibling on each side."""
+    entity = leaf
+    for level in range(depth):
+        entity = _multipart(
+            f"N{level}",
+            _PLAIN_TEXT.format("before"),
+            entity,
+            _PLAIN_TEXT.format("after"),
+        )
+    return "From: a@b.example\r\n" + entity
+
+
+def _refusing_multiparts(depth):
+    return _around(_REFUSED_PART, depth)
+
+
+def _refusing_rfc822(depth):
+    return (
+        "From: a@b.example\r\n"
+        + "Content-Type: message/rfc822\r\n\r\n" * depth
+        + _REFUSED_PART
+    )
+
+
+def _refusing_container(depth):
+    """
+    A multipart whose boundary ``as_bytes()`` cannot write, around a part
+    ``as_string()`` refuses: no part refuses both, the container does.
+    """
+    return _around(_multipart("\xe9", _REFUSED_TEXT), depth)
+
+
+def _refused_by_as_string_only(depth):
+    return _around(_REFUSED_TEXT, depth)
+
+
+def _conforming_multiparts(depth):
+    return _around(_PLAIN_TEXT.format("leaf"), depth)
+
+
+def _from_octets(text):
+    return mailparser.parse_from_bytes(text.encode("ascii", "surrogateescape"))
+
+
+@pytest.fixture
+def flattened(monkeypatch):
+    """Every part a generator flattens, once for each time it does."""
+    parts = []
+    flatten = Generator.flatten
+
+    def counting(self, msg, *args, **kwargs):
+        parts.append(msg)
+        return flatten(self, msg, *args, **kwargs)
+
+    monkeypatch.setattr(Generator, "flatten", counting)
+    return parts
+
+
+@pytest.mark.parametrize(
+    ("parse", "build", "passes"),
+    [
+        (_from_octets, _refusing_multiparts, 3),
+        (_from_octets, _refusing_rfc822, 3),
+        (mailparser.parse_from_string, _refusing_container, 3),
+        (_from_octets, _refused_by_as_string_only, 2),
+        (_from_octets, _conforming_multiparts, 1),
+    ],
+)
+@pytest.mark.parametrize("depth", [1, 10, 40])
+def test_message_as_string_flattens_each_part_a_bounded_number_of_times(
+    parse, build, passes, depth, flattened
+):
+    """
+    Regression: the fallback flattened a container again for every level
+    between it and the part that refused, so a refusing part under
+    ``depth`` containers cost the size of the message times ``depth``.
+    Each part is now flattened at most three times: by a pass of
+    ``as_string()`` that fails, by one of ``as_bytes()`` that fails,
+    and by the pass that writes it.
+    """
+    mail = parse(build(depth))
+    parts = len(mail.mime_tree)
+    assert parts > depth
+    del flattened[:]
+
+    text = mail.message_as_string
+
+    assert isinstance(text, str)
+    assert len(flattened) <= passes * parts
+    if build is _conforming_multiparts:
+        assert len(flattened) == parts
+
+
+_FALLBACK_TREE = (
+    "From: a@b.example\r\n"
+    + _multipart(
+        "A",
+        _PLAIN_TEXT.format("before A"),
+        _multipart(
+            "B",
+            _PLAIN_TEXT.format("before B"),
+            _REFUSED_PART,
+            _REFUSED_TEXT,
+        ),
+        _multipart("C", _PLAIN_TEXT.format("after A")),
+        preamble="preamble A\r\n",
+        epilogue="epilogue A\r\n",
+    )
+).encode("ascii", "surrogateescape")
+
+_FALLBACK_RFC822 = (
+    "From: a@b.example\r\n"
+    "Content-Type: message/rfc822\r\n\r\n"
+    "Subject: one\r\nContent-Type: message/rfc822\r\n\r\n"
+    "Subject: two\r\n" + _REFUSED_PART
+).encode("ascii", "surrogateescape")
+
+_NO_BOUNDARY = (
+    "NoBoundaryInMultipartDefect: A message claimed to be a multipart but "
+    "had no boundary parameter."
+)
+_NO_SUBPARTS = (
+    "MultipartInvariantViolationDefect: A message claimed to be a multipart "
+    "but no subparts were found."
+)
+
+
+def _charset_defect(part):
+    return (
+        f"CharsetDecodeDefect: part {part}, charset 'undefined' failed; "
+        "decoded with utf-8 replacement characters. Original bytes remain "
+        "in the MIME part."
+    )
+
+
+@pytest.mark.parametrize(
+    ("parse", "raw", "expected", "body", "defects", "tree"),
+    [
+        pytest.param(
+            mailparser.parse_from_bytes,
+            _FALLBACK_TREE,
+            # A and B are written from their raw headers and their
+            # sub-parts, without delimiters, preamble or epilogue; the
+            # parts that flatten are written by the generator.
+            "From: a@b.example\n"
+            'Content-Type: multipart/mixed; boundary="A"\n\n'
+            "Content-Type: text/plain\n\nbefore A"
+            'Content-Type: multipart/mixed; boundary="B"\n\n'
+            "Content-Type: text/plain\n\nbefore B"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n"
+            'Content-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text"
+            'Content-Type: multipart/mixed; boundary="C"\n\n'
+            "--C\nContent-Type: text/plain\n\nafter A\n--C--\n",
+            "before A\n--- mail_boundary ---\nbefore B\n"
+            "--- mail_boundary ---\n\ufffd\ufffd text\n"
+            "--- mail_boundary ---\nafter A\n"
+            "--- mail_boundary ---\n\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                {"multipart/report": [_charset_defect(4)]},
+                {"text/plain": [_charset_defect(5)]},
+            ],
+            [
+                ("multipart/mixed", None),
+                ("text/plain", 0),
+                ("multipart/mixed", 0),
+                ("text/plain", 2),
+                ("multipart/report", 2),
+                ("text/plain", 2),
+                ("multipart/mixed", 0),
+                ("text/plain", 6),
+            ],
+            id="multiparts",
+        ),
+        pytest.param(
+            mailparser.parse_from_bytes,
+            _FALLBACK_RFC822,
+            "From: a@b.example\nContent-Type: message/rfc822\n\n"
+            "Subject: one\nContent-Type: message/rfc822\n\n"
+            "Subject: two\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            "\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                {"multipart/report": [_charset_defect(2)]},
+            ],
+            [
+                ("message/rfc822", None),
+                ("message/rfc822", 0),
+                ("multipart/report", 1),
+            ],
+            id="rfc822",
+        ),
+        pytest.param(
+            mailparser.parse_from_bytes,
+            ("From: a@b.example\r\n" + _REFUSED_PART).encode(
+                "ascii", "surrogateescape"
+            ),
+            "From: a@b.example\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            "\ufffd\ufffd refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY, _NO_SUBPARTS]},
+                {"multipart/report": [_charset_defect(0)]},
+            ],
+            [("multipart/report", None)],
+            id="no-boundary-root",
+        ),
+        pytest.param(
+            mailparser.parse_from_string,
+            "From: a@b.example\r\n"
+            + _multipart(
+                "A",
+                _PLAIN_TEXT.format("before A"),
+                _multipart(
+                    "\xe9",
+                    _PLAIN_TEXT.format("before B"),
+                    _REFUSED_TEXT,
+                ),
+                _PLAIN_TEXT.format("after A"),
+            ),
+            # No part refuses as_bytes() here: the container does, at
+            # its own boundary, after its sub-parts were written.
+            "From: a@b.example\n"
+            'Content-Type: multipart/mixed; boundary="A"\n\n'
+            "Content-Type: text/plain\n\nbefore A"
+            'Content-Type: multipart/mixed; boundary="\xe9"\n\n'
+            "Content-Type: text/plain\n\nbefore B"
+            'Content-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text"
+            "Content-Type: text/plain\n\nafter A",
+            "before A\n--- mail_boundary ---\nbefore B\n"
+            "--- mail_boundary ---\n\ufffd\ufffd text\n"
+            "--- mail_boundary ---\nafter A",
+            [{"text/plain": [_charset_defect(4)]}],
+            [
+                ("multipart/mixed", None),
+                ("text/plain", 0),
+                ("multipart/mixed", 0),
+                ("text/plain", 2),
+                ("text/plain", 2),
+                ("text/plain", 0),
+            ],
+            id="container-refuses-as-bytes",
+        ),
+    ],
+)
+def test_message_as_string_fallback_output_is_unchanged(
+    parse, raw, expected, body, defects, tree
+):
+    """
+    The strings are the ones the fallback produced before it stopped
+    flattening a refusing part twice.  What the parse recovered and the
+    defects it recorded are the same before and after the export.
+    """
+    mail = parse(raw)
+
+    for _ in range(2):
+        assert mail.body == body
+        assert mail.defects == defects
+        assert mail.has_defects is True
+        assert mail.attachments == []
+        assert mail.resource_limit_defects == []
+        assert mail.from_ == [("", "a@b.example")]
+        assert [
+            (entry["content_type"], entry["parent"])
+            for entry in mail.mime_tree
+        ] == tree
+        assert mail.message_as_string == expected
+
+
+def test_message_as_string_flattens_again_under_another_policy():
+    """
+    A part is known to refuse only when flattening it alone repeats what
+    the failed pass did.  Here the root has a policy of its own, under
+    which ``as_bytes()`` applies the charset; the inner multipart has
+    not, and is still flattened: its delimiters are in the output.
+    """
+    message = email.message_from_bytes(
+        (
+            "From: a@b.example\r\n"
+            + _multipart("A", _multipart("B", _REFUSED_TEXT))
+        ).encode("ascii", "surrogateescape")
+    )
+    message.policy = email.policy.compat32.clone(cte_type="7bit")
+
+    assert mailparser.MailParser(message).message_as_string == (
+        "From: a@b.example\n"
+        'Content-Type: multipart/mixed; boundary="A"\n\n'
+        'Content-Type: multipart/mixed; boundary="B"\n\n'
+        '--B\nContent-Type: text/plain; charset="undefined"\n'
+        "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text\n--B--\n"
+    )
+
+
+class _RefusesUnfoldedHeader(email.policy.EmailPolicy):
+    """Refuses to write ``X-Long`` when lines have no length limit."""
+
+    def fold_binary(self, name, value):
+        if name == "X-Long" and self.max_line_length == 0:
+            raise UnicodeEncodeError("ascii", value, 0, 1, "unfolded")
+        return super().fold_binary(name, value)
+
+
+def test_message_as_string_flattens_again_below_a_signed_part():
+    """
+    Below ``multipart/signed`` the generator writes headers without a
+    line length limit, which is not how it writes the same part alone.
+    Container C refuses ``as_bytes()`` in the pass over the root only
+    for that reason: alone it flattens, and its delimiters are written.
+    """
+    signed = (
+        'Content-Type: multipart/signed; boundary="S"\r\n\r\n'
+        "--S\r\nX-Long: value\r\n"
+        + _multipart("C", _REFUSED_TEXT)
+        + "--S--\r\n"
+    )
+    message = email.message_from_bytes(
+        ("From: a@b.example\r\n" + _multipart("A", signed)).encode(
+            "ascii", "surrogateescape"
+        ),
+        policy=_RefusesUnfoldedHeader(),
+    )
+
+    text = mailparser.MailParser(message).message_as_string
+
+    assert "--C\n" in text
+    assert "--C--\n" in text
+    assert "--S" not in text
+
+
+def test_message_as_string_with_a_wrapped_generator(monkeypatch):
+    """
+    A tool that wrapped ``Generator.flatten`` before the parser was
+    imported leaves frames with the code the fallback looks for and
+    none of the locals it reads.  No part is named then: the export
+    costs more passes and gives the same string.
+    """
+    mail = _from_octets(_refusing_multiparts(3))
+    expected = mail.message_as_string
+    flatten = Generator.flatten
+
+    def wrapper(self, *args, **kwargs):
+        return flatten(self, *args, **kwargs)
+
+    monkeypatch.setattr(Generator, "flatten", wrapper)
+    monkeypatch.setattr("mailparser.utils._FLATTEN_CODE", wrapper.__code__)
+
+    assert mail.message_as_string == expected
+
+
+class _FlattensItself(Message):
+    """A part with a text of its own, whatever its charset."""
+
+    def as_string(self, unixfrom=False, maxheaderlen=0, policy=None):
+        return "written by the part itself\n"
+
+
+def test_message_as_string_flattens_again_a_part_of_another_class():
+    """
+    The pass over the root never calls ``as_string()`` of a sub-part,
+    so it says nothing about a sub-part whose class overrides it.
+    """
+    message = email.message_from_bytes(
+        (
+            "From: a@b.example\r\n" + _multipart("A", _PLAIN_TEXT.format("x"))
+        ).encode()
+    )
+    message.set_payload(
+        [
+            email.message_from_bytes(
+                _REFUSED_PART.encode("ascii", "surrogateescape"),
+                _class=_FlattensItself,
+            )
+        ]
+    )
+
+    text = mailparser.MailParser(message).message_as_string
+
+    assert text.endswith("written by the part itself\n")
+
+
+def test_message_as_string_too_deep_beside_a_refusing_part():
+    """
+    The refusing part ends both passes over the root early, and the
+    fallback reaches the deep sibling on its own: the ``RecursionError``
+    of that pass is not a charset error and still reaches the guard.
+    """
+    depth = sys.getrecursionlimit() // 3
+    deep = _nested_multipart(depth).partition("\r\n")[2]
+    mail = mailparser.parse_from_string(
+        "From: a@b.example\r\n" + _multipart("A", _REFUSED_PART, deep)
+    )
+
+    with pytest.raises(MailParserRecursionError) as raised:
+        mail.message_as_string
+    assert isinstance(raised.value.__cause__, RecursionError)
+    assert len(mail.mime_tree) == depth + 3
+
+
+@pytest.mark.parametrize("value", ["\ud800", "a\udfffb", "é\udcff"])
+def test_message_as_string_writes_a_header_with_a_lone_surrogate(value):
+    """
+    A str, from JSON for one, can hold a surrogate no octet escapes to.
+    Both generators refuse it and the email package cannot read it as
+    octets: the hand-built text writes it as it was parsed.
+    """
+    mail = mailparser.parse_from_string(
+        f"From: a@b.example\r\nX-A: {value}\r\nSubject: hello\r\n"
+        "Content-Type: text/plain\r\n\r\nbody\r\n"
+    )
+
+    assert mail.message_as_string == (
+        f"From: a@b.example\nX-A: {value}\nSubject: hello\n"
+        "Content-Type: text/plain\n\nbody\r\n"
+    )
+    assert mail.subject == "hello"
+    assert mail.body == "body\r\n"
+
+
+def test_parse_keeps_an_attachment_with_a_lone_surrogate_header():
+    """The parse flattens an attached container without a generator."""
+    mail = mailparser.parse_from_string(
+        'From: a@b.example\r\nContent-Type: multipart/mixed; boundary="R"\r\n'
+        "\r\n"
+        "--R\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+        '--R\r\nContent-Type: multipart/mixed; boundary="I"\r\n'
+        'Content-Disposition: attachment; filename="a.bin"\r\n\r\n'
+        "--I\r\nContent-Type: text/plain\r\nX-H: \ud800\r\nX-B: kept\r\n\r\n"
+        "inner\r\n--I--\r\n--R--\r\n"
+    )
+
+    [attachment] = mail.attachments
+    assert attachment["filename"] == "a.bin"
+    assert attachment["mail_content_type"] == "multipart/mixed"
+    assert attachment["payload"] == (
+        "Content-Type: text/plain\nX-H: \ud800\nX-B: kept\n\ninner"
+    )
+    assert mail.text_plain == ["body", "inner"]
+    assert "\nX-H: \ud800\nX-B: kept\n\ninner" in mail.message_as_string
+
+
+def test_message_as_string_keeps_an_escaped_octet_in_a_header():
+    """An octet escaped by surrogateescape is written as it always was."""
+    header = "X-A: x\udcffy\r\n"
+    plain = mailparser.parse_from_string(
+        f"From: a@b.example\r\n{header}Content-Type: text/plain\r\n\r\n"
+        f"body\r\n"
+    )
+    refused = mailparser.parse_from_string(
+        f"From: a@b.example\r\n{header}" + _REFUSED_PART
+    )
+
+    assert plain.message_as_string == (
+        "From: a@b.example\nX-A: =?unknown-8bit?b?eP95?=\n"
+        "Content-Type: text/plain\n\nbody\n"
+    )
+    assert refused.message_as_string == (
+        "From: a@b.example\nX-A: x�y\n"
+        'Content-Type: multipart/report; charset="undefined"\n'
+        "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n"
+    )
+
+
+def _with_inner_header(header, attached):
+    """A container, attached or not, whose text part has ``header``."""
+    disposition = (
+        'Content-Disposition: attachment; filename="c.eml"\r\n'
+        if attached
+        else ""
+    )
+    return (
+        "From: a@b.example\r\nSubject: kept\r\n"
+        'Content-Type: multipart/mixed; boundary="A"\r\n\r\n'
+        "--A\r\nContent-Type: text/plain\r\n\r\nbody\r\n"
+        '--A\r\nContent-Type: multipart/mixed; boundary="B"\r\n'
+        f"{disposition}\r\n"
+        f"--B\r\nContent-Type: text/plain\r\n{header}\r\n"
+        "X-After: kept\r\n\r\ninner\r\n--B--\r\n--A--\r\n"
+    ).encode("latin-1")
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "a\x0cb",
+        "a\x0cB: c",
+        "a\x0b--A",
+        "a\x1cb",
+        "a\x1d--B--",
+        "a\x1e\x0cX-Forged: yes",
+    ],
+)
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_does_not_stop_the_parse(value, attached):
+    """
+    Regression: ``Header.encode()`` takes a form feed, and the other
+    characters ``str.splitlines()`` breaks at, for a line break.  The
+    generator then refuses the header with ``HeaderWriteError`` or
+    ``HeaderParseError``, which are no charset errors: they left
+    ``parse_from_bytes()`` when the part was below an attached
+    container, and ``message_as_string`` wherever it was.  RFC 5322
+    section 4.1 accepts these characters in a field body as obsolete
+    syntax (``obs-NO-WS-CTL``), so no defect is reported.
+    """
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header(f"X-A: {value}", attached)
+    )
+
+    assert mail.message is not None
+    inner = mail.message.get_payload(1).get_payload(0)
+    assert inner["X-A"] == value
+    assert inner["X-After"] == "kept"
+    assert mail.subject == "kept"
+    assert mail.has_defects is False
+    assert mail.resource_limit_defects == []
+    filenames = [attachment["filename"] for attachment in mail.attachments]
+    assert filenames == (["c.eml"] if attached else [])
+    reparsed = mailparser.parse_from_string(mail.message_as_string)
+    assert reparsed.subject == "kept"
+    assert "X-Forged" not in reparsed.headers
+
+
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_is_written_as_it_was_parsed(attached):
+    """
+    The value below is refused by every Python release, as an embedded
+    header.  The part is written by hand with the value as it was
+    parsed, on one line: nothing is dropped and no header is forged.
+    """
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header("X-A: a\x0cB: c", attached)
+    )
+    written = (
+        "Content-Type: text/plain\nX-A: a\x0cB: c\nX-After: kept\n\ninner"
+    )
+
+    assert written in mail.message_as_string
+    payloads = [attachment["payload"] for attachment in mail.attachments]
+    assert payloads == ([written] if attached else [])
+
+
+@pytest.mark.skipif(
+    not hasattr(email.errors, "HeaderWriteError"),
+    reason="this Python lacks the fix of CVE-2024-6923",
+)
+@pytest.mark.parametrize("attached", [True, False])
+def test_header_the_generator_refuses_is_not_given_to_the_bytes_pass(attached):
+    """
+    The text generator refuses the header below, and the bytes
+    generator of some releases writes it, with a line break for each
+    form feed: a line ``--B`` the sender chose, which a second parse
+    reads as a delimiter.  The part is written by hand instead.
+    """
+    value = "a\x0c--B\x0cforged"
+    mail = mailparser.parse_from_bytes(
+        _with_inner_header(f"X-A: {value}", attached)
+    )
+
+    text = mail.message_as_string
+
+    assert f"X-A: {value}\nX-After: kept\n\ninner" in text
+    assert "\nforged\n" not in text
+    for attachment in mail.attachments:
+        assert f"X-A: {value}\nX-After: kept" in attachment["payload"]
+        assert "\nforged\n" not in attachment["payload"]
+
+
+def test_as_string_safe_with_a_budget_debits_every_pass(flattened):
+    """
+    At parse time every pass is debited, also one that fails, and the
+    debit decides which containers reach the resource limit: with a
+    budget no pass is skipped and the amounts stay what they were.
+    """
+    mail = _from_octets(_refusing_multiparts(6))
+    assert mail.message is not None
+    unbounded = mail.message_as_string
+    budget = SerializationBudget(list(mail.message.walk()))
+    characters, nodes = budget.characters, budget.nodes
+    del flattened[:]
+
+    text = as_string_safe(mail.message, budget=budget)
+
+    assert text == unbounded
+    assert characters - budget.characters == 5398
+    assert nodes - budget.nodes == 117
+    assert len(flattened) == 110
+
+
+def _empty_boundary(declared='boundary=""'):
+    """A multipart entity whose boundary is empty: ``--`` and ``----``."""
+    return (
+        f"Content-Type: multipart/mixed; {declared}\r\n\r\n"
+        "--\r\n" + _PLAIN_TEXT.format("inside") + "----\r\n"
+    )
+
+
+def _raw_headers(message):
+    """The headers of every part, as the message stores them."""
+    return [
+        [(name, str(value)) for name, value in part.raw_items()]
+        for part in _walk_iteratively(message)
+    ]
+
+
+def _tree_shape(mail):
+    return [
+        (entry["content_type"], entry["parent"], entry["boundary"])
+        for entry in mail.mime_tree
+    ]
+
+
+def _empty_boundary_defect(part, raw_value: object = ""):
+    """The defect of the part that declares an empty boundary."""
+    return {
+        "mime-headers": [
+            f"MimeHeaderDefect: part {part}, "
+            f"invalid-boundary-parameter: empty; raw={raw_value!r}"
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    ("declared", "raw_value", "other_defects"),
+    [
+        ('boundary=""', "", []),
+        ("boundary=", "", []),
+        ('boundary=" "', " ", []),
+        ("boundary*=utf-8''", ("utf-8", "", ""), []),
+        ("boundary*=utf-8''%20", ("utf-8", "", " "), []),
+        ('boundary*0=""; boundary*1=""', "", []),
+        ('boundary=""; boundary="evidence"', "", []),
+        (
+            "boundary*=undefined''%20",
+            ("undefined", "", " "),
+            ["invalid-boundary-parameter: raw=('undefined', '', ' ')"],
+        ),
+        (
+            "boundary*=utf-8''; boundary*1=\"\"",
+            ("utf-8", "", ""),
+            [
+                "content-type[0]: invalid-parameter-continuation; raw="
+                + repr("multipart/mixed; boundary*=utf-8''; boundary*1=\"\"")
+            ],
+        ),
+    ],
+)
+@pytest.mark.parametrize("tree_first", [True, False])
+def test_message_as_string_keeps_an_empty_boundary(
+    declared, raw_value, other_defects, tree_first
+):
+    """
+    Regression: the generator takes an empty boundary for a missing one,
+    invents another and writes it into the part.  Reading
+    ``message_as_string`` rewrote ``mail.message``, erased the anomaly
+    (RFC 2046 section 5.1.1 requires one character) and made what
+    ``mime_tree`` reports depend on which property was read first.
+    The anomaly is a defect of the part, with the value as evidence.
+    """
+    raw = "From: a@b.example\r\n" + _empty_boundary(declared)
+    details = [
+        *other_defects,
+        f"invalid-boundary-parameter: empty; raw={raw_value!r}",
+    ]
+    expected_defects = [
+        {
+            "mime-headers": [
+                f"MimeHeaderDefect: part 0, {detail}" for detail in details
+            ]
+        }
+    ]
+    mail = mailparser.parse_from_string(raw)
+    untouched = mailparser.parse_from_string(raw)
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    assert headers[0][1] == ("Content-Type", f"multipart/mixed; {declared}")
+    if tree_first:
+        assert mail.mime_tree == untouched.mime_tree
+
+    text = mail.message_as_string
+
+    assert text == (
+        f"From: a@b.example\nContent-Type: multipart/mixed; {declared}\n\n"
+        "--\nContent-Type: text/plain\n\ninside\n----\n"
+    )
+    assert mail.message_as_string == text
+    assert mailparser.parse_from_string(raw).message_as_string == text
+    assert _raw_headers(mail.message) == headers
+    assert mail.mime_tree == untouched.mime_tree
+    assert _tree_shape(mail) == [
+        ("multipart/mixed", None, ""),
+        ("text/plain", 0, None),
+    ]
+    json.dumps(mail.mime_tree).encode("utf-8")
+    assert mail.body == "inside"
+    assert mail.defects == untouched.defects == expected_defects
+    assert mail.has_defects is True
+    assert mail.mime_tree[0]["defects"] == ["MimeHeaderDefect"]
+    # Outside a generator pass the accessor answers as Message does.
+    boundary = mail.message.get_boundary()
+    assert type(boundary) is str
+    assert not boundary
+
+
+def test_parse_keeps_an_empty_boundary_below_an_attached_container():
+    """
+    Regression: ``parse()`` flattens the sub-parts of an attached
+    container, so the parse itself rewrote the empty boundary below it,
+    and the payload of the attachment held a boundary that differed
+    from one parse to the next.
+    """
+    raw = "From: a@b.example\r\n" + _multipart(
+        "A",
+        'Content-Type: multipart/mixed; boundary="T"\r\n'
+        "Content-Disposition: attachment\r\n\r\n"
+        "--T\r\n" + _empty_boundary("boundary*=utf-8''") + "--T--\r\n",
+    )
+    wire_headers = [
+        [
+            ("From", "a@b.example"),
+            ("Content-Type", 'multipart/mixed; boundary="A"'),
+        ],
+        [
+            ("Content-Type", 'multipart/mixed; boundary="T"'),
+            ("Content-Disposition", "attachment"),
+        ],
+        [("Content-Type", "multipart/mixed; boundary*=utf-8''")],
+        [("Content-Type", "text/plain")],
+    ]
+
+    mail = mailparser.parse_from_string(raw)
+
+    assert mail.message is not None
+    assert _raw_headers(mail.message) == wire_headers
+    assert _tree_shape(mail) == [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, "T"),
+        ("multipart/mixed", 1, ""),
+        ("text/plain", 2, None),
+    ]
+    payloads = [attachment["payload"] for attachment in mail.attachments]
+    assert payloads == [
+        "Content-Type: multipart/mixed; boundary*=utf-8''\n\n"
+        "--\nContent-Type: text/plain\n\ninside\n----\n"
+    ]
+    again = mailparser.parse_from_string(raw)
+    assert [
+        attachment["payload"] for attachment in again.attachments
+    ] == payloads
+    assert mail.defects == [_empty_boundary_defect(2, ("utf-8", "", ""))]
+    assert mail.has_defects is True
+    assert mail.resource_limit_defects == []
+    mail.message_as_string
+    assert _raw_headers(mail.message) == wire_headers
+    assert mail.mime_tree == again.mime_tree
+
+
+def test_message_as_string_keeps_the_boundary_of_a_conforming_sibling():
+    """
+    A conforming multipart beside the one with an empty boundary is
+    written with its own boundary, and the text parses back to the same
+    tree.
+    """
+    raw = "From: a@b.example\r\n" + _multipart(
+        "A", _empty_boundary(), _multipart("C", _PLAIN_TEXT.format("sibling"))
+    )
+    mail = mailparser.parse_from_string(raw)
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    tree = [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, ""),
+        ("text/plain", 1, None),
+        ("multipart/mixed", 0, "C"),
+        ("text/plain", 3, None),
+    ]
+
+    text = mail.message_as_string
+
+    assert text == (
+        'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n\n'
+        '--A\nContent-Type: multipart/mixed; boundary=""\n\n'
+        "--\nContent-Type: text/plain\n\ninside\n----\n\n"
+        '--A\nContent-Type: multipart/mixed; boundary="C"\n\n'
+        "--C\nContent-Type: text/plain\n\nsibling\n--C--\n\n"
+        "--A--\n"
+    )
+    assert _raw_headers(mail.message) == headers
+    assert _tree_shape(mail) == tree
+    assert _tree_shape(mailparser.parse_from_string(text)) == tree
+    # The defect names the part with the empty boundary, not its sibling.
+    assert mail.defects == [_empty_boundary_defect(1)]
+    assert [entry["defects"] for entry in mail.mime_tree] == [
+        [],
+        ["MimeHeaderDefect"],
+        [],
+        [],
+        [],
+    ]
+
+
+def test_empty_boundary_never_matched_is_a_defect_of_the_part():
+    """
+    The empty boundary is a defect of the header, whether or not a
+    delimiter is found: here the body has none, and the defects of the
+    email package are kept beside it.
+    """
+    mail = mailparser.parse_from_string(
+        'From: a@b.example\r\nContent-Type: multipart/mixed; boundary=""\r\n'
+        "\r\n"
+        "no delimiter\r\n"
+    )
+
+    assert mail.has_defects is True
+    assert mail.defects_categories == {
+        "MimeHeaderDefect",
+        "MultipartInvariantViolationDefect",
+        "StartBoundaryNotFoundDefect",
+    }
+    assert _empty_boundary_defect(0) in mail.defects
+    assert mail.body == "no delimiter\r\n"
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        # A boundary means nothing outside a multipart.
+        'text/plain; boundary=""',
+        # RFC 2046 section 5.1.1 allows one character.
+        'multipart/mixed; boundary="x"',
+    ],
+)
+def test_no_empty_boundary_defect_without_an_empty_multipart_boundary(
+    content_type,
+):
+    """Neighbouring forms that are not an empty multipart boundary."""
+    mail = mailparser.parse_from_string(
+        f"From: a@b.example\r\nContent-Type: {content_type}\r\n\r\n"
+        "--x\r\nContent-Type: text/plain\r\n\r\ninside\r\n--x--\r\n"
+    )
+
+    assert "MimeHeaderDefect" not in mail.defects_categories
+    assert mail.has_defects is False
+
+
+@pytest.mark.parametrize(
+    ("refusing", "content_type", "expected", "defects"),
+    [
+        pytest.param(
+            _REFUSED_PART,
+            "multipart/report",
+            # Both generators refuse the part: the container is written
+            # by hand, the multipart before it by the generator.
+            'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n'
+            "\n"
+            'Content-Type: multipart/mixed; boundary=""\n\n'
+            "--\nContent-Type: text/plain\n\ninside\n----\n"
+            'Content-Type: multipart/report; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
+            [
+                {"multipart/report": [_NO_BOUNDARY]},
+                _empty_boundary_defect(1),
+                {"multipart/report": [_charset_defect(3)]},
+            ],
+            id="written-by-hand",
+        ),
+        pytest.param(
+            _REFUSED_TEXT,
+            "text/plain",
+            # as_bytes() writes the whole message.
+            'From: a@b.example\nContent-Type: multipart/mixed; boundary="A"\n'
+            "\n"
+            '--A\nContent-Type: multipart/mixed; boundary=""\n\n'
+            "--\nContent-Type: text/plain\n\ninside\n----\n\n"
+            '--A\nContent-Type: text/plain; charset="undefined"\n'
+            "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text\n--A--\n",
+            [_empty_boundary_defect(1), {"text/plain": [_charset_defect(3)]}],
+            id="written-as-bytes",
+        ),
+    ],
+)
+def test_message_as_string_keeps_an_empty_boundary_beside_a_refusing_part(
+    refusing, content_type, expected, defects
+):
+    """
+    The pass a refusing part ends has already written the multipart
+    before it, and with it the boundary the generator invented.  The
+    passes of the fallback go through that multipart again.
+    """
+    mail = _from_octets(
+        "From: a@b.example\r\n" + _multipart("A", _empty_boundary(), refusing)
+    )
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+    assert mail.defects == defects
+
+    text = mail.message_as_string
+
+    assert text == expected
+    assert mail.message_as_string == text
+    assert _raw_headers(mail.message) == headers
+    assert _tree_shape(mail) == [
+        ("multipart/mixed", None, "A"),
+        ("multipart/mixed", 0, ""),
+        ("text/plain", 1, None),
+        (content_type, 0, None),
+    ]
+    assert mail.defects == defects
+    assert not mail.message.get_payload(0).get_boundary()
+
+
+def test_empty_boundary_is_false_again_after_a_too_deep_message():
+    """
+    The generator is given an empty boundary that is true only while a
+    pass runs, also when the pass ends in a ``RecursionError``.
+    """
+    deep = _nested_multipart(sys.getrecursionlimit() // 3).partition("\r\n")[2]
+    mail = mailparser.parse_from_string(
+        "From: a@b.example\r\n"
+        'Content-Type: multipart/mixed; boundary=""\r\n\r\n'
+        "--\r\n" + deep + "----\r\n"
+    )
+    assert mail.message is not None
+    headers = _raw_headers(mail.message)
+
+    with pytest.raises(MailParserRecursionError):
+        mail.message_as_string
+
+    boundary = mail.message.get_boundary()
+    assert type(boundary) is str
+    assert not boundary
+    assert _raw_headers(mail.message) == headers
+
+
+def test_message_as_string_gives_a_caller_built_multipart_a_boundary():
+    """
+    A multipart the caller builds without a boundary, as a plain
+    ``MIMEMultipart()`` is, has no delimiter to keep: the generator
+    must invent one to write it, and stores it in the message of the
+    caller.  The next read uses that boundary.
+    """
+    message = Message()
+    message["Content-Type"] = "multipart/mixed"
+    part = Message()
+    part.set_payload("inside")
+    message.attach(part)
+    mail = mailparser.MailParser(message)
+    assert message.get_boundary() is None
+
+    text = mail.message_as_string
+
+    boundary = message.get_boundary()
+    assert boundary
+    assert text == (
+        f'Content-Type: multipart/mixed; boundary="{boundary}"\n\n'
+        f"--{boundary}\n\ninside\n--{boundary}--\n"
+    )
+    assert mail.message_as_string == text
+
+
 def _text_message_returning(undecoded_payload):
     """
     A text/plain iso-8859-1 message whose ``get_payload(decode=False)`` returns
@@ -2134,7 +3326,9 @@ def test_body_bytes_payload_decoded_with_charset():
 
 
 @pytest.mark.parametrize("count", [2000, 8000])
-@pytest.mark.parametrize("distinct", [True, False], ids=["distinct", "repeated"])
+@pytest.mark.parametrize(
+    "distinct", [True, False], ids=["distinct", "repeated"]
+)
 def test_distinct_header_names_scale_linearly(count, distinct, monkeypatch):
     """Bound full header-list rescans on both independent growth axes."""
     budget = WorkBudget(8 * (count + 1))
@@ -2145,8 +3339,12 @@ def test_distinct_header_names_scale_linearly(count, distinct, monkeypatch):
         return original(message, *args, **kwargs)
 
     monkeypatch.setattr(Message, "get_all", counted_get_all)
-    headers = "".join(f"X{i if distinct else 0:05d}: v\r\n" for i in range(count))
-    mail = mailparser.parse_from_string(f"From: a@b.c\r\n{headers}\r\nbody\r\n")
+    headers = "".join(
+        f"X{i if distinct else 0:05d}: v\r\n" for i in range(count)
+    )
+    mail = mailparser.parse_from_string(
+        f"From: a@b.c\r\n{headers}\r\nbody\r\n"
+    )
     parsed_headers = mail.headers
     assert len(parsed_headers) == (count + 1 if distinct else 2)
     if distinct:
@@ -2200,7 +3398,9 @@ def test_header_named_headers_json_does_not_recurse(monkeypatch):
         pytest.fail("wire header invoked the headers_json property")
 
     monkeypatch.setattr(
-        mailparser.MailParser, "headers_json", property(unexpected_serialization)
+        mailparser.MailParser,
+        "headers_json",
+        property(unexpected_serialization),
     )
     mail = mailparser.parse_from_string(raw)
     assert mail.headers["Headers_json"] == "x"
@@ -2219,7 +3419,9 @@ def test_reserved_defect_keys_are_not_shadowed_by_headers():
     A header named after a defect output key must not replace the parsed
     value with a string from the wire.
     """
-    raw = "Defects: x\r\nDefects_categories: y\r\nHas_defects: z\r\n\r\nbody\r\n"
+    raw = (
+        "Defects: x\r\nDefects_categories: y\r\nHas_defects: z\r\n\r\nbody\r\n"
+    )
     mail = mailparser.parse_from_string(raw)
     assert mail.mail["has_defects"] is False
     assert "defects" not in mail.mail
@@ -2279,9 +3481,9 @@ def test_sender_ip_control_matrix():
     # malicious hostname alone must still resolve correctly
     assert _sender_ip(evil) == "1.2.3.4"
     # an ordinary hostname that merely contains "by" used to return None
-    assert _sender_ip(_GENUINE.format(host="nearby.example.org", ip="9.9.9.9")) == (
-        "9.9.9.9"
-    )
+    assert _sender_ip(
+        _GENUINE.format(host="nearby.example.org", ip="9.9.9.9")
+    ) == ("9.9.9.9")
 
 
 def test_sender_ip_ignores_the_receiving_server():
@@ -2300,7 +3502,9 @@ def test_sender_ip_ignores_the_receiving_server():
 def test_get_from_clause_is_anchored():
     """get_from_clause splits on RFC 5321 keywords, not on substrings."""
     assert (
-        get_from_clause("from derby.example.com (derby.example.com [1.2.3.4]) by mx")
+        get_from_clause(
+            "from derby.example.com (derby.example.com [1.2.3.4]) by mx"
+        )
         == "derby.example.com (derby.example.com [1.2.3.4])"
     )
     # no from clause: attribution fails closed rather than widening the
@@ -2358,7 +3562,10 @@ def test_wire_header_names_are_not_rewritten():
     mail = mailparser.parse_from_string(raw)
 
     assert mail.mail["subject"] == "innocuous"
-    assert mail.mail["subject_json"] == "MALWARE-C2 http://evil.example/payload.exe"
+    assert (
+        mail.mail["subject_json"]
+        == "MALWARE-C2 http://evil.example/payload.exe"
+    )
     assert mail.headers["X_Spam_Flag"] == "YES"
     assert "MALWARE-C2" in mail.mail_json
     assert "MALWARE-C2" in mail.headers_json
@@ -2411,7 +3618,9 @@ def test_message_without_headers_is_parsed():
     absent headers.  Every property returned "" — a pipeline grepping the
     body for indicators saw nothing and no error (CWE-754).
     """
-    mail = mailparser.parse_from_string("Click http://evil.example/pay.exe now\r\n")
+    mail = mailparser.parse_from_string(
+        "Click http://evil.example/pay.exe now\r\n"
+    )
     assert "evil.example" in mail.body
     assert isinstance(mail.mail, dict)
     assert isinstance(mail.attachments, list)
@@ -2426,12 +3635,14 @@ def test_sender_ip_ignores_the_helo_name():
     after the genuine IP.
     """
     exim = (
-        "Received: from evil.example ([93.184.216.34]:45321 helo=[8.8.8.8])\r\n"
+        "Received: from evil.example ([93.184.216.34]:45321 "
+        "helo=[8.8.8.8])\r\n"
         "\tby mx.victim.com with esmtps id ABC;"
         " Mon, 1 Jan 2024 00:00:00 +0000\r\n"
     )
     communigate = (
-        "Received: from [93.184.216.34] (account bounce@tin.it HELO 8.8.8.8)\r\n"
+        "Received: from [93.184.216.34] (account bounce@tin.it HELO "
+        "8.8.8.8)\r\n"
         "\tby mx.victim.com (CommuniGate) with ESMTP id ABC;"
         " Mon, 1 Jan 2024 00:00:00 +0000\r\n"
     )
@@ -2481,9 +3692,9 @@ def test_headers_dedupes_case_variants_of_one_name():
     assert len(mail.headers_json) < len(raw)
 
     # honest duplicates keep every value under one key
-    assert mailparser.parse_from_string("Subject: a\r\nSUBJECT: b\r\n\r\n").headers == {
-        "Subject": ["a", "b"]
-    }
+    assert mailparser.parse_from_string(
+        "Subject: a\r\nSUBJECT: b\r\n\r\n"
+    ).headers == {"Subject": ["a", "b"]}
 
 
 def test_multi_token_helo_never_steers_the_result():
@@ -2496,7 +3707,10 @@ def test_multi_token_helo_never_steers_the_result():
     it pulls in the ``for`` and ``envelope-from`` values, which the sender
     also picks — so truncation is left to fail closed (CWE-345).
     """
-    assert _sender_ip(_GENUINE.format(host="evil.example", ip="1.2.3.4")) == "1.2.3.4"
+    assert (
+        _sender_ip(_GENUINE.format(host="evil.example", ip="1.2.3.4"))
+        == "1.2.3.4"
+    )
 
     for helo in (
         "evil 6.6.6.6 by z",
@@ -2504,9 +3718,10 @@ def test_multi_token_helo_never_steers_the_result():
         "evil 6.6.6.6 for z",
         "a by b by c 6.6.6.6 by d",
     ):
-        assert _sender_ip(_GENUINE.format(host=helo, ip="1.2.3.4"), _FORGED) is None, (
-            f"HELO {helo!r} steered the result"
-        )
+        assert (
+            _sender_ip(_GENUINE.format(host=helo, ip="1.2.3.4"), _FORGED)
+            is None
+        ), f"HELO {helo!r} steered the result"
 
 
 def test_sender_ip_ignores_addresses_the_sender_wrote():
@@ -2542,7 +3757,8 @@ def test_ipv4_helo_literal_does_not_hide_an_ipv6_sender():
     own forged headers.
     """
     genuine = (
-        "Received: from 10.0.0.1 (evil.example [IPv6:2a00:1450:4864:20::32])\r\n"
+        "Received: from 10.0.0.1 (evil.example "
+        "[IPv6:2a00:1450:4864:20::32])\r\n"
         "\tby mx.victim.com (Postfix) with ESMTPS id ABC"
         " for <v@victim.com>; Mon, 1 Jan 2024 00:00:00 +0000\r\n"
     )
@@ -2594,7 +3810,8 @@ def test_sender_ip_ignores_an_address_literal_announced_at_ehlo():
     # with nothing else in the clause the answer is None, never the literal
     alone = (
         "Received: from [8.8.8.8] (unknown)\r\n"
-        "\tby mx.victim.com (Postfix) id ABC; Mon, 1 Jan 2024 00:00:00 +0000\r\n"
+        "\tby mx.victim.com (Postfix) id ABC; Mon, 1 Jan 2024 00:00:00 "
+        "+0000\r\n"
     )
     assert _sender_ip(alone, _FORGED) is None
 
@@ -2607,7 +3824,8 @@ def test_sender_ip_rejects_a_helo_marker_the_sender_injected():
     """
     injected = (
         "Received: from 8.8.8.8 helo=x\r\n"
-        "\tby mx.victim.com (Postfix) id ABC; Mon, 1 Jan 2024 00:00:00 +0000\r\n"
+        "\tby mx.victim.com (Postfix) id ABC; Mon, 1 Jan 2024 00:00:00 "
+        "+0000\r\n"
     )
     assert _sender_ip(injected, _FORGED) is None
 
@@ -2644,7 +3862,9 @@ def test_helo_strip_keeps_a_sender_whose_helo_is_the_word_helo():
             "\tby mx.victim.com (sendmail) with ESMTP id ABC;"
             " Mon, 1 Jan 2024 00:00:00 +0000\r\n"
         )
-        assert _sender_ip(received) == "45.33.32.156", f"HELO {helo!r} lost the IP"
+        assert _sender_ip(received) == "45.33.32.156", (
+            f"HELO {helo!r} lost the IP"
+        )
 
 
 def test_sender_ip_walks_past_a_private_internal_relay():
@@ -2694,7 +3914,8 @@ def test_raw_suffix_folds_underscores_to_dashes():
     returned fine.
     """
     mail = mailparser.parse_from_string(
-        "X-Mailer: Foo 1.0\r\nX-MSMail-Priority: High\r\nSubject: s\r\n\r\nbody\r\n"
+        "X-Mailer: Foo 1.0\r\nX-MSMail-Priority: High\r\nSubject: s\r\n\r\n"
+        "body\r\n"
     )
 
     def raw(name):
@@ -2707,3 +3928,151 @@ def test_raw_suffix_folds_underscores_to_dashes():
     assert raw("X_MSMail_Priority_raw") == ["High"]
     # absent headers give an empty list, never "null"
     assert raw("x_nonexistent_raw") == []
+
+
+@pytest.fixture
+def extract_msg_lib():
+    """Skip the test when the optional ``extract-msg`` is missing."""
+    return pytest.importorskip("extract_msg")
+
+
+def _outlook_temp_files():
+    pattern = os.path.join(tempfile.gettempdir(), "outlook_*")
+    return set(glob.glob(pattern))
+
+
+def test_from_file_msg_valid_still_parses(extract_msg_lib):
+    mail = mailparser.parse_from_file_msg(mail_outlook_1)
+    assert mail.subject
+
+
+def test_from_file_msg_garbage_raises_outlook_error(extract_msg_lib, tmp_path):
+    path = tmp_path / "garbage.msg"
+    path.write_bytes(b"not an OLE file\n" * 10)
+    before = _outlook_temp_files()
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(str(path))
+
+    assert isinstance(
+        exc.value.__cause__, extract_msg_lib.exceptions.InvalidFileFormatError
+    )
+    assert _outlook_temp_files() == before
+
+
+@pytest.mark.parametrize("divisor", [3, 2])
+def test_from_file_msg_truncated_raises_outlook_error(
+    extract_msg_lib, tmp_path, divisor
+):
+    with open(mail_outlook_1, "rb") as f:
+        data = f.read()
+    path = tmp_path / "truncated.msg"
+    path.write_bytes(data[: len(data) // divisor])
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(str(path))
+
+    assert isinstance(exc.value.__cause__, OSError)
+    assert not isinstance(exc.value.__cause__, FileNotFoundError)
+
+
+def test_from_file_msg_missing_file_stays_file_not_found(
+    extract_msg_lib, tmp_path
+):
+    with pytest.raises(FileNotFoundError):
+        mailparser.parse_from_file_msg(str(tmp_path / "missing.msg"))
+
+
+@pytest.mark.parametrize(
+    ("build", "error"),
+    [
+        pytest.param(lambda d: d, IsADirectoryError, id="a directory"),
+        pytest.param(
+            lambda d: d / "file" / "x.msg",
+            NotADirectoryError,
+            id="a path through a file",
+        ),
+    ],
+)
+def test_from_file_msg_path_error_is_not_a_malformed_file(
+    extract_msg_lib, tmp_path, build, error
+):
+    """
+    Regression: only three ``OSError`` classes were let through, so a
+    path the caller got wrong was reported as a malformed ``.msg``.
+    """
+    (tmp_path / "file").write_bytes(b"x")
+
+    with pytest.raises(error):
+        mailparser.parse_from_file_msg(str(build(tmp_path)))
+
+
+def test_from_file_msg_error_does_not_carry_the_stream(
+    extract_msg_lib, mocker
+):
+    """
+    Regression: the message held ``repr()`` of the library error, and
+    that of a ``UnicodeDecodeError`` holds the whole stream that could
+    not be decoded, four characters for each octet of the sender.
+    """
+    stream = b"\xff" * 1_000_001
+    error = UnicodeDecodeError("utf-16-le", stream, 0, 1, "truncated data")
+    mocker.patch.object(extract_msg_lib, "openMsg", side_effect=error)
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert exc.value.__cause__ is error
+    assert "UnicodeDecodeError" in str(exc.value)
+    assert len(str(exc.value)) < 1024
+
+
+def test_from_file_msg_too_deep_raises_recursion_error(
+    extract_msg_lib, mocker
+):
+    """A ``.msg`` too deep to convert is not reported as malformed."""
+    mocker.patch.object(
+        extract_msg_lib, "openMsg", side_effect=RecursionError("deep")
+    )
+
+    with pytest.raises(MailParserRecursionError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert isinstance(exc.value.__cause__, RecursionError)
+
+
+def test_from_file_msg_memory_error_stays_what_it_is(extract_msg_lib, mocker):
+    mocker.patch.object(extract_msg_lib, "openMsg", side_effect=MemoryError())
+
+    with pytest.raises(MemoryError):
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+
+def test_from_file_msg_non_email_stays_os_error(extract_msg_lib, mocker):
+    contact = mocker.Mock(spec=["close"])
+    mocker.patch.object(extract_msg_lib, "openMsg", return_value=contact)
+
+    with pytest.raises(MailParserOSError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert not isinstance(exc.value, MailParserOutlookError)
+    contact.close.assert_called_once_with()
+
+
+def test_from_file_msg_serialization_failure_leaves_no_temp_file(
+    extract_msg_lib, mocker
+):
+    eml = mocker.Mock()
+    eml.get.return_value = ""
+    eml.as_bytes.side_effect = ValueError("boom")
+    msg = mocker.Mock()
+    msg.asEmailMessage.return_value = eml
+    mocker.patch.object(extract_msg_lib, "openMsg", return_value=msg)
+    before = _outlook_temp_files()
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert isinstance(exc.value.__cause__, ValueError)
+    assert _outlook_temp_files() == before
+    msg.close.assert_called_once_with()

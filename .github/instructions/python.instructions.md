@@ -52,5 +52,6 @@ def calculate_area(radius: float) -> float:
     float: The area of the circle, calculated as π * radius^2.
     """
     import math
-    return math.pi * radius ** 2
+
+    return math.pi * radius**2
 ```

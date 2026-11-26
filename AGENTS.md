@@ -67,17 +67,21 @@ mail = mailparser.parse_from_string(
 )
 assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
 assert mail.has_defects is True
-assert mail.address_header_defects == [{
-    "reason": "invalid-display-name",
-    "raw": "billing@trusted.example < billing@vendor.example >",
-    "recovered": True,
-    "candidates": [{
-        "display_name": "billing@trusted.example",
-        "address": "billing@vendor.example",
-    }],
-    "header": "from",
-    "occurrence": 0,
-}]
+assert mail.address_header_defects == [
+    {
+        "reason": "invalid-display-name",
+        "raw": "billing@trusted.example < billing@vendor.example >",
+        "recovered": True,
+        "candidates": [
+            {
+                "display_name": "billing@trusted.example",
+                "address": "billing@vendor.example",
+            }
+        ],
+        "header": "from",
+        "occurrence": 0,
+    }
+]
 ```
 
 ## Python Style
@@ -116,6 +120,7 @@ optional Outlook dependencies are installed with `uv sync --extra outlook`).
 | `addresses.py`  | Forensic address scanner and recovery diagnostics                     |
 | `received.py`   | Context-aware lexical scanning of SMTP trace clauses                  |
 | `dates.py`      | Date semantics, obsolete forms and occurrence-aware diagnostics       |
+| `structure.py`  | Text drawing of the message structure (headers, hops, MIME tree)      |
 | `utils.py`      | Stateless parsing helpers (address, received headers, date, encoding) |
 | `const.py`      | Compiled regexes, header sets, clause splitter                        |
 | `exceptions.py` | Custom exception hierarchy                                            |
@@ -164,6 +169,101 @@ caches address results and recovery diagnostics once per parse, examining every
 header occurrence while retaining first-occurrence semantics for address
 properties. `address_header_defects` is reserved computed metadata; literal
 wire headers with that name remain accessible through `headers`/`message`.
+
+**MIME tree and drawing**: `mime_tree` is a flat list; entry `i` is the `part N` of defect
+messages and names its `parent` (ADR 0002). `parse()` keeps one small `_PartRecord` per part
+(roles, attachment position, size) and the entries are built on first read: most callers never
+read the tree, and the number of parts is chosen by the sender. It is a computed property kept
+out of `mail`/`mail_json`, whose output must not change. Walk, build and draw iteratively
+(`_walk_with_parents()`): nesting depth is chosen by the sender, so never recurse over parts.
+Every string in the tree must encode as UTF-8; a value decoded with a sender-chosen RFC 2231
+charset can hold lone surrogates (`mime_boundary()`). Reading the tree must not change the
+message (`_decoded_size()` discards the defects decoding adds). In `structure.py`
+every value taken from the message reaches the output only through `_visible()`, which escapes
+control, ANSI, bidirectional and zero-width characters and stops at a column limit; never format
+message text into the drawing directly. A warning mark means a recorded defect, never a heuristic.
+
+**Parameter recovery**: every message the parser builds is a `utils.RecoveringMessage`, never a
+plain `Message`: `from_string()`, `from_bytes()`, `from_file()` (Outlook included), the epilogue
+recovery and `mime_header_view()`. The email package uses parameters on its own, where no caller
+can catch what an RFC 2231 value raises: `get_boundary()` in the feed parser, `get_boundary()`,
+`get_param()`, `get_payload()` and `set_payload()` in the generator. Four values raise: a charset
+that refuses the octets (`boundary*=undefined''x`), sections with and without a number (`name*`
+next to `name*1`, before 3.13.18, 3.14.10 and 3.15.2), a section number longer than `int()`
+converts, and the `(charset, language, value)` tuple of an RFC 2231 charset where a codec name
+is expected. The class overrides `get_boundary()`, `get_payload()`, `set_payload()` and
+`_get_params_preserve()`; the last is private, but it is the one method every parameter accessor
+reads through, and a test fails if a Python release changes that. A well formed value is read
+as `Message` reads it, a malformed one as `Message` of 3.13.18, 3.14.10 and 3.15.2 reads it.
+`set_payload()` raises `LookupError` when the tuple names no codec, so that `as_string_safe()`
+falls back to bytes instead of writing a lossy body under an empty transfer encoding.
+
+A parameter is malformed, on every Python, when its RFC 2231 sections come with and without a
+number, repeat a number, or come more than once without one: releases differ in what they
+raise and in how they order equal numbers. `_renumbered()` orders the sections as the fixed
+releases do and numbers them again from 0, which every release reads the same way. The defect
+must not depend on the Python version either: `mime_header_view()` reports
+`invalid-parameter-continuation` from the structure of the list, `mime_boundary()` reports
+`invalid-boundary-parameter`, both as the `MimeHeaderDefect` of that part, never recorded on
+the message. An undecodable boundary is the percent-decoded value read as Latin-1, which is
+what the email package returns for a charset it does not know. The sub-parts of a part rebuilt
+from the epilogue are no entries of the tree: `parse()` reads each through the same two
+helpers and reports it on that part as `sub-part N: ...`, `N` being its position in the walk.
+
+All parameter lists go through `_read_params()`, behind a cache of 8 header values. The cache
+spares the split, which is quadratic in some Python releases, to accessors that read one value
+in a row: the feed parser, the helpers of one `parse()` iteration, the generator. It does not
+make a value split once per message: an entry is evicted when 8 other values are read in
+between, and a message with many containers splits a value again in a later phase. Never
+return the cached tuple itself. The cache holds text of the message, so `_forgets_parameters`
+empties it when `_parse_guarded()`, `parse()`, `_build_mime_tree()` or `message_as_string`
+ends, whether it returns or raises; an accessor the caller runs later on `mail.message` fills
+it again, with at most 8 values.
+
+Read a filename, charset or boundary through `mime_filename()`, `mime_charset()` and
+`mime_boundary()`: `get_filename()` and `get_content_charset()` still raise on an undecodable
+value, which is how the helpers detect it. The helpers accept a plain `Message` from
+`MailParser(message)` and read it through `RecoveringMessage.reading()`; the caller's parts are
+not replaced. Reading or flattening the payload of such a part therefore still runs the plain
+accessors, which raise `TypeError` for an RFC 2231 charset on an 8-bit body and, before
+3.13.18, for sections with and without a number. `raw_payload()` catches it and returns the
+bytes. `as_string_safe()` must not: its raw-bytes fallback is not text, and a charset that
+could have been applied must never reach it.
+
+**Flattening fallback**: when a part refuses its charset, `as_string_safe()` writes the containers
+around it by hand and flattens their sub-parts one by one. A pass that fails must not be repeated
+at every level: that cost the size of the message times its depth on `message_as_string`.
+`_refusing_parts()` reads the parts a failed pass went through from the frames of
+`Generator.flatten` in the traceback (locals `msg` and `policy`), and those parts skip the pass.
+A header the generator will not fold is refused the same way, and is no charset error:
+`Header.encode()` takes a form feed for a line break, which the feed parser does not
+(`HeaderWriteError`, `HeaderParseError`). Catch `_FLATTEN_ERRORS` around a pass, never the
+charset errors alone: the error left `parse_from_bytes()` below an attached container. A part
+refused for a header skips the bytes pass too: before its own fix the bytes generator writes
+that header with the line break, which a sender can make a delimiter.
+Three rules keep the output what it was:
+
+- A part is named only when flattening it alone repeats the failed pass: same class and same
+  policy object as the part the pass started from, and the same line length. Below
+  `multipart/signed` the generator drops the length limit, and a policy other than `compat32` may
+  refuse there a header it folds when the part is flattened alone.
+- Nothing is skipped when a `SerializationBudget` is passed: at parse time every pass is debited,
+  also one that fails, and the debit decides which containers reach the resource limit.
+- Add no stack frame per nesting level and catch no `RecursionError` there: the depth at which
+  `message_as_string` raises `MailParserRecursionError` must not move. A frame without the
+  expected locals names no part; it costs a pass, never another output.
+
+A pass must not rewrite the message: the generator takes an empty boundary (`boundary=""`,
+`boundary*=utf-8''`, only whitespace) for a missing one, invents another and stores it with
+`set_boundary()`, which changed `mail.message` on a read and during `parse()` below an attached
+container. Run every generator pass inside `_keeping_empty_boundaries()`: there
+`RecoveringMessage.get_boundary()` returns the empty boundary as a string that is true, so the
+delimiters written are the `--` and `----` the message has, and outside a pass it returns the
+plain `""`. Do not save and restore headers around a pass instead (finding the parts is a scan
+of the subtree at every call, and the text holds a random boundary); a plain `Message` of the
+caller has no such accessor and is still rewritten. Keeping the empty boundary is recovery, not
+compliance: `mime_boundary()` reports it as `invalid-boundary-parameter: empty` on that part
+(RFC 2046 section 5.1.1), and only for a `multipart/*` part.
 
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters

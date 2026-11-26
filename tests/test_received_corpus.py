@@ -74,7 +74,8 @@ class TestExchangeOutlookHeaders(unittest.TestCase):
 
     def test_exchange_internal(self):
         header = (
-            "from DM6PR06MB4475.namprd06.prod.outlook.com (2603:10b6:207:3d::31) "
+            "from DM6PR06MB4475.namprd06.prod.outlook.com "
+            "(2603:10b6:207:3d::31) "
             "by BL0PR06MB4465.namprd06.prod.outlook.com with HTTPS "
             "via BL0PR02CA0054.NAMPRD02.PROD.OUTLOOK.COM; "
             "Mon, 1 Oct 2024 09:49:22 +0000"
@@ -88,7 +89,8 @@ class TestExchangeOutlookHeaders(unittest.TestCase):
     def test_exchange_with_id(self):
         header = (
             "from edge.microsoft.com (10.0.0.1) "
-            "by EXCH01.corp.example.com (172.16.0.10) with Microsoft SMTP Server "
+            "by EXCH01.corp.example.com (172.16.0.10) with Microsoft SMTP "
+            "Server "
             "id 15.1.2507.23; Fri, 22 Nov 2024 16:00:00 -0800"
         )
         parsed = parse_received(header)
@@ -101,8 +103,10 @@ class TestGmailHeaders(unittest.TestCase):
 
     def test_gmail_standard(self):
         header = (
-            "from mail-wr1-f54.google.com (mail-wr1-f54.google.com. [209.85.221.54]) "
-            "by mx.google.com with ESMTPS id a1-2023abc.123.2024.01.15.08.30.00 "
+            "from mail-wr1-f54.google.com (mail-wr1-f54.google.com. "
+            "[209.85.221.54]) "
+            "by mx.google.com with ESMTPS id "
+            "a1-2023abc.123.2024.01.15.08.30.00 "
             "for <user@gmail.com>; Mon, 15 Jan 2024 08:30:00 -0800 (PST)"
         )
         parsed = parse_received(header)
@@ -127,7 +131,8 @@ class TestSendGridHeaders(unittest.TestCase):
     def test_sendgrid_date_format(self):
         header = (
             "from filter.sendgrid.net by filter0123.sendgrid.net "
-            "with SMTP 2024-03-15 10:30:00.123456789 +0000 UTC m=+12345.678901234"
+            "with SMTP 2024-03-15 10:30:00.123456789 +0000 UTC "
+            "m=+12345.678901234"
         )
         parsed = parse_received(header)
         self.assertIn("date", parsed)
@@ -154,7 +159,8 @@ class TestIBMDominoHeaders(unittest.TestCase):
     def test_ibm_domino_notes(self):
         header = (
             "from localhost "
-            "by smtp.notes.na.collabserv.com with smtp.notes.na.collabserv.com ESMTP "
+            "by smtp.notes.na.collabserv.com with "
+            "smtp.notes.na.collabserv.com ESMTP "
             "for <user@example.it> from <sender@it.ibm.com>; "
             "Wed, 8 Mar 2017 16:46:15 -0000"
         )
@@ -206,7 +212,9 @@ class TestEdgeCases(unittest.TestCase):
 
     def test_qmail_minimal(self):
         """qmail-style headers with only date."""
-        header = "(qmail 11769 invoked from network); 22 Aug 2016 14:23:01 -0000"
+        header = (
+            "(qmail 11769 invoked from network); 22 Aug 2016 14:23:01 -0000"
+        )
         parsed = parse_received(header)
         self.assertIn("date", parsed)
         self.assertIn("22 Aug 2016", parsed["date"])
@@ -214,7 +222,8 @@ class TestEdgeCases(unittest.TestCase):
     def test_no_from_clause(self):
         """Header starting with 'by' (internal delivery)."""
         header = (
-            "by mail.example.com (Postfix) id XYZ789; Mon, 1 Jan 2024 00:00:00 +0000"
+            "by mail.example.com (Postfix) id XYZ789; Mon, 1 Jan 2024 "
+            "00:00:00 +0000"
         )
         parsed = parse_received(header)
         self.assertIn("by", parsed)
@@ -294,7 +303,9 @@ class TestIPPatterns(unittest.TestCase):
         self.assertIsNone(match)
 
     def test_ipv6_full(self):
-        self.assertTrue(REGXIP6.search("2001:0db8:85a3:0000:0000:8a2e:0370:7334"))
+        self.assertTrue(
+            REGXIP6.search("2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+        )
 
     def test_ipv6_compressed(self):
         self.assertTrue(REGXIP6.search("2603:10b6:207:3d::31"))

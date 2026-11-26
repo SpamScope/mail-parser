@@ -18,6 +18,7 @@ limitations under the License.
 
 import base64
 import email
+import functools
 import importlib.util
 import ipaddress
 import json
@@ -25,6 +26,7 @@ import logging
 import re
 from bisect import bisect_right
 from email.feedparser import BytesFeedParser
+from itertools import islice
 
 from mailparser.const import (
     _IPV6_TAG_RE,
@@ -42,6 +44,9 @@ from mailparser.serialization import (
     SerializationLimitError,
 )
 from mailparser.utils import (
+    _CHARSET_ERRORS,
+    RecoveringMessage,
+    _read_params,
     _safe_attachment_filename,
     _safe_remove,
     as_string_safe,
@@ -53,6 +58,8 @@ from mailparser.utils import (
     get_mail_keys,
     get_to_domains,
     group_spans,
+    literal_text,
+    mime_boundary,
     mime_charset,
     mime_filename,
     mime_header_view,
@@ -65,6 +72,77 @@ from mailparser.utils import (
 )
 
 log = logging.getLogger(__name__)
+
+
+class _PartRecord:
+    """What ``parse()`` learns about one MIME part, for the MIME tree.
+
+    Kept small on purpose: the number of parts is chosen by the sender,
+    and most callers never read the tree.
+    """
+
+    __slots__ = ("part", "parent", "roles", "attachment", "size")
+
+    def __init__(self, part, parent):
+        self.part = part
+        self.parent = parent
+        self.roles = ()
+        self.attachment = None
+        self.size = None
+
+
+def _walk_with_parents(message):
+    """Yield every MIME part with the index of its enclosing part.
+
+    Same order as ``Message.walk()``, parents before children, but without
+    recursion: nesting depth is chosen by the sender.
+
+    Args:
+        message (email.message.Message): the root part
+
+    Yields:
+        tuple: the part and the index of its enclosing part, None for
+        the root
+    """
+    yield message, None
+    index = 0
+    pending = (
+        [(iter(message.get_payload()), 0)] if message.is_multipart() else []
+    )
+    while pending:
+        children, parent = pending[-1]
+        child = next(children, None)
+        if child is None:
+            pending.pop()
+            continue
+        index += 1
+        yield child, parent
+        if child.is_multipart():
+            pending.append((iter(child.get_payload()), index))
+
+
+def _forgets_parameters(function):
+    """Empty the cache of decoded parameters when a function ends.
+
+    The cache of ``utils._read_params()`` holds header values of the
+    message, and must not keep them alive once the work that reads
+    them is over, whether it returns or raises.
+
+    Args:
+        function (callable): a function that reads MIME parameters
+
+    Returns:
+        callable: the function, followed by the emptying of the cache
+    """
+
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        finally:
+            _read_params.cache_clear()
+
+    return wrapper
 
 
 def _in_sorted_spans(position, spans):
@@ -130,6 +208,15 @@ def parse_from_file_msg(fp):
 
     Returns:
         Instance of MailParser with raw email parsed
+
+    Raises:
+        MailParserOSError: if no conversion backend is available, or
+            the file is not a convertible email message
+        MailParserOutlookError: if the ``extract-msg`` backend finds the
+            file malformed; the library error is ``__cause__``
+        MailParserRecursionError: if the message, or the ``.msg``
+            itself, is nested too deeply
+        OSError: if ``fp`` cannot be opened
     """
     return MailParser.from_file_msg(fp)
 
@@ -180,7 +267,9 @@ class MailParser:
         # raising AttributeError, which would recurse.
         self._header_index = {}
         if message is not None:
-            log.debug("All headers of emails: {}".format(", ".join(message.keys())))
+            log.debug(
+                "All headers of emails: {}".format(", ".join(message.keys()))
+            )
         self.parse()
 
     def __str__(self) -> str:
@@ -190,6 +279,7 @@ class MailParser:
             return str()
 
     @classmethod
+    @_forgets_parameters
     def _parse_guarded(cls, build_message):
         """
         Build the email message and parse it, converting a ``RecursionError``
@@ -264,7 +354,7 @@ class MailParser:
                 # BytesParser.parse() would still translate CR/LF through
                 # its text wrapper. Feed bytes directly in bounded chunks.
                 with open(fp, "rb") as f:
-                    parser = BytesFeedParser()
+                    parser = BytesFeedParser(_factory=RecoveringMessage)
                     while chunk := f.read(8192):
                         parser.feed(chunk)
                     return parser.close()
@@ -296,7 +386,13 @@ class MailParser:
             Instance of MailParser
 
         Raises:
-            MailParserOSError: if no conversion backend is available
+            MailParserOSError: if no conversion backend is available, or
+                the file is not a convertible email message
+            MailParserOutlookError: if the ``extract-msg`` backend finds
+                the file malformed; the library error is ``__cause__``
+            MailParserRecursionError: if the message, or the ``.msg``
+                itself, is nested too deeply
+            OSError: if ``fp`` cannot be opened
         """
         log.debug("Parsing email from file Outlook")
 
@@ -325,7 +421,9 @@ class MailParser:
         """
 
         log.debug("Parsing email from string")
-        return cls._parse_guarded(lambda: email.message_from_string(s))
+        return cls._parse_guarded(
+            lambda: email.message_from_string(s, _class=RecoveringMessage)
+        )
 
     @classmethod
     def from_bytes(cls, bt):
@@ -339,7 +437,9 @@ class MailParser:
             Instance of MailParser
         """
         log.debug("Parsing email from bytes")
-        return cls._parse_guarded(lambda: email.message_from_bytes(bt))
+        return cls._parse_guarded(
+            lambda: email.message_from_bytes(bt, _class=RecoveringMessage)
+        )
 
     def _reset(self):
         """
@@ -359,13 +459,21 @@ class MailParser:
         self._decoded_headers = {}
         self._header_decoding_defects = []
         self._resource_limit_defects = []
+        self._mime_tree = None
+        self._tree_records = []
+        self._structural_parts = 0
+        self._part_defects = {}
         self._header_index = self._build_header_index()
         self._address_header_defects = []
         self._address_headers = {}
         for header in sorted(ADDRESSES_HEADERS):
-            for occurrence, value in enumerate(self._header_index.get(header, [])):
+            for occurrence, value in enumerate(
+                self._header_index.get(header, [])
+            ):
                 diagnostics = []
-                addresses = get_addresses(value, defects=diagnostics, decode_names=True)
+                addresses = get_addresses(
+                    value, defects=diagnostics, decode_names=True
+                )
                 if occurrence == 0:
                     self._address_headers[header] = addresses
                 for defect in diagnostics:
@@ -377,7 +485,8 @@ class MailParser:
             self._defects.append(
                 {
                     "address-headers": [
-                        f"AddressHeaderDefect: {d['header']}[{d['occurrence']}]: "
+                        f"AddressHeaderDefect: "
+                        f"{d['header']}[{d['occurrence']}]: "
                         f"{d['reason']}"
                         for d in self._address_header_defects
                     ]
@@ -512,6 +621,16 @@ class MailParser:
             return values[0]
         return values if values else ""
 
+    def _record_part_category(self, part_index, category):
+        """Record a defect category for the message and for one MIME part.
+
+        Args:
+            part_index (int): position of the part in the MIME tree
+            category (str): defect category name
+        """
+        self._defects_categories.add(category)
+        self._part_defects.setdefault(part_index, set()).add(category)
+
     def _decode_part_headers(self, part, part_index):
         """Inspect each header occurrence once, retaining literal failures."""
         occurrences = {}
@@ -548,7 +667,7 @@ class MailParser:
                     }
                 )
                 self._has_defects = True
-                self._defects_categories.add("HeaderDecodeDefect")
+                self._record_part_category(part_index, "HeaderDecodeDefect")
                 self._defects.append(
                     {
                         "header-decoding": [
@@ -558,7 +677,7 @@ class MailParser:
                     }
                 )
 
-    def _append_defects(self, part, part_content_type):
+    def _append_defects(self, part, part_content_type, part_index):
         """
         Add new defects and defects categories to object attributes.
 
@@ -568,13 +687,14 @@ class MailParser:
         Args:
             part (string): mail part
             part_content_type (string): content type of part
+            part_index (int): position of the part in the MIME tree
         """
 
         part_defects = {}
 
         for e in part.defects:
             defects = f"{e.__class__.__name__}: {e.__doc__}"
-            self._defects_categories.add(e.__class__.__name__)
+            self._record_part_category(part_index, e.__class__.__name__)
             part_defects.setdefault(part_content_type, []).append(defects)
             log.debug(f"Added defect {defects!r}")
 
@@ -588,7 +708,7 @@ class MailParser:
     def _record_container_limit(self, part_index, filename):
         """Diagnose an omitted copy without fabricating an empty attachment."""
         self._has_defects = True
-        self._defects_categories.add("ResourceLimitDefect")
+        self._record_part_category(part_index, "ResourceLimitDefect")
         self._resource_limit_defects.append(
             {
                 "reason": "container-serialization-limit",
@@ -633,7 +753,11 @@ class MailParser:
             # Only the computed parts are our own names and may be reached
             # through attribute access; every other key is a header name
             # chosen by the sender — see _header_value().
-            value = getattr(self, i) if i in COMPUTED_PARTS else self._header_value(i)
+            value = (
+                getattr(self, i)
+                if i in COMPUTED_PARTS
+                else self._header_value(i)
+            )
             if value:
                 mail[i] = value
 
@@ -656,10 +780,16 @@ class MailParser:
 
         return mail
 
-    def _decode_body_payload(self, part, charset, part_index):
-        """Decode body text from original bytes and report charset recovery."""
-        payload = part.get_payload(decode=True)
-        cte = ported_string(part.get("Content-Transfer-Encoding", "")).strip().lower()
+    def _decode_body_payload(self, part, payload, charset, part_index):
+        """Decode body text from original bytes and report charset recovery.
+
+        ``payload`` is the part's content after transfer decoding.
+        """
+        cte = (
+            ported_string(part.get("Content-Transfer-Encoding", ""))
+            .strip()
+            .lower()
+        )
         if not cte or cte in ("7bit", "8bit"):
             # get_payload(False) already applies a lossy charset decode.
             # The stored payload distinguishes Unicode string input from
@@ -680,7 +810,7 @@ class MailParser:
             # Some Python codecs can produce lone surrogates. Such a
             # value is not Unicode text and breaks UTF-8 JSON/CLI sinks.
             text.encode("utf-8")
-        except (LookupError, UnicodeError, ValueError):
+        except _CHARSET_ERRORS:
             try:
                 text = payload.decode("utf-8")
                 recovery = "decoded with utf-8"
@@ -688,7 +818,7 @@ class MailParser:
                 text = payload.decode("utf-8", "replace")
                 recovery = "decoded with utf-8 replacement characters"
             self._has_defects = True
-            self._defects_categories.add("CharsetDecodeDefect")
+            self._record_part_category(part_index, "CharsetDecodeDefect")
             self._defects.append(
                 {
                     part.get_content_type(): [
@@ -700,6 +830,118 @@ class MailParser:
             )
         return ported_string(text)
 
+    @staticmethod
+    def _embedded_headers(part):
+        """Return the literal From, Subject and Date of an embedded message.
+
+        First occurrences, read from the raw header list: the decoded view
+        of the email package replaces octets it cannot decode.
+
+        Args:
+            part (email.message.Message): root part of the embedded message
+
+        Returns:
+            dict: header name to its literal value, None when absent
+        """
+        headers = dict.fromkeys(("from", "subject", "date"))
+        for name, raw in part.raw_items():
+            header = name.lower()
+            if header in headers and headers[header] is None:
+                headers[header] = literal_text(raw)
+        return headers
+
+    @staticmethod
+    def _decoded_size(part):
+        """Return the octets of a leaf after transfer decoding.
+
+        Decoding reports its defects on the part.  They are discarded
+        here: measuring a part must not change what a later ``parse()``
+        of the same message reports.
+
+        Args:
+            part (email.message.Message): a part that is not a container
+
+        Returns:
+            int: number of octets
+        """
+        known_defects = len(part.defects)
+        octets = part.get_payload(decode=True)
+        del part.defects[known_defects:]
+        return len(octets or b"")
+
+    @_forgets_parameters
+    def _build_mime_tree(self):
+        """Describe every MIME part as declared on the wire.
+
+        ``parse()`` keeps one small record per part; the entries are built
+        from them on first use, so a caller that never reads the tree does
+        not pay for it.  One pass over a flat list: no recursion, whatever
+        nesting the sender chose.
+
+        Returns:
+            list of dict: the entries of ``mime_tree``
+        """
+        tree = []
+        for index, record in enumerate(self._tree_records):
+            part = record.part
+            metadata, _ = mime_header_view(part)
+            recovered = index >= self._structural_parts
+            is_container = part.is_multipart()
+            parent_part = (
+                None
+                if record.parent is None
+                else self._tree_records[record.parent].part
+            )
+            embedded = (
+                parent_part is not None
+                and not recovered
+                and parent_part.get_content_maintype() == "message"
+                and parent_part.get_content_subtype() != "delivery-status"
+            )
+            size = record.size
+            if size is None and not is_container:
+                # A base64 attachment is published as wire text, so
+                # parsing never decoded it.
+                size = self._decoded_size(part)
+            tree.append(
+                {
+                    "index": index,
+                    "parent": record.parent,
+                    "depth": 0
+                    if record.parent is None
+                    else tree[record.parent]["depth"] + 1,
+                    "content_type": ported_string(metadata.get_content_type()),
+                    "content_type_raw": metadata.get("content-type"),
+                    "content_transfer_encoding": ported_string(
+                        metadata.get("content-transfer-encoding", "")
+                    )
+                    .strip()
+                    .lower()
+                    or None,
+                    "charset": mime_charset(metadata),
+                    "content_disposition": metadata.get_content_disposition(),
+                    "filename": decode_header_part(mime_filename(metadata))
+                    or None,
+                    "content_id": ported_string(metadata.get("content-id"))
+                    or None,
+                    "boundary": mime_boundary(metadata)
+                    if part.get_content_maintype() == "multipart"
+                    else None,
+                    "size": size,
+                    "roles": ["container", *record.roles]
+                    if is_container
+                    else list(record.roles),
+                    "attachment": record.attachment,
+                    "defects": sorted(self._part_defects.get(index, ())),
+                    "recovered": recovered,
+                    "embedded_headers": self._embedded_headers(part)
+                    if embedded
+                    else None,
+                }
+            )
+        return tree
+
+    @_forgets_parameters
     def parse(self):
         """
         This method parses the raw email and makes the tokens.
@@ -725,11 +967,12 @@ class MailParser:
         attachment_descendants = set()
 
         # walk all mail parts to search defects
-        for p in self.message.walk():
+        for p, parent in _walk_with_parents(self.message):
             part_content_type = p.get_content_type()
-            self._append_defects(p, part_content_type)
+            self._append_defects(p, part_content_type, len(parts))
             inside_attachment = p in attachment_descendants
             parts.append((p, inside_attachment))
+            self._tree_records.append(_PartRecord(p, parent))
             serialization_parts.append(p)
             if p.is_multipart():
                 disposition = p.get_content_disposition()
@@ -742,21 +985,33 @@ class MailParser:
                 if inside_attachment or blocks_inline:
                     attachment_descendants.update(p.get_payload())
 
+        self._structural_parts = len(parts)
+
         # If defects are in epilogue defects get epilogue
         if self.defects_categories & EPILOGUE_DEFECTS:
             log.debug("Found defects in emails")
-            epilogue = find_between(
-                self.message.epilogue,
-                "{}".format("--" + self.message.get_boundary()),
-                "{}".format("--" + self.message.get_boundary() + "--"),
-            )
+            # Only the root's epilogue is searched.  The defect may sit
+            # on a nested part while the root has no boundary (it is
+            # not a multipart) or no epilogue (it was never closed).
+            root = RecoveringMessage.reading(self.message)
+            boundary = root.get_boundary()
+            root_epilogue = self.message.epilogue
+            epilogue = None
+            if boundary is not None and root_epilogue is not None:
+                epilogue = find_between(
+                    root_epilogue, "--" + boundary, "--" + boundary + "--"
+                )
 
             if epilogue is not None:
                 try:
-                    p = email.message_from_string(epilogue)
+                    p = email.message_from_string(
+                        epilogue,
+                        _class=RecoveringMessage,
+                    )
                     # Recovered epilogues lack reliable nesting context;
                     # retain their existing extraction behavior.
                     parts.append((p, True))
+                    self._tree_records.append(_PartRecord(p, 0))
                     serialization_parts.extend(p.walk())
                 except Exception:
                     log.error("Failed to get epilogue part. Check raw mail.")
@@ -772,9 +1027,25 @@ class MailParser:
             )
             charset = mime_charset(metadata, "utf-8", defects=metadata_defects)
             charset_raw = mime_charset(metadata)
+            record = self._tree_records[i]
+            if p.get_content_maintype() == "multipart":
+                # Read only to diagnose a boundary that is not text.
+                mime_boundary(metadata, defects=metadata_defects)
+            if i >= self._structural_parts:
+                # The sub-parts of a part rebuilt from the epilogue
+                # are no entries of the tree: they are read as parts
+                # are, and reported on that part.
+                subs = islice(_walk_with_parents(p), 1, None)
+                for number, (sub, _) in enumerate(subs, 1):
+                    view, details = mime_header_view(sub)
+                    if sub.get_content_maintype() == "multipart":
+                        mime_boundary(view, defects=details)
+                    metadata_defects.extend(
+                        f"sub-part {number}: {detail}" for detail in details
+                    )
             if metadata_defects:
                 self._has_defects = True
-                self._defects_categories.add("MimeHeaderDefect")
+                self._record_part_category(i, "MimeHeaderDefect")
                 self._defects.append(
                     {
                         "mime-headers": [
@@ -792,7 +1063,9 @@ class MailParser:
                 content_disposition = ported_string(
                     metadata.get_content_disposition()
                 ).lower()
-                log.debug(f"content-disposition {content_disposition!r} part {i!r}")
+                log.debug(
+                    f"content-disposition {content_disposition!r} part {i!r}"
+                )
                 content_id = ported_string(metadata.get("content-id"))
                 log.debug(f"content-id {content_id!r} part {i!r}")
                 content_subtype = ported_string(metadata.get_content_subtype())
@@ -820,25 +1093,37 @@ class MailParser:
 
                 # this is an attachment
                 if is_attachment:
+                    record.roles += ("attachment",)
                     log.debug(f"Email part {i!r} is an attachment")
                     log.debug(f"Filename {filename!r} part {i!r}")
                     binary = False
-                    mail_content_type = ported_string(metadata.get_content_type())
-                    log.debug(f"Mail content type {mail_content_type!r} part {i!r}")
+                    mail_content_type = ported_string(
+                        metadata.get_content_type()
+                    )
+                    log.debug(
+                        f"Mail content type {mail_content_type!r} part {i!r}"
+                    )
                     # Strip before comparing, exactly as email's own
                     # get_payload() does: a trailing space made every
                     # encoding branch below miss and the raw bytes fall
                     # through the text path, which drops the non-UTF-8 ones.
                     transfer_encoding = (
-                        ported_string(metadata.get("content-transfer-encoding", ""))
+                        ported_string(
+                            metadata.get("content-transfer-encoding", "")
+                        )
                         .strip()
                         .lower()
                     )
-                    log.debug(f"Transfer encoding {transfer_encoding!r} part {i!r}")
+                    log.debug(
+                        f"Transfer encoding {transfer_encoding!r} part {i!r}"
+                    )
                     content_disposition = ported_string(
                         metadata.get("content-disposition")
                     )
-                    log.debug(f"content-disposition {content_disposition!r} part {i!r}")
+                    log.debug(
+                        f"content-disposition {content_disposition!r} part "
+                        f"{i!r}"
+                    )
 
                     if p.is_multipart():
                         try:
@@ -855,7 +1140,9 @@ class MailParser:
                             self._record_container_limit(i, filename)
                             continue
                         binary = False
-                        log.debug(f"Filename {filename!r} part {i!r} is multipart")
+                        log.debug(
+                            f"Filename {filename!r} part {i!r} is multipart"
+                        )
                     elif transfer_encoding == "base64":
                         payload = raw_payload(p)
                         if not isinstance(payload, str):
@@ -864,7 +1151,9 @@ class MailParser:
                             # decoded bytes to keep the payload base64.
                             payload = base64.b64encode(payload).decode("ascii")
                         binary = True
-                        log.debug(f"Filename {filename!r} part {i!r} is binary")
+                        log.debug(
+                            f"Filename {filename!r} part {i!r} is binary"
+                        )
                     else:
                         # Every other encoding — uuencode, quoted-printable,
                         # 7bit, 8bit, binary — is re-encoded to base64 from
@@ -874,9 +1163,9 @@ class MailParser:
                         # binary payload), so the extracted file was neither
                         # the attachment nor the bytes on the wire, and its
                         # hash never matched what the recipient received.
-                        payload = base64.b64encode(p.get_payload(decode=True)).decode(
-                            "ascii"
-                        )
+                        octets = p.get_payload(decode=True)
+                        record.size = len(octets)
+                        payload = base64.b64encode(octets).decode("ascii")
                         binary = True
                         log.debug(
                             f"Filename {filename!r} part {i!r} is binary"
@@ -889,6 +1178,7 @@ class MailParser:
                     except ValueError:
                         safe_filename = None
 
+                    record.attachment = len(self._attachments)
                     self._attachments.append(
                         {
                             "filename": filename,
@@ -906,16 +1196,20 @@ class MailParser:
                 # Named inline text has both a body and an attachment view.
                 if not is_attachment or is_inline_body:
                     log.debug(f"Decoding body text for email part {i!r}")
-                    payload = self._decode_body_payload(p, charset, i)
+                    octets = p.get_payload(decode=True)
+                    record.size = len(octets or b"")
+                    payload = self._decode_body_payload(p, octets, charset, i)
 
                     if payload:
+                        record.roles += ("body",)
                         if p.get_content_subtype() == "html":
                             self._text_html.append(payload)
                         elif p.get_content_subtype() == "plain":
                             self._text_plain.append(payload)
                         else:
                             log.warning(
-                                f"Email content {p.get_content_subtype()!r} not handled"
+                                f"Email content {p.get_content_subtype()!r} "
+                                f"not handled"
                             )
                             self._text_not_managed.append(payload)
 
@@ -1047,15 +1341,19 @@ class MailParser:
         # family let one private literal at EHLO suppress the IPv6 scan and
         # hide the real sender.
         matches = sorted(
-            list(REGXIP.finditer(from_part)) + list(REGXIP6.finditer(from_part)),
+            list(REGXIP.finditer(from_part))
+            + list(REGXIP6.finditer(from_part)),
             key=lambda m: m.start(),
         )
-        matches = [m for m in matches if not _in_sorted_spans(m.start(), helo_spans)]
+        matches = [
+            m for m in matches if not _in_sorted_spans(m.start(), helo_spans)
+        ]
 
         candidates = [
             m.group()
             for m in matches
-            if m.start() >= first_token_end and _in_sorted_spans(m.start(), groups)
+            if m.start() >= first_token_end
+            and _in_sorted_spans(m.start(), groups)
         ]
         if candidates:
             return candidates
@@ -1142,7 +1440,9 @@ class MailParser:
             # Values are ``email.header.Header`` when the header carries
             # 8-bit bytes (the from_bytes path); dumping one raises
             # TypeError and kills the parse, so coerce to str first.
-            return json.dumps([ported_string(i) for i in raw], ensure_ascii=False)
+            return json.dumps(
+                [ported_string(i) for i in raw], ensure_ascii=False
+            )
 
         return self._header_value(name.replace("_", "-"))
 
@@ -1154,7 +1454,8 @@ class MailParser:
         The ``filename`` value is decoded from untrusted email metadata and
         must not be used directly to construct filesystem paths. Use
         ``write_attachments()`` when saving attachments. ``safe_filename``
-        contains a sanitized basename, or ``None`` if no usable basename exists.
+        contains a sanitized basename, or ``None`` if no usable basename
+        exists.
         """
         return self._attachments
 
@@ -1181,6 +1482,29 @@ class MailParser:
         for i in self.message.get_all("received", []) if self.message else []:
             output.append(decode_header_part(i))
         return output
+
+    @property
+    def mime_tree(self):
+        """
+        Return the MIME tree: one entry per MIME part, in wire order.
+
+        Entry ``i`` describes part ``i``, the number defect messages quote
+        as ``part N``, and names its enclosing part in ``parent``.  Values
+        are the ones the message declares; they are untrusted text.
+
+        Returns:
+            list of dict, empty when no message was parsed
+        """
+        if self._mime_tree is None:
+            self._mime_tree = self._build_mime_tree()
+        return self._mime_tree
+
+    @property
+    def mime_tree_json(self):
+        """
+        Return the MIME tree as JSON
+        """
+        return json.dumps(self.mime_tree, ensure_ascii=False, indent=2)
 
     @property
     def body(self):
@@ -1368,11 +1692,29 @@ class MailParser:
         return self._message
 
     @property
+    @_forgets_parameters
     def message_as_string(self):
         """
         Return the entire message flattened as a string.
+
+        The generator of the ``email`` package recurses once per MIME
+        nesting level, and it runs out of stack well before the parser
+        does: a message can parse cleanly and still be too deep to
+        flatten.  The original tree stays readable through ``message``
+        and ``mime_tree``.
+
+        Raises:
+            MailParserRecursionError: if the message is nested too
+                deeply to flatten.
         """
-        return as_string_safe(self.message) if self.message else ""
+        if not self.message:
+            return ""
+        try:
+            return as_string_safe(self.message)
+        except RecursionError as exc:
+            raise MailParserRecursionError(
+                "Message nesting too deep to flatten"
+            ) from exc
 
     @property
     def to_domains(self):
