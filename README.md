@@ -448,6 +448,12 @@ The other parameters of the header are read as usual. Each case is a
 `MimeHeaderDefect` of that MIME part, with the value as evidence:
 `invalid-boundary-parameter` or `invalid-parameter-continuation`.
 
+A multipart whose boundary is empty (`boundary=""`, `boundary*=utf-8''`, a
+value of only white space) is still read with the delimiters `--` and `----`,
+and its header is kept as received. RFC 2046 section 5.1.1 requires a boundary
+of 1 to 70 characters, so the part reports the `MimeHeaderDefect`
+`invalid-boundary-parameter: empty` with the raw parameter value.
+
 Header decoding is strict. An unknown charset, invalid byte sequence or
 non-Unicode scalar leaves the complete original header value literal instead
 of dropping bytes or mixing a decoded prefix with the original. A

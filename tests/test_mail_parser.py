@@ -2702,22 +2702,34 @@ def _tree_shape(mail):
     ]
 
 
+def _empty_boundary_defect(part, raw_value: object = ""):
+    """The defect of the part that declares an empty boundary."""
+    return {
+        "mime-headers": [
+            f"MimeHeaderDefect: part {part}, "
+            f"invalid-boundary-parameter: empty; raw={raw_value!r}"
+        ]
+    }
+
+
 @pytest.mark.parametrize(
-    ("declared", "defects"),
+    ("declared", "raw_value", "other_defects"),
     [
-        ('boundary=""', []),
-        ("boundary=", []),
-        ('boundary=" "', []),
-        ("boundary*=utf-8''", []),
-        ("boundary*=utf-8''%20", []),
-        ('boundary*0=""; boundary*1=""', []),
-        ('boundary=""; boundary="evidence"', []),
+        ('boundary=""', "", []),
+        ("boundary=", "", []),
+        ('boundary=" "', " ", []),
+        ("boundary*=utf-8''", ("utf-8", "", ""), []),
+        ("boundary*=utf-8''%20", ("utf-8", "", " "), []),
+        ('boundary*0=""; boundary*1=""', "", []),
+        ('boundary=""; boundary="evidence"', "", []),
         (
             "boundary*=undefined''%20",
+            ("undefined", "", " "),
             ["invalid-boundary-parameter: raw=('undefined', '', ' ')"],
         ),
         (
             "boundary*=utf-8''; boundary*1=\"\"",
+            ("utf-8", "", ""),
             [
                 "content-type[0]: invalid-parameter-continuation; raw="
                 + repr("multipart/mixed; boundary*=utf-8''; boundary*1=\"\"")
@@ -2726,18 +2738,25 @@ def _tree_shape(mail):
     ],
 )
 @pytest.mark.parametrize("tree_first", [True, False])
-def test_message_as_string_keeps_an_empty_boundary(declared, defects, tree_first):
+def test_message_as_string_keeps_an_empty_boundary(
+    declared, raw_value, other_defects, tree_first
+):
     """
     Regression: the generator takes an empty boundary for a missing one,
     invents another and writes it into the part.  Reading
     ``message_as_string`` rewrote ``mail.message``, erased the anomaly
     (RFC 2046 section 5.1.1 requires one character) and made what
     ``mime_tree`` reports depend on which property was read first.
+    The anomaly is a defect of the part, with the value as evidence.
     """
     raw = "From: a@b.example\r\n" + _empty_boundary(declared)
+    details = [
+        *other_defects,
+        f"invalid-boundary-parameter: empty; raw={raw_value!r}",
+    ]
     expected_defects = [
-        {"mime-headers": [f"MimeHeaderDefect: part 0, {detail}" for detail in defects]}
-    ] * bool(defects)
+        {"mime-headers": [f"MimeHeaderDefect: part 0, {detail}" for detail in details]}
+    ]
     mail = mailparser.parse_from_string(raw)
     untouched = mailparser.parse_from_string(raw)
     assert mail.message is not None
@@ -2760,7 +2779,8 @@ def test_message_as_string_keeps_an_empty_boundary(declared, defects, tree_first
     json.dumps(mail.mime_tree).encode("utf-8")
     assert mail.body == "inside"
     assert mail.defects == untouched.defects == expected_defects
-    assert mail.has_defects is bool(defects)
+    assert mail.has_defects is True
+    assert mail.mime_tree[0]["defects"] == ["MimeHeaderDefect"]
     # Outside a generator pass the accessor answers as Message does.
     boundary = mail.message.get_boundary()
     assert type(boundary) is str
@@ -2807,8 +2827,8 @@ def test_parse_keeps_an_empty_boundary_below_an_attached_container():
     ]
     again = mailparser.parse_from_string(raw)
     assert [attachment["payload"] for attachment in again.attachments] == payloads
-    assert mail.defects == []
-    assert mail.has_defects is False
+    assert mail.defects == [_empty_boundary_defect(2, ("utf-8", "", ""))]
+    assert mail.has_defects is True
     assert mail.resource_limit_defects == []
     mail.message_as_string
     assert _raw_headers(mail.message) == wire_headers
@@ -2848,7 +2868,55 @@ def test_message_as_string_keeps_the_boundary_of_a_conforming_sibling():
     assert _raw_headers(mail.message) == headers
     assert _tree_shape(mail) == tree
     assert _tree_shape(mailparser.parse_from_string(text)) == tree
-    assert mail.defects == []
+    # The defect names the part with the empty boundary, not its sibling.
+    assert mail.defects == [_empty_boundary_defect(1)]
+    assert [entry["defects"] for entry in mail.mime_tree] == [
+        [],
+        ["MimeHeaderDefect"],
+        [],
+        [],
+        [],
+    ]
+
+
+def test_empty_boundary_never_matched_is_a_defect_of_the_part():
+    """
+    The empty boundary is a defect of the header, whether or not a
+    delimiter is found: here the body has none, and the defects of the
+    email package are kept beside it.
+    """
+    mail = mailparser.parse_from_string(
+        'From: a@b.example\r\nContent-Type: multipart/mixed; boundary=""\r\n\r\n'
+        "no delimiter\r\n"
+    )
+
+    assert mail.has_defects is True
+    assert mail.defects_categories == {
+        "MimeHeaderDefect",
+        "MultipartInvariantViolationDefect",
+        "StartBoundaryNotFoundDefect",
+    }
+    assert _empty_boundary_defect(0) in mail.defects
+    assert mail.body == "no delimiter\r\n"
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        # A boundary means nothing outside a multipart.
+        'text/plain; boundary=""',
+        # RFC 2046 section 5.1.1 allows one character.
+        'multipart/mixed; boundary="x"',
+    ],
+)
+def test_no_empty_boundary_defect_without_an_empty_multipart_boundary(content_type):
+    """Neighbouring forms that are not an empty multipart boundary."""
+    mail = mailparser.parse_from_string(
+        f"From: a@b.example\r\nContent-Type: {content_type}\r\n\r\n"
+        "--x\r\nContent-Type: text/plain\r\n\r\ninside\r\n--x--\r\n"
+    )
+
+    assert "MimeHeaderDefect" not in mail.defects_categories
     assert mail.has_defects is False
 
 
@@ -2867,6 +2935,7 @@ def test_message_as_string_keeps_the_boundary_of_a_conforming_sibling():
             "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe refused\r\n",
             [
                 {"multipart/report": [_NO_BOUNDARY]},
+                _empty_boundary_defect(1),
                 {"multipart/report": [_charset_defect(3)]},
             ],
             id="written-by-hand",
@@ -2880,7 +2949,7 @@ def test_message_as_string_keeps_the_boundary_of_a_conforming_sibling():
             "--\nContent-Type: text/plain\n\ninside\n----\n\n"
             '--A\nContent-Type: text/plain; charset="undefined"\n'
             "Content-Transfer-Encoding: 8bit\n\n\udcff\udcfe text\n--A--\n",
-            [{"text/plain": [_charset_defect(3)]}],
+            [_empty_boundary_defect(1), {"text/plain": [_charset_defect(3)]}],
             id="written-as-bytes",
         ),
     ],

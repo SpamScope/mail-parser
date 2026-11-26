@@ -351,14 +351,14 @@ def test_nested_defect_no_epilogue(raw, epilogue, categories, tree, as_bytes):
 
 @_BOTH_ENTRY_POINTS
 @pytest.mark.parametrize(
-    "boundary, delimiter",
+    "boundary, delimiter, root_defects",
     [
-        pytest.param("A", "--A", id="boundary"),
+        pytest.param("A", "--A", [], id="boundary"),
         # RFC 2046 section 5.1.1 requires one character at least.
-        pytest.param('""', "--", id="empty boundary"),
+        pytest.param('""', "--", ["MimeHeaderDefect"], id="empty boundary"),
     ],
 )
-def test_nested_defect_with_epilogue(boundary, delimiter, as_bytes):
+def test_nested_defect_with_epilogue(boundary, delimiter, root_defects, as_bytes):
     """A part hidden after the root's close delimiter is recovered."""
     mail = _parse(
         f"From: a@b\nContent-Type: multipart/mixed; boundary={boundary}\n\n"
@@ -370,9 +370,9 @@ def test_nested_defect_with_epilogue(boundary, delimiter, as_bytes):
 
     assert mail.body == "hidden\n--- mail_boundary ---\nx\n"
     assert mail.has_defects is True
-    assert mail.defects_categories == {"StartBoundaryNotFoundDefect"}
+    assert mail.defects_categories == {"StartBoundaryNotFoundDefect", *root_defects}
     assert [_pick(node, "parent", *_TREE_KEYS) for node in mail.mime_tree] == [
-        (None, "multipart/mixed", ["container"], [], False),
+        (None, "multipart/mixed", ["container"], root_defects, False),
         (0, *_NESTED_NODE),
         (0, "text/plain", ["body"], [], True),
     ]

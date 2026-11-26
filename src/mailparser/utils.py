@@ -664,6 +664,7 @@ def mime_boundary(part, *, defects=None):
     An RFC 2231 boundary is decoded with the charset the sender names, and
     some codecs (``utf-7``, ``unicode_escape``) produce lone surrogates:
     a value that is not Unicode text and breaks UTF-8 JSON and CLI sinks.
+    An empty boundary is returned as it is and reported as a defect.
 
     Args:
         part: MIME part or metadata view.
@@ -676,6 +677,10 @@ def mime_boundary(part, *, defects=None):
     """
     part = RecoveringMessage.reading(part)
     boundary = _decoded_boundary(part, defects=defects)
+    if boundary == "" and defects is not None:
+        # RFC 2046 section 5.1.1: a boundary is 1 to 70 characters.
+        raw = part.get_param("boundary")
+        defects.append(f"invalid-boundary-parameter: empty; raw={raw!r}")
     if boundary is None or boundary.isascii():
         return boundary
     escaped = boundary.encode("utf-8", "backslashreplace").decode("utf-8")

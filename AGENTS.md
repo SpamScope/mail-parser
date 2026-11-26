@@ -251,7 +251,9 @@ container. Run every generator pass inside `_keeping_empty_boundaries()`: there
 delimiters written are the `--` and `----` the message has, and outside a pass it returns the
 plain `""`. Do not save and restore headers around a pass instead (finding the parts is a scan
 of the subtree at every call, and the text holds a random boundary); a plain `Message` of the
-caller has no such accessor and is still rewritten.
+caller has no such accessor and is still rewritten. Keeping the empty boundary is recovery, not
+compliance: `mime_boundary()` reports it as `invalid-boundary-parameter: empty` on that part
+(RFC 2046 section 5.1.1), and only for a `multipart/*` part.
 
 **Received header parsing**: `utils.receiveds_parsing()` uses the shared scanner in
 `received.py` for RFC 5321 clause keywords and the timestamp separator. Delimiters
