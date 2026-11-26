@@ -1100,7 +1100,7 @@ Log messages go to standard error, so standard output holds only the output
 you asked for and can be read as JSON:
 
 ```shell
-mailparser -f example_mail -j > example_mail.json
+mail-parser -f example_mail -j > example_mail.json
 ```
 
 Parse from stdin (useful for pipelines):
