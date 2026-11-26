@@ -295,9 +295,9 @@ All parsed properties provide three access variants using intuitive suffixes:
 Example usage:
 
 ```python
-mail.to          # Python list of recipient objects
-mail.to_json     # JSON string representation
-mail.to_raw      # Original "To:" header string as it appears in the email
+mail.to  # Python list of recipient objects
+mail.to_json  # JSON string representation
+mail.to_raw  # Original "To:" header string as it appears in the email
 ```
 
 The command-line tool outputs parsed emails in JSON format by default for easy integration with
@@ -520,7 +520,12 @@ import mailparser
 
 mail = mailparser.parse_from_file("example_mail")
 for part in mail.mime_tree:
-    print("  " * part["depth"], part["index"], part["content_type"], part["roles"])
+    print(
+        "  " * part["depth"],
+        part["index"],
+        part["content_type"],
+        part["roles"],
+    )
 
 print(mailparser.render_structure(mail))
 ```
@@ -671,28 +676,31 @@ mail = mailparser.parse_from_string(
 assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
 assert mail.has_defects is True
 assert "AddressHeaderDefect" in mail.defects_categories
-assert mail.defects == [{"address-headers": [
-    "AddressHeaderDefect: from[0]: invalid-display-name"
-]}]
-assert mail.address_header_defects == [{
-    "reason": "invalid-display-name",
-    "raw": "billing@trusted.example < billing@vendor.example >",
-    "recovered": True,
-    "candidates": [{
-        "display_name": "billing@trusted.example",
-        "address": "billing@vendor.example",
-    }],
-    "header": "from",
-    "occurrence": 0,
-}]
+assert mail.defects == [
+    {"address-headers": ["AddressHeaderDefect: from[0]: invalid-display-name"]}
+]
+assert mail.address_header_defects == [
+    {
+        "reason": "invalid-display-name",
+        "raw": "billing@trusted.example < billing@vendor.example >",
+        "recovered": True,
+        "candidates": [
+            {
+                "display_name": "billing@trusted.example",
+                "address": "billing@vendor.example",
+            }
+        ],
+        "header": "from",
+        "occurrence": 0,
+    }
+]
 assert json.loads(mail.mail_json)["address_header_defects"] == (
     mail.address_header_defects
 )
 
 # 2. Incomplete address: no selected mailbox; a valid neighbouring field survives.
 mail = mailparser.parse_from_string(
-    "From: Alice <alice@example.com\r\n"
-    "To: Bob <bob@example.com>\r\n\r\n"
+    "From: Alice <alice@example.com\r\nTo: Bob <bob@example.com>\r\n\r\n"
 )
 assert mail.from_ == []
 assert mail.to == [("Bob", "bob@example.com")]
@@ -709,8 +717,7 @@ assert mail.address_header_defects[0]["occurrence"] == 1
 
 # 4. Received: ambiguous trace syntax stays raw, with structured diagnostics.
 trace = (
-    "from sender.example (unclosed; by mx.example; "
-    "1 Jan 2024 12:00:00 +0000"
+    "from sender.example (unclosed; by mx.example; 1 Jan 2024 12:00:00 +0000"
 )
 mail = mailparser.parse_from_string(f"Received: {trace}\r\n\r\n")
 assert "ReceivedHeaderDefect" in mail.defects_categories
@@ -728,9 +735,7 @@ assert mail.received_header_defects[0]["recovered"] is True
 assert mail.received[0]["for"] == "<bob@example.com>"
 
 # 5. Dates: an impossible date is not selected; a wrong weekday is recoverable.
-mail = mailparser.parse_from_string(
-    "Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n"
-)
+mail = mailparser.parse_from_string("Date: 31 Feb 2024 12:00:00 +0000\r\n\r\n")
 assert "DateHeaderDefect" in mail.defects_categories
 assert mail.date is None
 assert mail.date_header_defects[0]["reason"] == "invalid-calendar-date"
@@ -749,7 +754,8 @@ mail = mailparser.parse_from_string(
     "1 Jan 2024 25:00:00 +0000\r\n\r\n"
 )
 assert {d["header"] for d in mail.date_header_defects} == {
-    "resent-date", "received"
+    "resent-date",
+    "received",
 }
 
 # 6. Charset: failed declared decoding, then readable UTF-8 or replacement text.
@@ -774,31 +780,43 @@ assert base64.b64decode(mail.attachments[0]["payload"]) == b"Hello"
 
 # 8. Standard-library structure defects: missing parameter/start/closing boundary.
 for raw, category in [
-    ("Content-Type: multipart/mixed\r\n\r\nHello",
-     "NoBoundaryInMultipartDefect"),
-    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\nHello',
-     "StartBoundaryNotFoundDefect"),
-    ('Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
-     '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n',
-     "CloseBoundaryNotFoundDefect"),
-    ("Subject: example\r\ninvalid header line\r\n\r\nHello",
-     "MissingHeaderBodySeparatorDefect"),
+    (
+        "Content-Type: multipart/mixed\r\n\r\nHello",
+        "NoBoundaryInMultipartDefect",
+    ),
+    (
+        'Content-Type: multipart/mixed; boundary="b"\r\n\r\nHello',
+        "StartBoundaryNotFoundDefect",
+    ),
+    (
+        'Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
+        "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n",
+        "CloseBoundaryNotFoundDefect",
+    ),
+    (
+        "Subject: example\r\ninvalid header line\r\n\r\nHello",
+        "MissingHeaderBodySeparatorDefect",
+    ),
 ]:
     mail = mailparser.parse_from_string(raw)
     assert mail.has_defects
     assert category in mail.defects_categories
-    assert any(category in text for entry in mail.defects
-               for texts in entry.values() for text in texts)
+    assert any(
+        category in text
+        for entry in mail.defects
+        for texts in entry.values()
+        for text in texts
+    )
 
 # 9. Bad epilogue: reusing the parent's boundary corrupts nested MIME structure.
 # The attachment after the first closing boundary lands in the outer epilogue.
 raw = (
     'MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary="b"\r\n\r\n'
     '--b\r\nContent-Type: multipart/alternative; boundary="b"\r\n\r\n'
-    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b--\r\n'
+    "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b--\r\n"
     '--b\r\nContent-Type: application/octet-stream; name="evidence.txt"\r\n'
     'Content-Disposition: attachment; filename="evidence.txt"\r\n'
-    'Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8=\r\n--b--\r\n'
+    "Content-Transfer-Encoding: base64\r\n\r\nSGVsbG8=\r\n--b--\r\n"
 )
 mail = mailparser.parse_from_string(raw)
 assert mail.has_defects
@@ -821,8 +839,8 @@ for raw in [
     "From: Alice <alice@example.com>\r\n"
     "Date: 1 Jan 24 12:00:00 GMT\r\n\r\nHello",
     'Content-Type: multipart/mixed; boundary="b"\r\n\r\n'
-    '--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n'
-    '--b--\r\nOrdinary epilogue\r\n',
+    "--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n"
+    "--b--\r\nOrdinary epilogue\r\n",
 ]:
     mail = mailparser.parse_from_string(raw)
     assert mail.has_defects is False
@@ -930,11 +948,11 @@ Import the `mailparser` module and use the convenient factory functions:
 ```python
 import mailparser
 
-mail = mailparser.parse_from_bytes(byte_mail)      # Parse from bytes object
-mail = mailparser.parse_from_file(f)               # Parse from file path
-mail = mailparser.parse_from_file_msg(outlook_mail) # Parse Outlook .msg file
-mail = mailparser.parse_from_file_obj(fp)          # Parse from file object
-mail = mailparser.parse_from_string(raw_mail)      # Parse from string
+mail = mailparser.parse_from_bytes(byte_mail)  # Parse from bytes object
+mail = mailparser.parse_from_file(f)  # Parse from file path
+mail = mailparser.parse_from_file_msg(outlook_mail)  # Parse Outlook .msg file
+mail = mailparser.parse_from_file_obj(fp)  # Parse from file object
+mail = mailparser.parse_from_string(raw_mail)  # Parse from string
 ```
 
 File paths are read as bytes, preserving undecodable octets and original MIME
@@ -953,29 +971,29 @@ by its caller.
 Once parsed, access all email components through intuitive properties:
 
 ```python
-mail.attachments              # List of all attachments with metadata
-mail.body                     # Complete message body
-mail.date                     # Parsed datetime object (UTC)
-mail.defects                  # List of RFC compliance defects
-mail.defects_categories       # Categorized defect types
-mail.delivered_to             # Delivery address
-mail.from_                    # Sender information
+mail.attachments  # List of all attachments with metadata
+mail.body  # Complete message body
+mail.date  # Parsed datetime object (UTC)
+mail.defects  # List of RFC compliance defects
+mail.defects_categories  # Categorized defect types
+mail.delivered_to  # Delivery address
+mail.from_  # Sender information
 mail.get_server_ipaddress(trust="my_server_mail_trust")  # Reliable sender IP
-mail.headers                  # All headers as structured object
-mail.mail                     # Fully tokenized mail object
-mail.message                  # Underlying email.message.Message object
-mail.message_as_string        # Reconstructed message as string
-mail.message_id               # Unique message identifier
-mail.mime_tree                # One entry per MIME part, with its enclosing part
-mail.received                 # Parsed routing information (hop-by-hop)
-mail.subject                  # Email subject
-mail.text_plain               # Plain text body parts (list)
-mail.text_html                # HTML body parts (list)
-mail.text_not_managed         # Unprocessed text parts (check logs for subtypes)
-mail.to                       # Recipient information
-mail.to_domains               # Extracted recipient domains
-mail.timezone                 # Timezone information (offset from UTC)
-mail.mail_partial             # Partial mail object (main parts only)
+mail.headers  # All headers as structured object
+mail.mail  # Fully tokenized mail object
+mail.message  # Underlying email.message.Message object
+mail.message_as_string  # Reconstructed message as string
+mail.message_id  # Unique message identifier
+mail.mime_tree  # One entry per MIME part, with its enclosing part
+mail.received  # Parsed routing information (hop-by-hop)
+mail.subject  # Email subject
+mail.text_plain  # Plain text body parts (list)
+mail.text_html  # HTML body parts (list)
+mail.text_not_managed  # Unprocessed text parts (check logs for subtypes)
+mail.to  # Recipient information
+mail.to_domains  # Extracted recipient domains
+mail.timezone  # Timezone information (offset from UTC)
+mail.mail_partial  # Partial mail object (main parts only)
 ```
 
 ## Saving Attachments to Disk

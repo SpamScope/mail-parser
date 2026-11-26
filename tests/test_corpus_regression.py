@@ -50,7 +50,9 @@ def snapshot(mail):
                 "headers": compact(list(part.raw_items())),
                 "type": part.get_content_type(),
                 "multipart": part.is_multipart(),
-                "payload": digest(payload) if isinstance(payload, bytes) else None,
+                "payload": digest(payload)
+                if isinstance(payload, bytes)
+                else None,
                 "preamble": compact(part.preamble),
                 "epilogue": compact(part.epilogue),
             }
@@ -120,7 +122,8 @@ def test_existing_corpus_outputs(case):
             except UnicodeEncodeError:
                 if sys.version_info < (3, 11) and filename == "mail_outlook_1":
                     pytest.xfail(
-                        "Baseline stdlib string-parser failure on Python 3.9/3.10"
+                        "Baseline stdlib string-parser failure on Python "
+                        "3.9/3.10"
                     )
                 raise
     finally:

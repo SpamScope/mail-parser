@@ -69,13 +69,17 @@ def _parse(raw, factory, tmp_path):
         path.write_bytes(raw)
         return mailparser.parse_from_file(path)
     if factory == "string":
-        return mailparser.parse_from_string(raw.decode("utf-8", "surrogateescape"))
+        return mailparser.parse_from_string(
+            raw.decode("utf-8", "surrogateescape")
+        )
     return mailparser.parse_from_bytes(raw)
 
 
 def _mime_details(mail):
     return [
-        detail for defect in mail.defects for detail in defect.get("mime-headers", [])
+        detail
+        for defect in mail.defects
+        for detail in defect.get("mime-headers", [])
     ]
 
 
@@ -92,7 +96,9 @@ def _continuation_details(part, header, value):
     "parameter, raw_value",
     [
         pytest.param(
-            "boundary*=undefined''abc", ("undefined", "", "abc"), id="undefined"
+            "boundary*=undefined''abc",
+            ("undefined", "", "abc"),
+            id="undefined",
         ),
         pytest.param("boundary*=idna''abc", ("idna", "", "abc"), id="idna"),
         pytest.param(
@@ -101,7 +107,9 @@ def _continuation_details(part, header, value):
             id="continued",
         ),
         pytest.param(
-            "boundary*=a%00b'en'abc", ("a\x00b", "en", "abc"), id="nul in charset"
+            "boundary*=a%00b'en'abc",
+            ("a\x00b", "en", "abc"),
+            id="nul in charset",
         ),
     ],
 )
@@ -109,7 +117,10 @@ def test_undecodable_boundary_is_read_as_latin_1(
     parameter, raw_value, factory, tmp_path
 ):
     """The parts are split on the octets of the value, read as Latin-1."""
-    raw = f"Content-Type: multipart/mixed; {parameter}\r\n\r\n".encode() + _CHILDREN
+    raw = (
+        f"Content-Type: multipart/mixed; {parameter}\r\n\r\n".encode()
+        + _CHILDREN
+    )
     mail = _parse(raw, factory, tmp_path)
     root, text, attachment = mail.mime_tree
 
@@ -123,7 +134,8 @@ def test_undecodable_boundary_is_read_as_latin_1(
     assert root["defects"] == ["MimeHeaderDefect"]
     assert text["defects"] == attachment["defects"] == []
     assert _mime_details(mail) == [
-        f"MimeHeaderDefect: part 0, invalid-boundary-parameter: raw={raw_value!r}"
+        f"MimeHeaderDefect: part 0, invalid-boundary-parameter: "
+        f"raw={raw_value!r}"
     ]
     mail.mail_json.encode("utf-8")
     mail.mime_tree_json.encode("utf-8")
@@ -157,7 +169,9 @@ def test_undecodable_boundary_is_percent_decoded(factory, tmp_path):
         ("boundary*1*=undefined'en'%FF", True),
     ],
 )
-def test_one_header_line_cannot_stop_the_parse(parameter, always_diagnosed, as_bytes):
+def test_one_header_line_cannot_stop_the_parse(
+    parameter, always_diagnosed, as_bytes
+):
     """Each reported one-line message parses, without a boundary to find."""
     raw = f"Content-Type: multipart/mixed; {parameter}\r\n\r\n"
     mail = (
@@ -181,13 +195,17 @@ def test_one_header_line_cannot_stop_the_parse(parameter, always_diagnosed, as_b
 def test_unsortable_name_sections_are_joined(factory, tmp_path):
     """``name*`` next to ``name*1`` is section 0, and always reported."""
     value = "text/plain; name*=x; name*1=y"
-    mail = _parse(f"Content-Type: {value}\r\n\r\nhi\r\n".encode(), factory, tmp_path)
+    mail = _parse(
+        f"Content-Type: {value}\r\n\r\nhi\r\n".encode(), factory, tmp_path
+    )
     (root,) = mail.mime_tree
 
     assert [a["filename"] for a in mail.attachments] == ["xy"]
     assert base64.b64decode(mail.attachments[0]["payload"]) == b"hi\r\n"
     assert root["filename"] == "xy"
-    assert _mime_details(mail) == _continuation_details(0, "content-type", value)
+    assert _mime_details(mail) == _continuation_details(
+        0, "content-type", value
+    )
     assert mail.has_defects is True
     assert root["defects"] == ["MimeHeaderDefect"]
 
@@ -197,7 +215,8 @@ def test_unsortable_name_sections_are_joined(factory, tmp_path):
     "value, filename",
     [
         pytest.param(
-            "attachment; filename*0=report; filename*=utf-8''evil.exe; filename*1=.pdf",
+            "attachment; filename*0=report; filename*=utf-8''evil.exe; "
+            "filename*1=.pdf",
             "report.pdf",
             id="section 0 wins",
         ),
@@ -223,7 +242,9 @@ def test_unsortable_name_sections_are_joined(factory, tmp_path):
         ),
     ],
 )
-def test_dropped_or_reordered_section_is_reported(value, filename, factory, tmp_path):
+def test_dropped_or_reordered_section_is_reported(
+    value, filename, factory, tmp_path
+):
     """The name is the same on every Python, and so is the evidence.
 
     A fixed email package reads these lists without a word, and an older
@@ -236,7 +257,9 @@ def test_dropped_or_reordered_section_is_reported(value, filename, factory, tmp_
     assert [a["filename"] for a in mail.attachments] == [filename]
     assert mail.has_defects is True
     assert mail.mime_tree[0]["defects"] == ["MimeHeaderDefect"]
-    assert _mime_details(mail) == _continuation_details(0, "content-disposition", value)
+    assert _mime_details(mail) == _continuation_details(
+        0, "content-disposition", value
+    )
 
 
 @_FACTORIES
@@ -249,7 +272,9 @@ def test_repeated_charset_section_names_no_charset(factory, tmp_path):
     assert mail.mime_tree[0]["charset"] is None
     assert mail.text_plain == ["café"]
     assert mail.mime_tree[0]["defects"] == ["MimeHeaderDefect"]
-    assert _mime_details(mail) == _continuation_details(0, "content-type", value)
+    assert _mime_details(mail) == _continuation_details(
+        0, "content-type", value
+    )
 
 
 @_FACTORIES
@@ -267,12 +292,16 @@ def test_unsortable_sections_of_a_disposition(factory, tmp_path):
     """The body of the part is kept; ``name`` is no disposition filename."""
     value = "inline; name*=; name*1*="
     mail = _parse(
-        f"Content-Disposition: {value}\r\n\r\nhi\r\n".encode(), factory, tmp_path
+        f"Content-Disposition: {value}\r\n\r\nhi\r\n".encode(),
+        factory,
+        tmp_path,
     )
 
     assert mail.text_plain == ["hi\r\n"]
     assert mail.attachments == []
-    assert _mime_details(mail) == _continuation_details(0, "content-disposition", value)
+    assert _mime_details(mail) == _continuation_details(
+        0, "content-disposition", value
+    )
     assert mail.has_defects is True
 
 
@@ -281,7 +310,9 @@ def test_unsortable_boundary_sections_still_split_the_parts(factory, tmp_path):
     """The email package reads this boundary itself, while it parses."""
     value = "multipart/mixed; boundary*=ab; boundary*1=c"
     mail = _parse(
-        f"Content-Type: {value}\r\n\r\n".encode() + _CHILDREN, factory, tmp_path
+        f"Content-Type: {value}\r\n\r\n".encode() + _CHILDREN,
+        factory,
+        tmp_path,
     )
     root, text, attachment = mail.mime_tree
 
@@ -289,16 +320,23 @@ def test_unsortable_boundary_sections_still_split_the_parts(factory, tmp_path):
     assert [a["filename"] for a in mail.attachments] == ["a.bin"]
     assert root["boundary"] == "abc"
     assert text["defects"] == attachment["defects"] == []
-    assert _mime_details(mail) == _continuation_details(0, "content-type", value)
+    assert _mime_details(mail) == _continuation_details(
+        0, "content-type", value
+    )
 
 
 @_FACTORIES
-@pytest.mark.parametrize("broken", ["", "; x*=a; x*1=b"], ids=["alone", "next"])
-def test_neighbours_of_unsortable_sections_are_intact(broken, factory, tmp_path):
+@pytest.mark.parametrize(
+    "broken", ["", "; x*=a; x*1=b"], ids=["alone", "next"]
+)
+def test_neighbours_of_unsortable_sections_are_intact(
+    broken, factory, tmp_path
+):
     """A parameter reads the same with and without the broken one."""
     raw = (
         f"Content-Type: multipart/mixed; boundary=abc{broken}\r\n\r\n"
-        f"--abc\r\nContent-Type: text/plain; charset=iso-8859-1{broken}\r\n\r\n"
+        f"--abc\r\nContent-Type: text/plain; charset=iso-8859-1{broken}\r\n"
+        f"\r\n"
     ).encode() + (
         b"caf\xe9\r\n--abc\r\nContent-Type: application/octet-stream\r\n"
         b"Content-Disposition: attachment;"
@@ -316,7 +354,9 @@ def test_neighbours_of_unsortable_sections_are_intact(broken, factory, tmp_path)
     assert attachment["filename"] == "café.bin"
     assert base64.b64decode(mail.attachments[0]["payload"]) == b"data"
     expected = ["MimeHeaderDefect"] if broken else []
-    assert root["defects"] == text["defects"] == attachment["defects"] == expected
+    assert (
+        root["defects"] == text["defects"] == attachment["defects"] == expected
+    )
 
 
 @_FACTORIES
@@ -326,11 +366,13 @@ def test_nested_part_carries_its_own_defect(factory, tmp_path):
     raw = (
         "Content-Type: multipart/mixed; boundary=outer\r\n\r\n"
         "--outer\r\nContent-Type: text/plain\r\n\r\nfirst\r\n"
-        "--outer\r\nContent-Type: multipart/mixed; boundary*=undefined''inner\r\n\r\n"
+        "--outer\r\nContent-Type: multipart/mixed; "
+        "boundary*=undefined''inner\r\n\r\n"
         f"--inner\r\nContent-Type: {name}\r\n\r\nnested\r\n"
         "--inner--\r\n"
         "--outer\r\nContent-Type: application/octet-stream\r\n"
-        "Content-Disposition: attachment; filename*=utf-8''caf%C3%A9.bin\r\n\r\n"
+        "Content-Disposition: attachment; filename*=utf-8''caf%C3%A9.bin\r\n"
+        "\r\n"
         "last\r\n--outer--\r\n"
     ).encode()
     mail = _parse(raw, factory, tmp_path)
@@ -376,7 +418,8 @@ def test_nested_part_carries_its_own_defect(factory, tmp_path):
             id="extended",
         ),
         pytest.param(
-            'Content-Disposition: attachment; filename*0="a"; filename*1="b.txt"',
+            'Content-Disposition: attachment; filename*0="a"; '
+            'filename*1="b.txt"',
             "ab.txt",
             id="continued",
         ),
@@ -398,7 +441,9 @@ def test_nested_part_carries_its_own_defect(factory, tmp_path):
         ),
     ],
 )
-def test_conforming_filename_parameters_decode(header, filename, factory, tmp_path):
+def test_conforming_filename_parameters_decode(
+    header, filename, factory, tmp_path
+):
     """RFC 2231 sections 3, 4 and 4.1: nothing is recovered or reported."""
     mail = _parse(f"{header}\r\n\r\nhi\r\n".encode(), factory, tmp_path)
 
@@ -413,7 +458,10 @@ def test_conforming_filename_parameters_decode(header, filename, factory, tmp_pa
 )
 def test_conforming_boundary_parameters_decode(parameter, factory, tmp_path):
     """A boundary the email package decodes is not diagnosed."""
-    raw = f"Content-Type: multipart/mixed; {parameter}\r\n\r\n".encode() + _CHILDREN
+    raw = (
+        f"Content-Type: multipart/mixed; {parameter}\r\n\r\n".encode()
+        + _CHILDREN
+    )
     mail = _parse(raw, factory, tmp_path)
 
     assert mail.mime_tree[0]["boundary"] == "abc"
@@ -425,7 +473,10 @@ def test_conforming_boundary_parameters_decode(parameter, factory, tmp_path):
 @_FACTORIES
 def test_conforming_charset_parameter_decodes(factory, tmp_path):
     """An RFC 2231 charset selects the codec of the body."""
-    raw = b"Content-Type: text/plain; charset*=us-ascii'en'iso-8859-1\r\n\r\ncaf\xe9"
+    raw = (
+        b"Content-Type: text/plain; charset*=us-ascii'en'iso-8859-1\r\n\r\n"
+        b"caf\xe9"
+    )
     mail = _parse(raw, factory, tmp_path)
 
     assert mail.text_plain == ["café"]
@@ -434,7 +485,9 @@ def test_conforming_charset_parameter_decodes(factory, tmp_path):
 
 
 @_FACTORIES
-def test_boundary_of_a_part_that_is_not_multipart_is_not_read(factory, tmp_path):
+def test_boundary_of_a_part_that_is_not_multipart_is_not_read(
+    factory, tmp_path
+):
     """Nothing decodes this parameter, so nothing can report it."""
     raw = b"Content-Type: text/plain; boundary*=idna''A%80\r\n\r\nhi\r\n"
     mail = _parse(raw, factory, tmp_path)
@@ -477,7 +530,9 @@ def test_rfc2231_charset_does_not_stop_reading_a_payload(
     """
     raw = (
         b"Content-Transfer-Encoding: base64\r\n"
-        b"Content-Type: text/html; " + parameters.encode() + b"\r\n\r\n\xff\xfe\r\n"
+        b"Content-Type: text/html; "
+        + parameters.encode()
+        + b"\r\n\r\n\xff\xfe\r\n"
     )
     mail = _parse(raw, factory, tmp_path)
     (attachment,) = mail.attachments
@@ -498,7 +553,11 @@ def _container(child_type, body):
     return (
         b"Content-Type: multipart/mixed; boundary=q\r\n"
         b"Content-Disposition: attachment; filename=c.bin\r\n\r\n"
-        b"--q\r\nContent-Type: " + child_type + b"\r\n\r\n" + body + b"\r\n--q--\r\n"
+        b"--q\r\nContent-Type: "
+        + child_type
+        + b"\r\n\r\n"
+        + body
+        + b"\r\n--q--\r\n"
     )
 
 
@@ -658,7 +717,9 @@ def test_sub_parts_of_the_epilogue_part_are_reported_on_it(as_bytes):
     assert recovered["recovered"] is True
     assert recovered["content_type"] == "message/rfc822"
     assert recovered["defects"] == ["MimeHeaderDefect"]
-    assert all("MimeHeaderDefect" not in node["defects"] for node in structural)
+    assert all(
+        "MimeHeaderDefect" not in node["defects"] for node in structural
+    )
     assert _mime_details(mail) == [
         "MimeHeaderDefect: part 2, sub-part 1: invalid-boundary-parameter: "
         "raw=('undefined', '', 'abc')",
@@ -677,7 +738,8 @@ def test_sub_parts_of_the_epilogue_part_are_reported_on_it(as_bytes):
         pytest.param(
             b"filename=\xc3\xa9\xff",
             [
-                "MimeHeaderDefect: part 2, sub-part 1: content-disposition[0]: "
+                "MimeHeaderDefect: part 2, sub-part 1: "
+                "content-disposition[0]: "
                 "invalid UTF-8; raw='inline; filename=\\\\xc3\\\\xa9\\\\xff'"
             ],
             id="plain",
@@ -685,10 +747,12 @@ def test_sub_parts_of_the_epilogue_part_are_reported_on_it(as_bytes):
         pytest.param(
             b"filename*=x; filename*1=\xc3\xa9\xff",
             [
-                "MimeHeaderDefect: part 2, sub-part 1: content-disposition[0]: "
+                "MimeHeaderDefect: part 2, sub-part 1: "
+                "content-disposition[0]: "
                 "invalid UTF-8; "
                 "raw='inline; filename*=x; filename*1=\\\\xc3\\\\xa9\\\\xff'",
-                "MimeHeaderDefect: part 2, sub-part 1: content-disposition[0]: "
+                "MimeHeaderDefect: part 2, sub-part 1: "
+                "content-disposition[0]: "
                 "invalid-parameter-continuation; "
                 "raw='inline; filename*=x; filename*1=é\ufffd'",
             ],
@@ -703,7 +767,9 @@ def test_sub_part_header_the_email_package_cannot_print(filename, details):
     """
     raw = (
         _EPILOGUE.encode() + b"Content-Type: multipart/mixed; boundary=C\n\n"
-        b"--C\nContent-Disposition: inline; " + filename + b"\n\n--C--\n--A--\n"
+        b"--C\nContent-Disposition: inline; "
+        + filename
+        + b"\n\n--C--\n--A--\n"
     )
     mail = mailparser.parse_from_string(raw.decode("utf-8", "surrogateescape"))
 
@@ -732,7 +798,10 @@ def test_every_part_of_a_parsed_message_recovers_parameters(factory, tmp_path):
 @pytest.mark.parametrize(
     "value, params",
     [
-        ("t/p; name*=x; name*1=y", [("t/p", ""), ("name", (None, None, "xy"))]),
+        (
+            "t/p; name*=x; name*1=y",
+            [("t/p", ""), ("name", (None, None, "xy"))],
+        ),
         # An explicit section 0 wins over the section without a number.
         ("t/p; a*0=p; a*=q; a*1=r", [("t/p", ""), ("a", "pr")]),
         # Equal numbers keep the order of the header.
@@ -740,7 +809,10 @@ def test_every_part_of_a_parsed_message_recovers_parameters(factory, tmp_path):
             "t/p; n*=invoice; n*=.exe; n*1=.pdf",
             [("t/p", ""), ("n", (None, None, "invoice.exe.pdf"))],
         ),
-        ("t/p; n*2=c; n*=b; n*2=a; n*=a", [("t/p", ""), ("n", (None, None, "baca"))]),
+        (
+            "t/p; n*2=c; n*=b; n*2=a; n*=a",
+            [("t/p", ""), ("n", (None, None, "baca"))],
+        ),
         (
             't/p; a*1*=%41; a*=x; b*0="q"; b*1=r',
             [("t/p", ""), ("a", (None, None, "xA")), ("b", "qr")],
@@ -798,7 +870,9 @@ def test_other_parameters_read_as_the_email_package_reads_them(value):
     plain["Content-Type"] = recovering["Content-Type"] = value
 
     assert recovering.get_params() == plain.get_params()
-    assert recovering.get_params(unquote=False) == plain.get_params(unquote=False)
+    assert recovering.get_params(unquote=False) == plain.get_params(
+        unquote=False
+    )
     assert recovering.get_boundary() == plain.get_boundary()
     assert recovering.get_filename() == plain.get_filename()
     assert recovering.get_content_charset() == plain.get_content_charset()
@@ -956,7 +1030,8 @@ def test_section_number_too_long_to_convert(factory, tmp_path):
 def test_section_number_too_long_next_to_a_boundary(factory, tmp_path):
     """The email package reads the boundary through the same list."""
     raw = (
-        f"Content-Type: multipart/mixed; boundary=abc; x*{_LONG_NUMBER}*=y\r\n\r\n"
+        f"Content-Type: multipart/mixed; boundary=abc; x*{_LONG_NUMBER}*=y\r\n"
+        f"\r\n"
     ).encode() + _CHILDREN
     mail = _parse(raw, factory, tmp_path)
     root, text, attachment = mail.mime_tree
@@ -1011,7 +1086,9 @@ def test_helpers_read_a_plain_message_without_raising():
     defects = []
 
     assert mime_boundary(message, defects=defects) == "abc"
-    assert defects == ["invalid-boundary-parameter: raw=('undefined', '', 'abc')"]
+    assert defects == [
+        "invalid-boundary-parameter: raw=('undefined', '', 'abc')"
+    ]
     assert mime_filename(message) == "xy"
     assert mime_charset(message, "utf-8") == "utf-8"
     assert type(message) is Message
@@ -1022,8 +1099,8 @@ def test_helpers_read_a_plain_message_without_raising():
     [
         pytest.param(
             b"Content-Type: multipart/mixed; boundary=abc\r\n"
-            b"Content-Disposition: attachment; filename*=x; filename*1=y\r\n\r\n"
-            + _CHILDREN,
+            b"Content-Disposition: attachment; filename*=x; filename*1=y\r\n"
+            b"\r\n" + _CHILDREN,
             "xy",
             ["MimeHeaderDefect"],
             id="container",
@@ -1052,14 +1129,17 @@ def test_helpers_read_a_plain_message_without_raising():
         ),
         pytest.param(
             b"Content-Transfer-Encoding: base64\r\nContent-Type: text/html;"
-            b" name*1*=x-unknown'en'q; charset*0*=idna'en'%FF\r\n\r\n\xff\xfe\r\n",
+            b" name*1*=x-unknown'en'q; charset*0*=idna'en'%FF\r\n\r\n"
+            b"\xff\xfe\r\n",
             "q",
             [],
             id="payload",
         ),
     ],
 )
-def test_message_built_by_the_caller_is_parsed_as_given(raw, filename, defects):
+def test_message_built_by_the_caller_is_parsed_as_given(
+    raw, filename, defects
+):
     """A plain ``Message`` is read through the helpers, not replaced."""
     message = email.message_from_bytes(raw)
     mail = mailparser.MailParser(message)

@@ -129,7 +129,9 @@ class TestImprovedReceivedPatterns(unittest.TestCase):
         """
         Test minimal header with only date (qmail invoked headers).
         """
-        header = "(qmail 11769 invoked from network); 22 Aug 2016 14:23:01 -0000"
+        header = (
+            "(qmail 11769 invoked from network); 22 Aug 2016 14:23:01 -0000"
+        )
 
         parsed = parse_received(header)
 

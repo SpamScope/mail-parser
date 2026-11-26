@@ -12,10 +12,11 @@ it excels at security analysis, forensics, and RFC-compliant email processing.
 
 ```python
 import mailparser
-mail = mailparser.parse_from_file(filepath)       # Standard email files
-mail = mailparser.parse_from_string(raw_email)    # Email as string
-mail = mailparser.parse_from_bytes(email_bytes)   # Email as bytes
-mail = mailparser.parse_from_file_msg(msg_file)   # Outlook .msg files
+
+mail = mailparser.parse_from_file(filepath)  # Standard email files
+mail = mailparser.parse_from_string(raw_email)  # Email as string
+mail = mailparser.parse_from_bytes(email_bytes)  # Email as bytes
+mail = mailparser.parse_from_file_msg(msg_file)  # Outlook .msg files
 ```
 
 ### Triple-Format Property Access
@@ -23,9 +24,9 @@ mail = mailparser.parse_from_file_msg(msg_file)   # Outlook .msg files
 Every parsed component offers **three access patterns** (`src/mailparser/core.py:550-570`):
 
 ```python
-mail.subject          # Python object (decoded string)
-mail.subject_raw      # Raw header value (JSON list)
-mail.subject_json     # JSON-serialized version
+mail.subject  # Python object (decoded string)
+mail.subject_raw  # Raw header value (JSON list)
+mail.subject_json  # JSON-serialized version
 ```
 
 This pattern applies to all properties via `__getattr__` magic in `core.py`.
@@ -35,8 +36,8 @@ This pattern applies to all properties via `__getattr__` magic in `core.py`.
 Headers with hyphens use **underscore substitution** (`core.py:__getattr__`):
 
 ```python
-mail.X_MSMail_Priority      # Accesses "X-MSMail-Priority" header
-mail.Content_Type           # Accesses "Content-Type" header
+mail.X_MSMail_Priority  # Accesses "X-MSMail-Priority" header
+mail.Content_Type  # Accesses "Content-Type" header
 ```
 
 ## Development Workflows
@@ -94,9 +95,9 @@ Version is **dynamically loaded** from `src/mailparser/version.py` (see
 The parser identifies RFC violations that could indicate malicious intent (`core.py:240-268`):
 
 ```python
-mail.has_defects          # Boolean flag
-mail.defects              # List of defect dicts by content type
-mail.defects_categories   # Set of defect class names (e.g., "StartBoundaryNotFoundDefect")
+mail.has_defects  # Boolean flag
+mail.defects  # List of defect dicts by content type
+mail.defects_categories  # Set of defect class names (e.g., "StartBoundaryNotFoundDefect")
 ```
 
 **Epilogue defect handling** (`core.py:320-335`): When `EPILOGUE_DEFECTS` are detected, parser extracts hidden

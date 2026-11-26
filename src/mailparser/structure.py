@@ -66,7 +66,9 @@ _BLANK = "   "
 # (which include ANSI escapes), formatting characters (bidirectional
 # overrides, zero-width joiners), line separators, odd spaces, and code
 # points with no assigned or no agreed meaning.
-_HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp", "Zs"})
+_HIDDEN_CATEGORIES = frozenset(
+    {"Cc", "Cf", "Cs", "Co", "Cn", "Zl", "Zp", "Zs"}
+)
 
 # Characters of other categories that draw nothing or a blank: the rest of
 # Unicode's Default_Ignorable_Code_Point (fillers, variation selectors)
@@ -187,7 +189,9 @@ def _literal_address_headers(mail):
     Returns:
         dict: lowercase header name to its literal values, in wire order
     """
-    wanted = ADDRESSES_HEADERS.intersection(name for name, _ in _MESSAGE_HEADERS)
+    wanted = ADDRESSES_HEADERS.intersection(
+        name for name, _ in _MESSAGE_HEADERS
+    )
     found = {}
     for name, raw in mail.message.raw_items() if mail.message else ():
         header = name.lower()
@@ -259,7 +263,9 @@ def _delivery_lines(mail, show, style):
     }
     number_width = len(str(len(hops)))
     from_width = max((len(sender) for sender, _ in names.values()), default=0)
-    by_width = max((len(receiver) for _, receiver in names.values()), default=0)
+    by_width = max(
+        (len(receiver) for _, receiver in names.values()), default=0
+    )
 
     lines = []
     for hop in hops:
@@ -292,7 +298,9 @@ def _delivery_lines(mail, show, style):
 def _node_summary(node, show):
     """Return the attributes shown beside a part's index and type."""
     pieces = [
-        show(node[key]) for key in ("content_transfer_encoding", "charset") if node[key]
+        show(node[key])
+        for key in ("content_transfer_encoding", "charset")
+        if node[key]
     ]
     if node["size"] is not None:
         pieces.append(_size(node["size"]))
@@ -369,10 +377,15 @@ def _tree_lines(tree, show, style):
         del open_levels[depth:]
         open_levels.append(not is_last)
         indent = "".join(
-            style.pipe if is_open else _BLANK for is_open in open_levels[1:depth]
+            style.pipe if is_open else _BLANK
+            for is_open in open_levels[1:depth]
         )
-        connector = "" if depth == 0 else (style.last if is_last else style.branch)
-        left = f"{indent}{connector}{node['index']} {show(node['content_type'])}"
+        connector = (
+            "" if depth == 0 else (style.last if is_last else style.branch)
+        )
+        left = (
+            f"{indent}{connector}{node['index']} {show(node['content_type'])}"
+        )
         rows.append((left, _node_summary(node, show)))
 
         below = indent
@@ -380,7 +393,8 @@ def _tree_lines(tree, show, style):
             below += _BLANK if is_last else style.pipe
         below += style.pipe if node["index"] in last_child else _BLANK
         rows.extend(
-            (f"{below}{detail}", "") for detail in _node_details(node, show, style)
+            (f"{below}{detail}", "")
+            for detail in _node_details(node, show, style)
         )
     flush_skipped()
 

@@ -264,7 +264,9 @@ def split_received(value, *, defects=None, groups=None):
         elif not angle:
             if char == ";":
                 separators.append(index)
-            elif not separators and (index == 0 or value[index - 1] in _FWS + ")"):
+            elif not separators and (
+                index == 0 or value[index - 1] in _FWS + ")"
+            ):
                 match = _KEYWORD.match(value, index)
                 if match:
                     keyword = match.group(1).lower()
@@ -272,9 +274,9 @@ def split_received(value, *, defects=None, groups=None):
                     while end < len(value) and value[end] in _FWS:
                         end += 1
                     # Retain the established MTA TLS annotation exception.
-                    if keyword != "with" or not value[end : end + 6].lower().startswith(
-                        "cipher"
-                    ):
+                    if keyword != "with" or not value[
+                        end : end + 6
+                    ].lower().startswith("cipher"):
                         boundaries.append((index, match.end(), keyword))
                 elif char.isdigit() and sendgrid is None:
                     sendgrid = _SENDGRID_DATE_RE.match(value, index)
@@ -304,7 +306,9 @@ def split_received(value, *, defects=None, groups=None):
             middle = value[end + 1 : separators[1]].strip(_FWS)
             parts = middle.split(None, 1)
             if len(separators) != 2 or len(parts) != 2:
-                raise MailParserReceivedParsingError("ambiguous-date-separators")
+                raise MailParserReceivedParsingError(
+                    "ambiguous-date-separators"
+                )
             if (
                 not boundaries
                 or boundaries[-1][2] != "id"
@@ -312,7 +316,9 @@ def split_received(value, *, defects=None, groups=None):
                 or not parts[1].startswith("<")
                 or not parts[1].endswith(">")
             ):
-                raise MailParserReceivedParsingError("ambiguous-date-separators")
+                raise MailParserReceivedParsingError(
+                    "ambiguous-date-separators"
+                )
             extra_clause = ("for", _clause_value(parts[1]))
             date = value[separators[1] + 1 :].strip(_FWS)
             if defects is not None:
@@ -329,7 +335,11 @@ def split_received(value, *, defects=None, groups=None):
 
     clauses = []
     for position, (_, start, keyword) in enumerate(boundaries):
-        stop = boundaries[position + 1][0] if position + 1 < len(boundaries) else end
+        stop = (
+            boundaries[position + 1][0]
+            if position + 1 < len(boundaries)
+            else end
+        )
         clauses.append((keyword, _clause_value(value[start:stop])))
     if extra_clause is not None:
         clauses.append(extra_clause)

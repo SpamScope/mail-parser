@@ -22,7 +22,9 @@ def _parse(raw, factory, tmp_path):
         path.write_bytes(raw)
         return mailparser.parse_from_file(path)
     if factory == "string":
-        return mailparser.parse_from_string(raw.decode("utf-8", "surrogateescape"))
+        return mailparser.parse_from_string(
+            raw.decode("utf-8", "surrogateescape")
+        )
     return mailparser.parse_from_bytes(raw)
 
 
@@ -79,7 +81,8 @@ def test_rfc2231_continuation_still_decodes(factory, tmp_path):
         _HEADERS + b"Content-Type: application/octet-stream\r\n"
         b"Content-Disposition: attachment;\r\n"
         b" filename*0*=utf-8''caf%C3%A9; filename*1=.bin\r\n"
-        b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(_PAYLOAD)
+        b"Content-Transfer-Encoding: base64\r\n\r\n"
+        + base64.b64encode(_PAYLOAD)
     )
     mail = _parse(raw, factory, tmp_path)
     assert mail.attachments[0]["filename"] == "café.bin"
@@ -94,7 +97,8 @@ def test_invalid_mime_octets_remain_evidence(factory, tmp_path):
         _HEADERS + b"Content-Type: application/octet-stream\r\n"
         b'Content-Disposition: attachment; filename="a\xffb.bin"\r\n'
         b"Content-ID: <a\xffb@example.com>\r\n"
-        b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(_PAYLOAD)
+        b"Content-Transfer-Encoding: base64\r\n\r\n"
+        + base64.b64encode(_PAYLOAD)
     )
     mail = _parse(raw, factory, tmp_path)
     assert mail.attachments[0]["filename"] == "a\ufffdb.bin"
@@ -118,7 +122,8 @@ def test_repeated_mime_header_keeps_occurrence_evidence(tmp_path):
         _HEADERS + b"Content-Type: application/octet-stream\r\n"
         b'Content-Disposition: attachment; filename="valid.bin"\r\n'
         b'Content-Disposition: attachment; filename="bad\xff.bin"\r\n'
-        b"Content-Transfer-Encoding: base64\r\n\r\n" + base64.b64encode(_PAYLOAD)
+        b"Content-Transfer-Encoding: base64\r\n\r\n"
+        + base64.b64encode(_PAYLOAD)
     )
     mail = _parse(raw, "bytes", tmp_path)
     assert mail.attachments[0]["filename"] == "valid.bin"
@@ -135,11 +140,15 @@ def test_metadata_defects_retain_mime_part_context(tmp_path):
         b"--part\r\nContent-Type: application/octet-stream\r\n"
         b'Content-Disposition: attachment; filename="good.bin"\r\n\r\ngood\r\n'
         b"--part\r\nContent-Type: application/octet-stream\r\n"
-        b'Content-Disposition: attachment; filename="bad\xff.bin"\r\n\r\nbad\r\n'
+        b'Content-Disposition: attachment; filename="bad\xff.bin"\r\n\r\n'
+        b"bad\r\n"
         b"--part--\r\n"
     )
     mail = _parse(raw, "bytes", tmp_path)
-    assert [a["filename"] for a in mail.attachments] == ["good.bin", "bad�.bin"]
+    assert [a["filename"] for a in mail.attachments] == [
+        "good.bin",
+        "bad�.bin",
+    ]
     assert [base64.b64decode(a["payload"]) for a in mail.attachments] == [
         b"good",
         b"bad",

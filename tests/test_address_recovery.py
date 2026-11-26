@@ -32,7 +32,9 @@ def test_issue175_public_outputs(header, padding):
     mail.headers
     mail.mail_partial
     assert json.dumps(mail.address_header_defects) == before
-    assert json.loads(getattr(mail, header.replace("-", "_") + "_raw")) == [value]
+    assert json.loads(getattr(mail, header.replace("-", "_") + "_raw")) == [
+        value
+    ]
 
 
 @pytest.mark.parametrize(
@@ -50,7 +52,10 @@ def test_issue175_public_outputs(header, padding):
             "bad@name (cmt <decoy@example.com>) <real@example.com>",
             [("bad@name", "real@example.com")],
         ),
-        ("bad@name (a,b) < real@example.com >", [("bad@name", "real@example.com")]),
+        (
+            "bad@name (a,b) < real@example.com >",
+            [("bad@name", "real@example.com")],
+        ),
         (
             '"Support <decoy@example.com>" <real@example.com>, '
             "bad@name < next@example.com >",
@@ -71,10 +76,17 @@ def test_issue175_public_outputs(header, padding):
             "bad@name < (note) real@example.com (tail) >",
             [("bad@name", "real@example.com")],
         ),
-        ("bad@name <a@[IPv6:2001:db8::1]>", [("bad@name", "a@[IPv6:2001:db8::1]")]),
         (
-            'Group: "First, Person" <one@example.com>, bad@name < two@example.com >;',
-            [("First, Person", "one@example.com"), ("bad@name", "two@example.com")],
+            "bad@name <a@[IPv6:2001:db8::1]>",
+            [("bad@name", "a@[IPv6:2001:db8::1]")],
+        ),
+        (
+            'Group: "First, Person" <one@example.com>, bad@name < '
+            "two@example.com >;",
+            [
+                ("First, Person", "one@example.com"),
+                ("bad@name", "two@example.com"),
+            ],
         ),
         (
             "Route <@old.example,@relay.example:user@example.com>",
@@ -102,7 +114,9 @@ def test_ambiguous_items_are_reported_without_promoting_labels(value):
     mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert all(addr != "bad@name" for _, addr in mail.from_)
     assert mail.address_header_defects
-    assert any(not defect["recovered"] for defect in mail.address_header_defects)
+    assert any(
+        not defect["recovered"] for defect in mail.address_header_defects
+    )
     assert mail.has_defects
     assert json.loads(getattr(mail, "from_raw")) == [value]
 
@@ -111,7 +125,9 @@ def test_multiple_candidates_are_visible_but_not_selected():
     value = "bad@name <one@example.com> <two@example.com>"
     mail = mailparser.parse_from_string(f"From: {value}\r\n\r\n")
     assert mail.from_ == []
-    assert [c["address"] for c in mail.address_header_defects[0]["candidates"]] == [
+    assert [
+        c["address"] for c in mail.address_header_defects[0]["candidates"]
+    ] == [
         "one@example.com",
         "two@example.com",
     ]
@@ -119,7 +135,8 @@ def test_multiple_candidates_are_visible_but_not_selected():
 
 def test_diagnostics_cannot_be_shadowed_by_a_wire_header():
     mail = mailparser.parse_from_string(
-        "Address_header_defects: forged\r\nFrom: bad@name < real@example.com >\r\n\r\n"
+        "Address_header_defects: forged\r\nFrom: bad@name < real@example.com "
+        ">\r\n\r\n"
     )
     assert isinstance(mail.mail["address_header_defects"], list)
     assert mail.headers["Address_header_defects"] == "forged"
@@ -185,7 +202,9 @@ def test_issue175_matrix(display, address, tail):
             if '"sender desk"' in address
             else "sender@vendor.example"
         )
-        assert actual == [expected] + (["other@elsewhere.example"] if tail else [])
+        assert actual == [expected] + (
+            ["other@elsewhere.example"] if tail else []
+        )
     else:
         # Malformed/ambiguous shapes have no historical-output oracle.
         # They must retain evidence and never promote an address in a label.
@@ -200,7 +219,11 @@ def test_issue175_matrix(display, address, tail):
     [
         "bad@name <real@example.com>" + " " * 40000,
         "<" * 40000,
-        "bad@name " + "(" * 4000 + "comment" + ")" * 4000 + " <real@example.com>",
+        "bad@name "
+        + "(" * 4000
+        + "comment"
+        + ")" * 4000
+        + " <real@example.com>",
         "x" * 40000,
     ],
     ids=["space-padding", "open-angles", "nested-comments", "long-atom"],
@@ -219,7 +242,9 @@ def test_hostile_address_input_finishes(value):
     ],
 )
 def test_cfws_is_not_part_of_mailbox_identity(value):
-    expected = "local.part@example.com" if ". part" in value else "local@example.com"
+    expected = (
+        "local.part@example.com" if ". part" in value else "local@example.com"
+    )
     result = get_addresses(value)
     assert len(result) == 1
     assert result[0][1] == expected
@@ -236,7 +261,8 @@ def test_malformed_group_boundary_does_not_drop_an_existing_mailbox():
 
 def test_repeated_headers_are_all_inspected_without_changing_first_value():
     mail = mailparser.parse_from_string(
-        "From: first@example.com\r\nFrom: bad@name < real@example.com >\r\n\r\n"
+        "From: first@example.com\r\nFrom: bad@name < real@example.com >\r\n"
+        "\r\n"
     )
     assert mail.from_ == [("", "first@example.com")]
     assert mail.address_header_defects[0]["occurrence"] == 1

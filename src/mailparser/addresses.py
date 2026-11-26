@@ -176,7 +176,8 @@ def _mailbox(value: str) -> str | None:
         else:
             return None
         if not domains or any(
-            not domain.startswith("@") or not _ADDR_SPEC.fullmatch("route" + domain)
+            not domain.startswith("@")
+            or not _ADDR_SPEC.fullmatch("route" + domain)
             for domain in domains
         ):
             return None
@@ -315,11 +316,15 @@ def _display_source(value: str, phrase: bool, problems: set[str]) -> str:
                 # once, rather than repeatedly copying an expanding name.
                 while end < len(value):
                     next_start = end
-                    while next_start < len(value) and value[next_start] in " \t":
+                    while (
+                        next_start < len(value) and value[next_start] in " \t"
+                    ):
                         next_start += 1
                     if next_start == end:
                         break
-                    word = _decoded_word(value, next_start, bool(comment), problems)
+                    word = _decoded_word(
+                        value, next_start, bool(comment), problems
+                    )
                     if not word:
                         break
                     pieces.append(word[0])
@@ -359,7 +364,9 @@ def parse_address_header(raw: str, strict_parser, *, decode_names=False):
         # copy quadratically much text on a long ambiguous item.
         prefix = item.text[: item.angles[0][0]] if item.angles else ""
         name = _name(
-            _display_source(prefix, True, display_problems) if decode_names else prefix
+            _display_source(prefix, True, display_problems)
+            if decode_names
+            else prefix
         )
         for index, (left, right) in enumerate(item.angles):
             address = _mailbox(item.text[left + 1 : right])
@@ -371,7 +378,9 @@ def parse_address_header(raw: str, strict_parser, *, decode_names=False):
             reason = ",".join(sorted(set(item.problems)))
         elif item.angles:
             left, right = item.angles[0]
-            if len(item.angles) != 1 or item.text[right + 1 :].strip(" \t\r\n"):
+            if len(item.angles) != 1 or item.text[right + 1 :].strip(
+                " \t\r\n"
+            ):
                 reason = "ambiguous-angle-address"
             elif not candidates:
                 reason = "invalid-angle-address"
@@ -397,16 +406,22 @@ def parse_address_header(raw: str, strict_parser, *, decode_names=False):
             # reaching the stdlib's recursive comment parser.
             source = item.raw if item.comment_depth < 16 else item.text
             if decode_names:
-                source = _display_source(source, bool(item.angles), display_problems)
+                source = _display_source(
+                    source, bool(item.angles), display_problems
+                )
             parsed = strict_parser([source])
-            if [addr for _, addr in parsed if addr] == [a for _, a in selected]:
+            if [addr for _, addr in parsed if addr] == [
+                a for _, a in selected
+            ]:
                 selected = [(name, addr) for name, addr in parsed if addr]
             else:
                 # Parsing can reject legal CFWS too. This records recovery,
                 # not a claim that every rejection proves RFC noncompliance.
                 reason = reason or "structural-recovery"
         if display_problems:
-            reason = ",".join(filter(None, [reason, *sorted(display_problems)]))
+            reason = ",".join(
+                filter(None, [reason, *sorted(display_problems)])
+            )
         results.extend(selected)
         if reason:
             diagnostics.append(

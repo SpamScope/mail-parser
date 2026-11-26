@@ -67,17 +67,21 @@ mail = mailparser.parse_from_string(
 )
 assert mail.from_ == [("billing@trusted.example", "billing@vendor.example")]
 assert mail.has_defects is True
-assert mail.address_header_defects == [{
-    "reason": "invalid-display-name",
-    "raw": "billing@trusted.example < billing@vendor.example >",
-    "recovered": True,
-    "candidates": [{
-        "display_name": "billing@trusted.example",
-        "address": "billing@vendor.example",
-    }],
-    "header": "from",
-    "occurrence": 0,
-}]
+assert mail.address_header_defects == [
+    {
+        "reason": "invalid-display-name",
+        "raw": "billing@trusted.example < billing@vendor.example >",
+        "recovered": True,
+        "candidates": [
+            {
+                "display_name": "billing@trusted.example",
+                "address": "billing@vendor.example",
+            }
+        ],
+        "header": "from",
+        "occurrence": 0,
+    }
+]
 ```
 
 ## Python Style

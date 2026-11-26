@@ -33,7 +33,10 @@ import mailparser
 )
 def test_subject_unfolding(route, value, expected, tmp_path):
     """Unfold wire CRLF/LF before decoding, preserving other evidence."""
-    raw = f"Subject: {value}\r\nComments: a\r\n b\r\nTo: good@example.com\r\n\r\nbody"
+    raw = (
+        f"Subject: {value}\r\nComments: a\r\n b\r\nTo: good@example.com\r\n"
+        f"\r\nbody"
+    )
     if route == "string":
         parsed = mailparser.parse_from_string(raw)
     elif route == "bytes":
@@ -63,7 +66,9 @@ def test_subject_unfolding(route, value, expected, tmp_path):
 def test_repeated_subjects_keep_occurrences_and_decode_failure(newline):
     """Literal decode failures retain the whole evidence and diagnostics."""
     bad = f"=?no-such-codec?q?test?={newline} evidence"
-    parsed = mailparser.parse_from_string(f"sUbJeCt: a\r\n b\r\nSubject: {bad}\r\n\r\n")
+    parsed = mailparser.parse_from_string(
+        f"sUbJeCt: a\r\n b\r\nSubject: {bad}\r\n\r\n"
+    )
     assert parsed.subject == ["a b", bad]
     assert isinstance(parsed.subject_raw, str)
     assert json.loads(parsed.subject_raw) == ["a\r\n b", bad]

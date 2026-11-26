@@ -313,7 +313,12 @@ def decode_header_part(header, *, defects=None):
             )
         # Return the whole literal value, never a decoded prefix plus the
         # original. Escape surrogates so JSON/CLI sinks remain usable.
-        return str(header).encode("utf-8", "backslashreplace").decode("utf-8").strip()
+        return (
+            str(header)
+            .encode("utf-8", "backslashreplace")
+            .decode("utf-8")
+            .strip()
+        )
     return output.strip()
 
 
@@ -621,7 +626,9 @@ def mime_header_view(part: Message) -> tuple[Message, list[str]]:
             else:
                 evidence = None
         if evidence is not None:
-            defects.append(f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}")
+            defects.append(
+                f"{header}[{occurrence}]: invalid UTF-8; raw={evidence!r}"
+            )
         view[name] = value
         if occurrence or header not in _PARAMETER_HEADERS:
             continue
@@ -1095,7 +1102,9 @@ def receiveds_parsing(receiveds, *, defects=None, date_defects=None):
         log.debug(f"Parsing received {idx + 1}/{n}")
         log.debug(f"Try to parse {received!r}")
         diagnostics = []
-        raw_evidence = received.encode("utf-8", "backslashreplace").decode("utf-8")
+        raw_evidence = received.encode("utf-8", "backslashreplace").decode(
+            "utf-8"
+        )
         try:
             # BytesParser stores raw octets using surrogateescape. Decode
             # valid UTF-8 for display, retaining malformed octets losslessly.
@@ -1117,20 +1126,29 @@ def receiveds_parsing(receiveds, *, defects=None, date_defects=None):
         else:
             parsed.append(
                 {
-                    key: item.encode("utf-8", "backslashreplace").decode("utf-8")
+                    key: item.encode("utf-8", "backslashreplace").decode(
+                        "utf-8"
+                    )
                     for key, item in values_by_clause.items()
                 }
             )
         if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
             diagnostics.append(
-                {"reason": "invalid-utf8", "recovered": "raw" not in parsed[-1]}
+                {
+                    "reason": "invalid-utf8",
+                    "recovered": "raw" not in parsed[-1],
+                }
             )
         if defects is not None:
             for defect in diagnostics:
-                defect.update(raw=raw_evidence, header="received", occurrence=idx)
+                defect.update(
+                    raw=raw_evidence, header="received", occurrence=idx
+                )
                 defects.append(defect)
 
-    log.debug("len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed)))
+    log.debug(
+        "len(receiveds) %s, len(parsed) %s" % (len(receiveds), len(parsed))
+    )
 
     if len(receiveds) != len(parsed):  # pragma: no cover
         # something really bad happened,
@@ -1553,7 +1571,9 @@ def print_attachments(attachments, flag_hash):  # pragma: no cover
             else:
                 payload = i["payload"]
 
-            i["md5"], i["sha1"], i["sha256"], i["sha512"] = fingerprints(payload)
+            i["md5"], i["sha1"], i["sha256"], i["sha512"] = fingerprints(
+                payload
+            )
 
     for i in attachments:
         safe_print(json.dumps(i, ensure_ascii=False, indent=4))
@@ -1581,7 +1601,9 @@ def write_attachments(attachments, base_path):  # pragma: no cover
         try:
             filename = _safe_attachment_filename(a["filename"])
         except ValueError:
-            log.warning(f"Skipped attachment with invalid filename: {a['filename']!r}")
+            log.warning(
+                f"Skipped attachment with invalid filename: {a['filename']!r}"
+            )
             continue
 
         filename = _deduplicate_filename(filename, used_filenames)
@@ -1602,7 +1624,8 @@ def _safe_attachment_filename(filename):
     if not isinstance(filename, str) or "\x00" in filename:
         raise ValueError("Invalid attachment filename")
 
-    # Treat both POSIX and Windows separators as directory separators on every OS.
+    # Treat both POSIX and Windows separators as directory separators on every
+    # OS.
     filename = os.path.basename(filename.replace("\\", "/"))
     if filename in ("", ".", ".."):
         raise ValueError("Invalid attachment filename")
@@ -1625,7 +1648,9 @@ def _split_attachment_extension(filename):
     """Split a filename while preserving common compressed-tar extensions."""
     lower_filename = filename.lower()
     for extension in _COMPOUND_ATTACHMENT_EXTENSIONS:
-        if lower_filename.endswith(extension) and len(filename) > len(extension):
+        if lower_filename.endswith(extension) and len(filename) > len(
+            extension
+        ):
             return filename[: -len(extension)], filename[-len(extension) :]
     return os.path.splitext(filename)
 
@@ -1720,7 +1745,11 @@ def _deduplicate_filename(filename, used_filenames):
     # Reserve room for the marker instead of appending past the limit:
     # write_sample() sanitizes again, and the clamp there would cut the
     # marker back off, collapsing distinct attachments onto one file.
-    budget = _MAX_FILENAME_BYTES - len(extension.encode("utf-8")) - _MAX_MARKER_BYTES
+    budget = (
+        _MAX_FILENAME_BYTES
+        - len(extension.encode("utf-8"))
+        - _MAX_MARKER_BYTES
+    )
     stem = _clamp_to_budget(root, budget)
 
     # Key on the stem the candidates are built from, not on the name as
@@ -1771,12 +1800,16 @@ def write_sample(binary, payload, path, filename):  # pragma: no cover
     resolved_sample = os.path.realpath(sample)
 
     try:
-        contained = os.path.commonpath((base_path, resolved_sample)) == base_path
+        contained = (
+            os.path.commonpath((base_path, resolved_sample)) == base_path
+        )
     except ValueError:
         contained = False
 
     if not contained or os.path.islink(sample):
-        raise MailParserPathError("Attachment path escapes the output directory")
+        raise MailParserPathError(
+            "Attachment path escapes the output directory"
+        )
 
     with open(sample, "wb") as f:
         f.write(content)
