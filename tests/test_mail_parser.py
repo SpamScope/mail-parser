@@ -20,6 +20,7 @@ import base64
 import datetime
 import email
 import email.policy
+import glob
 import hashlib
 import json
 import logging
@@ -39,6 +40,7 @@ import mailparser
 from mailparser.const import REGXIP6
 from mailparser.exceptions import (
     MailParserOSError,
+    MailParserOutlookError,
     MailParserPathError,
     MailParserRecursionError,
 )
@@ -3247,3 +3249,84 @@ def test_raw_suffix_folds_underscores_to_dashes():
     assert raw("X_MSMail_Priority_raw") == ["High"]
     # absent headers give an empty list, never "null"
     assert raw("x_nonexistent_raw") == []
+
+
+@pytest.fixture
+def extract_msg_lib():
+    """Skip the test when the optional ``extract-msg`` is missing."""
+    return pytest.importorskip("extract_msg")
+
+
+def _outlook_temp_files():
+    pattern = os.path.join(tempfile.gettempdir(), "outlook_*")
+    return set(glob.glob(pattern))
+
+
+def test_from_file_msg_valid_still_parses(extract_msg_lib):
+    mail = mailparser.parse_from_file_msg(mail_outlook_1)
+    assert mail.subject
+
+
+def test_from_file_msg_garbage_raises_outlook_error(extract_msg_lib, tmp_path):
+    path = tmp_path / "garbage.msg"
+    path.write_bytes(b"not an OLE file\n" * 10)
+    before = _outlook_temp_files()
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(str(path))
+
+    assert isinstance(
+        exc.value.__cause__, extract_msg_lib.exceptions.InvalidFileFormatError
+    )
+    assert _outlook_temp_files() == before
+
+
+@pytest.mark.parametrize("divisor", [3, 2])
+def test_from_file_msg_truncated_raises_outlook_error(
+    extract_msg_lib, tmp_path, divisor
+):
+    with open(mail_outlook_1, "rb") as f:
+        data = f.read()
+    path = tmp_path / "truncated.msg"
+    path.write_bytes(data[: len(data) // divisor])
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(str(path))
+
+    assert isinstance(exc.value.__cause__, OSError)
+    assert not isinstance(exc.value.__cause__, FileNotFoundError)
+
+
+def test_from_file_msg_missing_file_stays_file_not_found(extract_msg_lib, tmp_path):
+    with pytest.raises(FileNotFoundError):
+        mailparser.parse_from_file_msg(str(tmp_path / "missing.msg"))
+
+
+def test_from_file_msg_non_email_stays_os_error(extract_msg_lib, mocker):
+    contact = mocker.Mock(spec=["close"])
+    mocker.patch.object(extract_msg_lib, "openMsg", return_value=contact)
+
+    with pytest.raises(MailParserOSError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert not isinstance(exc.value, MailParserOutlookError)
+    contact.close.assert_called_once_with()
+
+
+def test_from_file_msg_serialization_failure_leaves_no_temp_file(
+    extract_msg_lib, mocker
+):
+    eml = mocker.Mock()
+    eml.get.return_value = ""
+    eml.as_bytes.side_effect = ValueError("boom")
+    msg = mocker.Mock()
+    msg.asEmailMessage.return_value = eml
+    mocker.patch.object(extract_msg_lib, "openMsg", return_value=msg)
+    before = _outlook_temp_files()
+
+    with pytest.raises(MailParserOutlookError) as exc:
+        mailparser.parse_from_file_msg(mail_outlook_1)
+
+    assert isinstance(exc.value.__cause__, ValueError)
+    assert _outlook_temp_files() == before
+    msg.close.assert_called_once_with()

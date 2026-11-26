@@ -206,6 +206,14 @@ def parse_from_file_msg(fp):
 
     Returns:
         Instance of MailParser with raw email parsed
+
+    Raises:
+        MailParserOSError: if no conversion backend is available, or
+            the file is not a convertible email message
+        MailParserOutlookError: if the ``extract-msg`` backend finds the
+            file malformed; the library error is ``__cause__``
+        FileNotFoundError, IsADirectoryError, PermissionError: if ``fp``
+            cannot be opened
     """
     return MailParser.from_file_msg(fp)
 
@@ -373,7 +381,12 @@ class MailParser:
             Instance of MailParser
 
         Raises:
-            MailParserOSError: if no conversion backend is available
+            MailParserOSError: if no conversion backend is available, or
+                the file is not a convertible email message
+            MailParserOutlookError: if the ``extract-msg`` backend finds
+                the file malformed; the library error is ``__cause__``
+            FileNotFoundError, IsADirectoryError, PermissionError: if
+                ``fp`` cannot be opened
         """
         log.debug("Parsing email from file Outlook")
 

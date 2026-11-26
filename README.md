@@ -64,7 +64,9 @@ Two conversion backends are supported:
 Only when it is *not* available does mail-parser fall back to the `msgconvert`
 external tool, logging a deprecation warning. If neither backend is available,
 `parse_from_file_msg()` raises `MailParserOSError` telling you to install
-either path.
+either path. A malformed `.msg` (not OLE, truncated, corrupt) read with
+`extract-msg` raises `MailParserOutlookError`, with the library's exception as
+`__cause__`.
 
 > **⚠️ Deprecated:** the `msgconvert` external-tool backend is deprecated and
 > will be removed in a future release. Migrate to the pure-Python backend with

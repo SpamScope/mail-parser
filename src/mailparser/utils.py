@@ -52,7 +52,9 @@ from mailparser.const import (
 )
 from mailparser.dates import date_diagnostics, parse_mail_date
 from mailparser.exceptions import (
+    MailParserError,
     MailParserOSError,
+    MailParserOutlookError,
     MailParserPathError,
     MailParserReceivedParsingError,
 )
@@ -776,28 +778,52 @@ def extract_msg_convert(fp):
         ImportError: if the ``extract-msg`` library is not installed
         MailParserOSError: if the ``.msg`` is not a convertible email
             message (e.g. a contact or calendar item)
+        MailParserOutlookError: if the ``.msg`` is malformed or the
+            library fails on it; the library error is ``__cause__``
+        FileNotFoundError, IsADirectoryError, PermissionError: if
+            ``fp`` cannot be opened; this is the caller's mistake
     """
     import extract_msg  # lazy: keep package import stdlib-only
 
     log.debug("Started converting Outlook email with extract-msg")
-    msg = extract_msg.openMsg(fp)
     try:
-        # openMsg() may return a non-email MSGFile (contact, calendar,
-        # task...) which cannot be rendered as an email message.
-        as_email_message = getattr(msg, "asEmailMessage", None)
-        if as_email_message is None:
-            raise MailParserOSError(
-                f"Outlook file {fp!r} is not a convertible email "
-                f"message (type {type(msg).__name__})"
-            )
-        eml = as_email_message()
-        info = f"{eml.get('From', '')} | {eml.get('Subject', '')}".strip()
-        temp = _new_outlook_tempfile()
-        with open(temp, "wb") as f:
-            f.write(eml.as_bytes())
-        return temp, info
-    finally:
-        msg.close()
+        msg = extract_msg.openMsg(fp)
+        try:
+            # openMsg() may return a non-email MSGFile (contact, calendar,
+            # task...) which cannot be rendered as an email message.
+            as_email_message = getattr(msg, "asEmailMessage", None)
+            if as_email_message is None:
+                raise MailParserOSError(
+                    f"Outlook file {fp!r} is not a convertible email "
+                    f"message (type {type(msg).__name__})"
+                )
+            eml = as_email_message()
+            info = f"{eml.get('From', '')} | {eml.get('Subject', '')}".strip()
+            # Serialize before the temp file exists: a failure here must
+            # not leave an empty ``.eml`` behind.
+            data = eml.as_bytes()
+        finally:
+            msg.close()
+    except (
+        MailParserError,
+        FileNotFoundError,
+        IsADirectoryError,
+        PermissionError,
+    ):
+        # Not a malformed file: our own errors, or the caller's path.
+        raise
+    except Exception as e:
+        # The .msg is attacker-controlled and the libraries raise a wide,
+        # unstable set (extract_msg, olefile.OleFileError which is an
+        # OSError, ValueError, IndexError, ...), so no narrow tuple holds.
+        raise MailParserOutlookError(
+            f"Cannot convert Outlook file {fp!r}: {e!r}"
+        ) from e
+
+    temp = _new_outlook_tempfile()
+    with open(temp, "wb") as f:
+        f.write(data)
+    return temp, info
 
 
 def msgconvert(email):
